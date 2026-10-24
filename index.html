@@ -1028,8 +1028,8 @@ td.acts{width:1%;white-space:nowrap}
 /* ===== Avaliações ===== */
 .av-est{display:inline-flex;gap:1px;color:var(--line);font-size:16px;line-height:1;letter-spacing:0} .av-est i{font-style:normal} .av-est i.on{color:#D9A42B}
 .av-est.grande{font-size:24px;gap:3px}
-.av-topo{display:grid;grid-template-columns:minmax(180px,.7fr) minmax(260px,1.3fr) minmax(300px,1.4fr);gap:14px}
-@media (max-width:980px){.av-topo{grid-template-columns:1fr 1fr}.av-qr{grid-column:1/-1}}
+.av-topo{display:grid;grid-template-columns:minmax(0,.7fr) minmax(0,1.3fr) minmax(0,1.4fr);gap:14px}.av-topo>*{min-width:0}
+@media (max-width:1240px){.av-topo{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.av-qr{grid-column:1/-1}}
 @media (max-width:560px){.av-topo{grid-template-columns:1fr}}
 .av-media{display:flex;flex-direction:column;align-items:flex-start;gap:4px}
 .av-num{font-family:var(--f-display);font-size:52px;line-height:1}
@@ -1361,6 +1361,7 @@ html:root[data-modo="pb"]{--k-bg:#111111;--k-bd:#111111;--k-lab:#FFDC8F;--k-sub:
 .inst-bar .inst-t{flex:1;min-width:0;line-height:1.3}
 .inst-bar .btn.ghost{color:#DEDCD4}
 @media (min-width:900px){.inst-bar{bottom:20px;left:auto;right:20px;width:440px}}
+.lg-mask,input.lg-mask{-webkit-text-security:disc;text-security:disc;font-family:var(--f-body);letter-spacing:.08em}
 
 </style>
 
@@ -5699,6 +5700,22 @@ function ligarBotaoLogin() {
   const espera = !syncPronto();
   b.disabled = espera || LOGIN.ocupado; b.classList.toggle('carregando', espera || LOGIN.ocupado);
 }
+/* nada preenchido sozinho: o navegador não pode colocar e-mail e senha guardados (de outra pessoa
+   que usou o aparelho) ao abrir a tela. Os campos ficam bloqueados até a pessoa tocar neles, e o que
+   o navegador colocar antes disso é apagado. */
+function semAutoPreencher(root) {
+  if (!root) return;
+  root.querySelectorAll('input:not([type=checkbox]):not([type=radio]):not([type=file])').forEach(el => {
+    if (el.dataset.semAuto) return; el.dataset.semAuto = '1';
+    const ini = el.value, travado = el.readOnly;
+    if (travado) return;   // campo que já é só leitura (e-mail na criação da senha)
+    el.readOnly = true;
+    const libera = () => { el.dataset.mexeu = '1'; el.readOnly = false; };
+    el.addEventListener('pointerdown', libera); el.addEventListener('keydown', libera);
+    el.addEventListener('focus', () => { el.readOnly = false; });   // foco automático da tela não conta como a pessoa ter mexido
+    [60, 400, 1200, 2500].forEach(t => setTimeout(() => { if (!el.dataset.mexeu && el.value !== ini) el.value = ini; }, t));
+  });
+}
 function ligarLogin() {
   const root = document.querySelector('.lg'); if (!root) return;
   const q = s => root.querySelector(s);
@@ -5733,6 +5750,7 @@ function ligarLogin() {
       if (/senha/i.test(err.message) && q('#lg-s') && LOGIN.modo === 'entrar') { q('#lg-s').value = ''; q('#lg-s').focus(); }
     }
   };
+  semAutoPreencher(q('#lg-form'));
   ligarBotaoLogin();
   setTimeout(() => { const alvo = q('#lg-e')?.value ? (q('#lg-c') || q('#lg-s')) : q('#lg-e'); if (alvo && !matchMedia('(max-width:700px)').matches) alvo.focus({ preventScroll: true }); }, 60);
 }
@@ -9122,12 +9140,12 @@ function telaAtivar(msg) {
     <p>Entre com a <b>conta do estúdio</b>. É feito uma vez só em cada celular ou computador. Depois, cada pessoa da equipe entra com o próprio e-mail e senha.</p></div>
     ${msg ? msgProd(msg, 'info') : ''}
     <form class="lg-form" id="at-f" novalidate>
-      ${campoLg('at-e', 'E-mail da conta do estúdio', 'email', 'mail', 'autocomplete="username" inputmode="email" placeholder="conta@estudio.com"')}
-      ${campoLg('at-s', 'Senha da conta do estúdio', 'password', 'lock', 'autocomplete="current-password"')}
+      ${campoLg('at-e', 'E-mail da conta do estúdio', 'text', 'mail', 'autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="email" name="ce-' + Math.random().toString(36).slice(2) + '" placeholder="conta@estudio.com"')}
+      ${campoLg('at-s', 'Senha da conta do estúdio', 'text', 'lock', 'class="lg-mask" autocomplete="off" autocapitalize="off" spellcheck="false" name="cs-' + Math.random().toString(36).slice(2) + '"')}
       <button class="lg-btn" type="submit"><span>Ativar aparelho</span>${lgi('seta')}</button></form>
     <div class="lg-pe"><span class="lg-seg">${lgi('escudo')}Acesso protegido</span></div>`, linkCliente());
   const f = document.getElementById('at-f'), b = f.querySelector('.lg-btn');
-  f.querySelector('[data-olho]')?.addEventListener('click', e => { const i = document.getElementById('at-s'); i.type = i.type === 'password' ? 'text' : 'password'; e.preventDefault(); });
+  semAutoPreencher(f);   // a senha do estúdio nunca é guardada nem preenchida pelo navegador
   f.onsubmit = async e => {
     e.preventDefault(); if (b.disabled) return;
     const email = document.getElementById('at-e').value.trim(), senha = document.getElementById('at-s').value;
@@ -9396,9 +9414,10 @@ window.PROD_RECUPERAR_DONO = () => {
   const donas = (DB.users || []).filter(u => u.papel === 'proprietaria' && !u.excluido);
   const ov = openModal('Código da proprietária', `<p class="muted small" style="margin:0 0 10px">Confirme a <b>conta do estúdio</b> (a mesma usada para ativar os aparelhos). O sistema gera um código para você criar uma senha nova em <b>Primeiro acesso ou código</b>.</p>
     <div class="form">${donas.length > 1 ? `<label class="f full">Proprietária<select id="rd-u">${donas.map(u => `<option value="${u.id}">${esc(u.nome)} · ${esc(u.email)}</option>`).join('')}</select></label>` : ''}
-      <label class="f full">E-mail da conta do estúdio<input id="rd-e" type="email" autocomplete="username"></label>
-      <label class="f full">Senha da conta do estúdio<input id="rd-s" type="password" autocomplete="current-password"></label></div><div id="rd-x"></div>`,
+      <label class="f full">E-mail da conta do estúdio<input id="rd-e" type="text" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+      <label class="f full">Senha da conta do estúdio<input id="rd-s" type="text" class="lg-mask" autocomplete="off" autocapitalize="off" spellcheck="false"></label></div><div id="rd-x"></div>`,
     `<button class="btn" data-close>Cancelar</button><button class="btn pri" id="rd-ok">Gerar código</button>`);
+  semAutoPreencher(ov);
   ov.querySelector('#rd-ok').onclick = async () => {
     const x = ov.querySelector('#rd-x'), err = m => { x.innerHTML = `<div class="lg-msg bad" style="margin-top:10px">${esc(m)}</div>`; };
     const email = ov.querySelector('#rd-e').value.trim().toLowerCase(), senha = ov.querySelector('#rd-s').value;
