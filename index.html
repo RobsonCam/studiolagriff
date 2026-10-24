@@ -7,9 +7,9 @@
 <meta name="description" content="Sistema de gestão do Studio La Griff: agenda, atendimentos, clientes e financeiro.">
 <meta name="theme-color" content="#30241C">
 <meta name="robots" content="noindex">
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -1367,7 +1367,7 @@ html:root[data-modo="pb"]{--k-bg:#111111;--k-bd:#111111;--k-lab:#FFDC8F;--k-sub:
 </head>
 <body>
 <div id="app"><div class="prod-load"><p>Carregando…</p></div></div><div id="modal-root"></div><div id="toasts" class="toasts" aria-live="polite"></div>
-<script src="config.js"></script>
+<script src="/config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script>
 /* =========================================================================
@@ -5023,11 +5023,12 @@ const pedidosPendentes = () => (DB.pedidos || []).filter(p => p.status === 'pend
 const origemNome = id => ((DB.origens || []).find(o => o.id === id) || {}).nome || 'Link direto';
 /* endereço deste sistema no claude.ai: enquanto o formulário não estiver na Netlify, os links abrem
    o formulário aqui mesmo (modo de teste), com o nome do link no fim: …#agendar=instagram */
-const SISTEMA_URL_PADRAO = location.origin + location.pathname;
+const SISTEMA_URL_PADRAO = location.origin + '/';
 const sistemaUrl = () => (DB.config.sistemaUrl || SISTEMA_URL_PADRAO).replace(/[#?].*$/, '');
 /* o claude.ai não repassa o final do link (#… ou ?…) para a página, então no modo de teste todos os QR Codes
    levam ao mesmo endereço; quem abre sem estar logado vê primeiro o formulário e escolhe como conheceu o estúdio */
-const linkFormulario = codigo => { const b = (DB.config.formularioUrl || '').trim(); return b ? `${b}${b.includes('?') ? '&' : '?'}o=${encodeURIComponent(codigo)}` : sistemaUrl(); };
+/* no sistema definitivo o link fica curto: https://studiolagriff.netlify.app/balcao (os links antigos com ?o= continuam valendo) */
+const linkFormulario = codigo => { const b = (DB.config.formularioUrl || '').trim(); if (!b) return sistemaUrl(); if (DB.config.producao && !b.includes('?')) return `${b.replace(/\/+$/, '')}/${encodeURIComponent(codigo)}`; return `${b}${b.includes('?') ? '&' : '?'}o=${encodeURIComponent(codigo)}`; };
 const formularioNoSistema = () => !(DB.config.formularioUrl || '').trim();
 const formularioPrimeiro = () => formularioNoSistema() && DB.config.formularioPrimeiro !== false;
 /* o link que abriu a página pede o formulário? (#agendar=nome-do-link, #agendar?o=…, ?agendar=…) */
@@ -9081,6 +9082,10 @@ function iniciar(hot) {
 const PROD = { sb: null, modo: '', dono: false, email: '', processando: false, pubJ: '', cfJ: '', pubT: 0, entT: 0 };
 const PROD_CFG = window.LAGRIFF_CONFIG || {};
 const PROD_FILA_K = 'lagriff.envios';
+/* link curto da cliente: https://studiolagriff.netlify.app/<nome do link> */
+const PROD_RESERVADOS = new Set(['index', 'index.html', 'sw.js', 'config.js', 'icons', 'manifest.webmanifest']);
+const codigoNoCaminho = () => { const m = decodeURIComponent(location.pathname || '').match(/^\/([\w-]{2,40})\/?$/); return m && !PROD_RESERVADOS.has(m[1].toLowerCase()) ? m[1].toLowerCase() : null; };
+{ const _cod = codigoDoLink; codigoDoLink = function () { return _cod() || codigoNoCaminho(); }; }
 
 /* ---------------- telas próprias (mesmo visual da tela de entrada) ---------------- */
 function telaProd(card, base = '') {
@@ -9103,7 +9108,7 @@ function erroNaTela(m) {
   el.className = 'lg-msg bad'; el.setAttribute('role', 'alert'); el.textContent = m;
   card.classList.remove('treme'); void card.offsetWidth; card.classList.add('treme');
 }
-const linkCliente = () => `<button class="lg-cli" type="button" onclick="location.href='./?agendar=balcao'">Sou cliente: quero agendar</button>`;
+const linkCliente = () => `<button class="lg-cli" type="button" onclick="location.href='/balcao'">Sou cliente: quero agendar</button>`;
 
 function telaSemConfig() {
   telaProd(`<div class="lg-hd"><span class="lg-kick">Instalação</span><h2>Falta ligar o banco de dados</h2>
@@ -9171,7 +9176,7 @@ function telaConfigurar() {
     const modo = dados ? (document.querySelector('[name=cf-m]:checked') || {}).value || 'cadastros' : 'cadastros';
     try {
       if (q('#cf-n').value.trim().length < 3) throw new Error('Informe o nome da proprietária.');
-      const D = prepararProducao(dados || seedBase(), modo, { nome: q('#cf-n').value, email: q('#cf-e').value, endereco: location.origin + location.pathname });
+      const D = prepararProducao(dados || seedBase(), modo, { nome: q('#cf-n').value, email: q('#cf-e').value, endereco: location.origin + '/' });
       PROD.dono = true;
       iniciarApp({ DB: D });
     } catch (er) { erroNaTela(er.message); }
@@ -9361,7 +9366,7 @@ function ligarModoPublico() {
   };
   confirmarPeloLink = function (S, tk, resposta) { const r = _conf(S, tk, resposta); enviarEntrada('confirmar', { tk, resposta }); return r; };
   registrarAcessoOrigem = function (S, codigo, dia) { const ok = _acesso(S, codigo, dia); if (ok) enviarEntrada('acesso', { codigo, dia: dia || TODAY }); return ok; };
-  ligarPublico = function (cat) { _ligar(cat); const b = document.getElementById('pub-equipe'); if (b) b.onclick = () => { location.href = location.pathname; }; };
+  ligarPublico = function (cat) { _ligar(cat); const b = document.getElementById('pub-equipe'); if (b) b.onclick = () => { location.href = '/'; }; };
   window.addEventListener('online', drenarFila);
   drenarFila();
 }
@@ -9464,7 +9469,7 @@ function iniciarApp(hot) {
   iniciar(hot || {});
 }
 async function bootProd() {
-  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('./sw.js').catch(() => { });
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => { });
   if (!PROD_CFG.supabaseUrl || !PROD_CFG.supabaseAnonKey || /COLE_AQUI/.test(PROD_CFG.supabaseUrl + PROD_CFG.supabaseAnonKey) || !window.supabase) {
     aplicarTema(TEMA); return window.supabase ? telaSemConfig() : telaProd(`<div class="lg-hd"><h2>Sem conexão</h2><p>Não foi possível carregar o sistema. Verifique a internet e tente de novo.</p></div><button class="lg-btn" onclick="location.reload()"><span>Tentar de novo</span>${lgi('seta')}</button>`);
   }
@@ -9491,7 +9496,7 @@ async function bootProd() {
   // aparelho novo (ou sem internet e sem nada salvo)
   if (!local || !local.config || !local.config.producao) {
     if (existe === null) return telaProd(`<div class="lg-hd"><h2>Sem conexão</h2><p>Para abrir o sistema pela primeira vez neste aparelho é preciso internet.</p></div><button class="lg-btn" onclick="location.reload()"><span>Tentar de novo</span>${lgi('seta')}</button>`);
-    const ph = prepararProducao(seedBase(), 'cadastros', { endereco: location.origin + location.pathname }); ph.config.__ph = true; ph.users.forEach(u => { u.excluido = true; });
+    const ph = prepararProducao(seedBase(), 'cadastros', { endereco: location.origin + '/' }); ph.config.__ph = true; ph.users.forEach(u => { u.excluido = true; });
     iniciarApp({ DB: ph }); aguardarDados();
   } else iniciarApp({});
 }
@@ -9501,7 +9506,7 @@ function ligarEquipe() {
   PROD.sb.channel('lagriff-entradas').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'entradas' }, () => agendarEntradas()).subscribe();
   setInterval(() => { agendarEntradas(0); publicarPublico(); }, 45000);
   let antes = '';
-  setInterval(() => { const e = SYNC.estado + SYNC.pronto; if (e !== antes) { antes = e; if (SYNC.pronto && SYNC.estado === 'aovivo') { if (!(DB.config.formularioUrl || '').trim()) { DB.config.formularioUrl = location.origin + location.pathname; save(); } agendarEntradas(0); agendarPublico(); } } }, 700);
+  setInterval(() => { const e = SYNC.estado + SYNC.pronto; if (e !== antes) { antes = e; if (SYNC.pronto && SYNC.estado === 'aovivo') { if (!(DB.config.formularioUrl || '').trim()) { DB.config.formularioUrl = location.origin + '/'; save(); } agendarEntradas(0); agendarPublico(); } } }, 700);
   avisoInstalar();
 }
 bootProd();
