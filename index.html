@@ -910,6 +910,16 @@ tr.pend-pg .cv-st,tr.pend-pg .cv-st.bad,tr.pend-pg .cv-st.ok,.tw.cards tr.pend-p
 .tw.cards tr.pend-pg td,.tw.cards tr.pend-pg td *:not(.btn):not(.pill):not(.cv-st):not(.cv-st *){color:#2B1E0E}
 .tw.cards tr.pend-pg td em,.tw.cards tr.pend-pg .muted{color:#6B5326!important}
 .tw.cards tr.pend-pg .pill{background:#FFFDF6;color:#2B1E0E;border:1px solid #E2C88A}
+/* espaço usado no banco */
+.esp{display:flex;flex-direction:column;gap:10px;margin:4px 0 12px}
+.esp-l{display:flex;flex-direction:column;gap:5px}
+.esp-b{height:10px;border-radius:99px;background:var(--sunk);overflow:hidden}
+.esp-b i{display:block;height:100%;border-radius:99px;background:var(--ok)}
+.esp-b i.warn{background:#D9A21E}.esp-b i.bad{background:#C0392B}
+.esp-aviso{display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:space-between;margin:0 0 14px;padding:14px 16px;border-radius:14px;background:#FFF1C7;border:1.5px solid #D9A21E;color:#3B2A12}
+.esp-aviso>div{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1 1 260px}.esp-aviso b{font-size:15px}.esp-aviso span{font-size:13.5px;line-height:1.4}
+.esp-aviso.crit{background:#FBE3E1;border-color:#C0392B;color:#5A1712}
+.esp-aviso .btn{flex:0 0 auto;color:#2B1E0E;border-color:rgba(59,42,18,.35);background:#fff}.esp-aviso .btn.pri{background:#C0392B;color:#fff;border-color:#C0392B}
 /* Entrada e Saída */
 .cx-nav{display:flex;align-items:center;gap:8px} .cx-nav b{min-width:170px;text-align:center;font-size:16.5px}
 .cx-svg{width:100%;height:auto;display:block;overflow:hidden}
@@ -6200,9 +6210,40 @@ function pgRegras() {
       <div class="bar" style="margin-top:10px;justify-content:flex-end"><button class="btn pri" id="rg-s3">Salvar metas</button></div></div>
     <div class="panel"><h2>Cópia de segurança</h2>
       <p class="muted small" style="margin:0 0 10px">Um arquivo com todos os dados do sistema: equipe, clientes, agenda, serviços, financeiro e configurações. Guarde em um lugar seguro (Google Drive, e-mail) uma vez por semana.${DB.config.producao ? '' : ' É também com este arquivo que os cadastros passam para o sistema definitivo.'}</p>
+      ${usoEspacoHTML()}
       <div class="bar" style="justify-content:flex-end">${DB.config.producao ? '<button class="btn" id="rg-rest">Restaurar uma cópia</button>' : ''}<button class="btn pri" id="rg-bkp">Baixar cópia de segurança</button></div></div>
   </div>`;
 }
+/* =================== ESPAÇO USADO NO BANCO (plano grátis do Supabase) =================== */
+/* medido pelo sistema definitivo (prod.js) em window.USO_ESPACO; no sistema de teste não existe */
+const MB = n => (n / 1048576).toLocaleString('pt-BR', { maximumFractionDigits: n < 10485760 ? 1 : 0 }) + ' MB';
+function usoEspaco() {
+  const u = window.USO_ESPACO; if (!u || !u.banco) return null;
+  const pb = u.banco / u.limite_banco, pa = u.limite_arquivos ? (u.arquivos || 0) / u.limite_arquivos : 0, p = Math.max(pb, pa);
+  return { ...u, pb, pa, p, nivel: p >= 0.85 ? 'critico' : p >= 0.7 ? 'alerta' : 'ok' };
+}
+function usoEspacoHTML() {
+  const u = usoEspaco(); if (!u) return '';
+  const barra = (rot, usado, lim, p, extra) => `<div class="esp-l"><div class="split small"><span>${rot}</span><b>${MB(usado)} de ${MB(lim)} · ${Math.round(p * 100)}%</b></div>
+    <div class="esp-b"><i class="${p >= 0.85 ? 'bad' : p >= 0.7 ? 'warn' : 'ok'}" style="width:${Math.max(1, Math.min(100, p * 100))}%"></i></div>${extra ? `<div class="muted small">${extra}</div>` : ''}</div>`;
+  return `<div class="esp">${barra('Banco de dados', u.banco, u.limite_banco, u.pb, `Dados do sistema ${MB(u.dados || 0)} · exames anexados ${MB(u.anexos || 0)}`)}
+    ${barra('Arquivos', u.arquivos || 0, u.limite_arquivos, u.pa)}
+    <div class="muted small">Plano grátis do Supabase · medido em ${new Date(u.medido).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}. Ao chegar em 70% o sistema avisa no Painel para baixar a cópia de segurança.</div></div>`;
+}
+/* aviso no Painel (proprietária e suporte) quando o espaço passa de 70% */
+function avisoEspacoHTML() {
+  const u = usoEspaco(); if (!u || u.nivel === 'ok' || !isOwner(ACTOR)) return '';
+  const crit = u.nivel === 'critico';
+  return `<div class="esp-aviso ${crit ? 'crit' : ''}" role="alert"><div><b>${crit ? 'Espaço do banco quase no limite' : 'Espaço do banco passou de 70%'}</b>
+    <span>${Math.round(u.p * 100)}% do limite grátis do Supabase já está em uso. Baixe a cópia de segurança agora${crit ? ' e fale com o suporte da FX Mídia Social para liberar espaço ou mudar de plano' : ''}.</span></div>
+    <button class="btn ${crit ? 'pri' : ''}" data-baixar-copia>Baixar cópia de segurança</button></div>`;
+}
+function baixarCopia() {
+  if (!isOwner(ACTOR)) return toast('Só a proprietária baixa a cópia de segurança.', 'bad');
+  audit(DB, ACTOR, 'Cópia de segurança baixada', ''); save();
+  baixar(`copia-seguranca-${nomeArq(DB.config.nome)}-${TODAY}.json`, JSON.stringify(copiaSeguranca(DB)), 'Cópia de segurança');
+}
+document.addEventListener('click', e => { if (e.target.closest('[data-baixar-copia]')) { e.preventDefault(); baixarCopia(); } });
 function afterRegras() {
   const q = s => document.querySelector(s); if (!q('#rg-s1')) return;
   const tg = () => { q('#rg-spw').hidden = val('rg-st') !== 'pct'; q('#rg-svw').hidden = val('rg-st') !== 'valor'; }; q('#rg-st').onchange = tg; tg();
@@ -6211,7 +6252,7 @@ function afterRegras() {
   q('#rg-s2').onclick = () => run(() => { const niveis = {}; document.querySelectorAll('[data-bn]').forEach(el => { const n = el.dataset.bn; niveis[n] = niveis[n] || {}; niveis[n][el.dataset.k] = el.type === 'checkbox' ? el.checked : el.value; });
     salvarBeneficios(DB, ACTOR, { ativo: q('#rg-ba').checked, produtos: q('#rg-bp').checked, avisarNivel: q('#rg-bn').checked, niveis }); }, 'Benefícios salvos');
   q('#rg-mm').onchange = () => { UI.metaMes = val('rg-mm') || TODAY.slice(0, 7); render(); };
-  q('#rg-bkp').onclick = () => { if (!isOwner(ACTOR)) return toast('Só a proprietária baixa a cópia de segurança.', 'bad'); audit(DB, ACTOR, 'Cópia de segurança baixada', ''); save(); baixar(`copia-seguranca-${nomeArq(DB.config.nome)}-${TODAY}.json`, JSON.stringify(copiaSeguranca(DB)), 'Cópia de segurança'); };
+  q('#rg-bkp').onclick = baixarCopia;
   const rs = q('#rg-rest'); if (rs) rs.onclick = modalRestaurar;
   q('#rg-s3').onclick = () => run(() => { const func = {}; document.querySelectorAll('[data-meta-f]').forEach(el => { func[el.dataset.metaF] = toCents(el.value) || 0; });
     exigirDono(ACTOR); DB.config.metasProdutos = q('#rg-mp').checked; salvarMeta(DB, ACTOR, { mes: val('rg-mm'), salao: toCents(val('rg-ms')) || 0, func }); }, 'Metas salvas');
@@ -6873,6 +6914,7 @@ function pgPainel() {
   const prox = ags.filter(x => ['aguardando', 'confirmado', 'chegou'].includes(x.status) && (x.data > TODAY || (x.data === TODAY && toMin(x.fim) >= nm))).sort((x, y) => (x.data + x.inicio).localeCompare(y.data + y.inicio)).slice(0, 6);
   const pend = DB.parcelas.filter(p => p.status === 'pendente' && p.forma !== 'convenio' && DB.atendimentos.find(x => x.id === p.atendimentoId)?.status === 'concluido');
   return `
+  ${avisoEspacoHTML()}
   ${hero(a.nome, proxHoje(ags), [[agHoje.length, 'atendimentos hoje'], [brl(sum(ats.map(x => x.valorFinal))), 'faturado no período'], [brl(sum(L.map(r => r.aPagar))), 'comissões a pagar']])}
   <div class="stack">
     <div class="bar" style="justify-content:space-between"><div class="sec" style="margin:0">Visão do período</div>${perBar()}</div>
@@ -8859,6 +8901,7 @@ ${DB.config.producao ? `    <div class="panel"><h2>Sistema do salão</h2>
     <div class="panel"><h2>Rotina e cuidados</h2>
       ${(() => { const b = (DB.auditoria || []).find(x => x.acao === 'Cópia de segurança baixada'); const dias = b ? Math.floor((Date.now() - (parseStamp(b.quando) || Date.now())) / 864e5) : null; return st('Cópia de segurança (toda semana)', b ? (dias > 7 ? `Atrasada · ${dias} dias` : `Em dia · ${b.quando.slice(0, 10)}`) : 'Nunca baixada', b && dias <= 7 ? 'ok' : 'warn'); })()}
       ${st('Integração bancária ou com operadora', 'Não existe', '')}
+      ${usoEspacoHTML() ? `<div style="margin-top:12px">${usoEspacoHTML()}</div>` : ''}
       <div class="note small" style="margin-top:10px">Baixe a cópia em <b>Regras e metas → Cópia de segurança</b> e guarde no Google Drive. Para ajustes no sistema, fale com a FX Mídia Social.</div></div>
 ` : `    <div class="panel"><h2>Modo demonstração</h2>
       ${st('Dados de clientes, funcionários e valores', 'Fictícios', 'warn')}${st('Troca de usuário pelo seletor "Acessando como"', 'Simulação', 'warn')}${st('Gravação no navegador deste aparelho', 'Temporária', 'warn')}${st('Permissões aplicadas pela camada de acesso do app (no banco real: RLS)', 'Simulação', 'warn')}
@@ -9272,6 +9315,7 @@ function criarBanco(sb) {
         async get() { const { data, error } = await sb.from('docs').select('data,atualizado').eq('col', col).eq('id', id).maybeSingle(); if (error) throw erroProd(error); if (data) guardar(col, id, data.data, data.atualizado); return snapDoc(id, data ? data.data : null); },
         async set(obj) { const { error } = await sb.from('docs').upsert({ col, id, data: obj }); if (error) throw erroProd(error); },
         async update(obj) { const { error } = await sb.rpc('doc_merge', { p_col: col, p_id: id, p_campos: obj }); if (error) throw erroProd(error); },
+        async delete() { const { error } = await sb.from('docs').delete().eq('col', col).eq('id', id); if (error) throw erroProd(error); },
         async acquire() { return { acquired: true }; },
         onSnapshot(cb, onErr) {
           const s = { cb }, k = col + '/' + id; if (!subsDoc.has(k)) subsDoc.set(k, new Set()); subsDoc.get(k).add(s);
@@ -9530,13 +9574,25 @@ async function bootProd() {
     iniciarApp({ DB: ph }); aguardarDados();
   } else iniciarApp({});
 }
+/* espaço usado no banco: medido a cada 6 horas (e ao conectar); acima de 70% o Painel avisa */
+try { const u = JSON.parse(localStorage.getItem('lagriff.uso') || 'null'); if (u) window.USO_ESPACO = u; } catch (e) { }
+async function medirEspaco() {
+  if (PROD.modo !== 'equipe' || !PROD.sb) return;
+  try {
+    const { data, error } = await PROD.sb.rpc('uso_espaco'); if (error || !data) return;
+    const antes = JSON.stringify(window.USO_ESPACO || {}); window.USO_ESPACO = data;
+    try { localStorage.setItem('lagriff.uso', JSON.stringify(data)); } catch (e) { }
+    if (antes !== JSON.stringify(data) && typeof renderRemoto === 'function' && SYNC.pronto) renderRemoto();
+  } catch (e) { }
+}
 /* recebe os envios das clientes e mantém a página pública atualizada */
 function ligarEquipe() {
   if (PROD.ligado) return; PROD.ligado = true;
   PROD.sb.channel('lagriff-entradas').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'entradas' }, () => agendarEntradas()).subscribe();
   setInterval(() => { agendarEntradas(0); publicarPublico(); }, 45000);
+  setInterval(medirEspaco, 6 * 3600e3);
   let antes = '';
-  setInterval(() => { const e = SYNC.estado + SYNC.pronto; if (e !== antes) { antes = e; if (SYNC.pronto && SYNC.estado === 'aovivo') { if (!(DB.config.formularioUrl || '').trim()) { DB.config.formularioUrl = location.origin + '/'; save(); } agendarEntradas(0); agendarPublico(); } } }, 700);
+  setInterval(() => { const e = SYNC.estado + SYNC.pronto; if (e !== antes) { antes = e; if (SYNC.pronto && SYNC.estado === 'aovivo') { medirEspaco(); if (!(DB.config.formularioUrl || '').trim()) { DB.config.formularioUrl = location.origin + '/'; save(); } agendarEntradas(0); agendarPublico(); } } }, 700);
   avisoInstalar();
 }
 bootProd();
