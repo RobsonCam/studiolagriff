@@ -1411,6 +1411,8 @@ function horaValida(h, rotulo = 'a hora do pagamento') {
 }
 const dataHora = (d, h) => d ? `${d.split('-').reverse().join('/')}${h ? ' às ' + h : ''}` : '';
 const stamp = () => new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+/* "24/10/2026, 01:05" → milissegundos (0 se não der para ler) */
+const parseStamp = t => { const m = String(t || '').match(/(\d{2})\/(\d{2})\/(\d{4})\D+(\d{2}):(\d{2})/); return m ? new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5]).getTime() : 0; };
 const digits = s => String(s || '').replace(/\D/g, '');
 
 /* ---------- dicionários ---------- */
@@ -8844,17 +8846,26 @@ function pgWhatsApp() {
 function pgAjustes() {
   const own = isOwner(ACTOR);
   const st = (t, s, tone) => `<div class="split"><span>${t}</span>${pill(s, tone)}</div>`;
-  return `<div class="ph"><div><h1>Ajustes e status</h1><p>O que já funciona, o que é demonstração e o que depende de configuração externa.</p></div></div>
+  return `<div class="ph"><div><h1>Ajustes e status</h1><p>${DB.config.producao ? 'O que está funcionando no sistema do salão e os cuidados de rotina.' : 'O que já funciona, o que é demonstração e o que depende de configuração externa.'}</p></div></div>
   <div class="grid g2">
-    ${own ? `<div class="panel"><h2>Identidade</h2><div class="stack" style="gap:10px"><label class="f">Nome do salão<input id="cfg-n" value="${esc(DB.config.nome)}"></label><div class="bar"><button class="btn pri" id="cfg-ok">Salvar nome</button><button class="btn dng" id="cfg-reset">Restaurar dados de demonstração</button></div></div></div>` : ''}
+    ${own ? `<div class="panel"><h2>Identidade</h2><div class="stack" style="gap:10px"><label class="f">Nome do salão<input id="cfg-n" value="${esc(DB.config.nome)}"></label><div class="bar"><button class="btn pri" id="cfg-ok">Salvar nome</button>${DB.config.producao ? '' : '<button class="btn dng" id="cfg-reset">Restaurar dados de demonstração</button>'}</div></div></div>` : ''}
     <div class="panel"><h2>Implementado e funcionando</h2>
       ${st('Agenda dia/semana/mês, conflitos, bloqueios, reagendamento', 'Pronto', 'ok')}${st('Registro de serviços com pagamento dividido', 'Pronto', 'ok')}${st('Motor de comissão central, centavos inteiros', 'Pronto', 'ok')}
       ${st('Convênios com acerto parcial e integral', 'Pronto', 'ok')}${st('Fechamento semanal e pagamentos sem duplicidade', 'Pronto', 'ok')}${st('Relatórios com PDF e CSV', 'Pronto', 'ok')}${st('Equipe, acessos e permissões por pessoa', 'Pronto', 'ok')}${st('Mensagens de WhatsApp', 'Pronto', 'ok')}${st(`${(TESTES || (TESTES = runTests())).length} testes automáticos`, 'Pronto', 'ok')}</div>
-    <div class="panel"><h2>Modo demonstração</h2>
+${DB.config.producao ? `    <div class="panel"><h2>Sistema do salão</h2>
+      ${st('Banco de dados (Supabase)', { aovivo: 'Ao vivo', conectando: 'Conectando', erro: 'Sem conexão', local: 'Desconectado', leitura: 'Somente leitura', aguardando: 'Aguardando' }[SYNC.estado] || 'Ao vivo', SYNC.estado === 'aovivo' ? 'ok' : 'warn')}
+      ${st('Dados iguais em todos os aparelhos', 'Ativo', 'ok')}${st('Login individual com senha protegida', 'Ativo', 'ok')}${st('Regras de acesso no banco (só a conta do estúdio)', 'Ativo', 'ok')}
+      ${st('Página da cliente: agendar, avaliar, confirmar', 'Ativo', 'ok')}${st('Aplicativo instalável e uso sem internet', 'Ativo', 'ok')}${st('Publicação automática (GitHub + Netlify)', 'Ativo', 'ok')}</div>
+    <div class="panel"><h2>Rotina e cuidados</h2>
+      ${(() => { const b = (DB.auditoria || []).find(x => x.acao === 'Cópia de segurança baixada'); const dias = b ? Math.floor((Date.now() - (parseStamp(b.quando) || Date.now())) / 864e5) : null; return st('Cópia de segurança (toda semana)', b ? (dias > 7 ? `Atrasada · ${dias} dias` : `Em dia · ${b.quando.slice(0, 10)}`) : 'Nunca baixada', b && dias <= 7 ? 'ok' : 'warn'); })()}
+      ${st('Integração bancária ou com operadora', 'Não existe', '')}
+      <div class="note small" style="margin-top:10px">Baixe a cópia em <b>Regras e metas → Cópia de segurança</b> e guarde no Google Drive. Para ajustes no sistema, fale com a FX Mídia Social.</div></div>
+` : `    <div class="panel"><h2>Modo demonstração</h2>
       ${st('Dados de clientes, funcionários e valores', 'Fictícios', 'warn')}${st('Troca de usuário pelo seletor "Acessando como"', 'Simulação', 'warn')}${st('Gravação no navegador deste aparelho', 'Temporária', 'warn')}${st('Permissões aplicadas pela camada de acesso do app (no banco real: RLS)', 'Simulação', 'warn')}
       <div class="note warn small" style="margin-top:10px">Nesta demonstração os dados ficam só neste navegador. Não é persistência real: outro aparelho não vê os lançamentos.</div></div>
     <div class="panel"><h2>Depende de configuração externa</h2>
       ${st('Banco Supabase PostgreSQL (schema pronto)', 'Configurar', 'info')}${st('Login real com Supabase Auth', 'Configurar', 'info')}${st('Políticas RLS no banco (escritas no schema)', 'Configurar', 'info')}${st('Publicação no Netlify e domínio próprio', 'Configurar', 'info')}${st('Convite de acesso por e-mail', 'Configurar', 'info')}${st('Integração bancária ou com operadora', 'Não existe', '')}</div>
+`}
   </div>`;
 }
 
@@ -8940,7 +8951,7 @@ const AFTER = {
   ajustes() {
     document.getElementById('cfg-ok')?.addEventListener('click', () => run(() => { exigirDono(ACTOR); if (!val('cfg-n').trim()) throw new Error('Informe o nome.'); DB.config.nome = val('cfg-n').trim(); audit(DB, ACTOR, 'Nome do salão alterado', DB.config.nome); }, 'Nome atualizado'));
     const r = document.getElementById('cfg-reset');
-    if (r) r.onclick = () => { if (r.dataset.armed) { const u = DB.sessaoUserId; DB = seedDemo(); DB.sessaoUserId = u; save(); TESTES = null; render(); toast('Dados de demonstração restaurados'); } else { r.dataset.armed = 1; r.textContent = 'Toque de novo para apagar e restaurar'; } };
+    if (r) r.onclick = () => { if (DB.config.producao) return toast('No sistema do salão os dados reais não podem ser trocados pela demonstração.', 'bad'); if (r.dataset.armed) { const u = DB.sessaoUserId; DB = seedDemo(); DB.sessaoUserId = u; save(); TESTES = null; render(); toast('Dados de demonstração restaurados'); } else { r.dataset.armed = 1; r.textContent = 'Toque de novo para apagar e restaurar'; } };
   }
 };
 
