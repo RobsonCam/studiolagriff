@@ -415,7 +415,7 @@ tfoot td{font-weight:700;background:var(--sunk)}
 .chip.on{background:var(--pri);border-color:var(--pri);color:var(--pri-ink)}
 .chips.sm{margin-top:8px}.chips.sm .chip{padding:3px 9px;font-size:13px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
 .wm-nome{width:100%}
-.switch{display:flex;align-items:center;gap:10px;font-size:15.5px;cursor:pointer;color:var(--ink)}
+.switch{position:relative;display:flex;align-items:center;gap:10px;font-size:15.5px;cursor:pointer;color:var(--ink)}
 .switch input{position:absolute;opacity:0;width:1px;height:1px}
 .switch span{width:38px;height:22px;border-radius:22px;background:var(--line);position:relative;flex:none;transition:background .2s}
 .switch span::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .22s var(--ease)}
@@ -871,7 +871,7 @@ html.trava-rolagem{overflow:hidden!important}
 /* ===== Janelas sempre dentro da tela: cabeçalho e botões fixos, só o meio rola ===== */
 @media (min-width:561px){
   .ov{align-items:center;overflow:hidden}
-  .md{max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow:hidden}
+  .md{max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow:hidden;overflow:clip}
   .md .md-b{flex:1 1 auto;min-height:0;max-height:none;overflow:auto}
   .md-h,.md-f{flex:none}
   .md-f{padding:12px 20px}
@@ -6474,6 +6474,8 @@ function openModal(title, body, foot = '', wide = false) {
   // abre só o card: nenhum campo é selecionado sozinho (no celular isso abriria o teclado por cima).
   // O foco vai para a janela, para o Tab e o Esc funcionarem no computador.
   setTimeout(() => { if (ov.contains(document.activeElement)) return; const md = ov.querySelector('.md'); if (md) { md.setAttribute('tabindex', '-1'); md.focus({ preventScroll: true }); } }, 30);
+  // no computador só o miolo da janela rola: se o navegador rolar a janela inteira (foco num campo), volta ao lugar
+  const mdEl = ov.querySelector('.md'); if (mdEl) mdEl.addEventListener('scroll', () => { if (mdEl.scrollTop && window.innerWidth > 560) mdEl.scrollTop = 0; });
   return ov;
 }
 function closeModal() { if (MODAL) { MODAL.remove(); MODAL = null; } document.documentElement.classList.remove('trava-rolagem'); }
