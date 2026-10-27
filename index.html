@@ -1285,6 +1285,161 @@ html:root[data-modo="pb"]{--k-bg:#111111;--k-bd:#111111;--k-lab:#FFDC8F;--k-sub:
 .cod{font-size:42.5px;letter-spacing:.14em;color:var(--gold);font-variant-numeric:tabular-nums}
 .cod-msg{white-space:pre-wrap;font:inherit;font-size:15px;background:var(--sunk);border-radius:12px;padding:12px 14px;margin:12px 0 0;color:var(--ink)}
 
+/* =====================================================================
+   PREMIUM · sem bordas, superfícies em camadas, luz dourada e movimento suave
+   (vem por último: sobrepõe o visual antigo sem mudar as cores da marca)
+   ===================================================================== */
+:root{
+  --gf1:#B8862B;--gf2:#7A5230;--gf3:#2F6E4E;--gf4:#41597F;--gf5:#A3373F;
+  --glow:rgba(201,152,58,.13);--glow2:rgba(122,82,48,.08);
+  --p-bg:linear-gradient(180deg,#FFFFFF 0%,#FBF8F2 100%);
+  --p-sh:0 1px 0 rgba(255,255,255,.9) inset,0 1px 2px rgba(48,36,28,.04),0 22px 44px -28px rgba(48,36,28,.32);
+  --p-sh-h:0 1px 0 rgba(255,255,255,.9) inset,0 2px 6px rgba(48,36,28,.05),0 30px 60px -26px rgba(48,36,28,.38);
+  --p-fio:linear-gradient(90deg,transparent,rgba(184,134,43,.45),transparent);
+  --in-bg:color-mix(in srgb,var(--sunk) 70%,var(--surface));
+}
+@media (prefers-color-scheme:dark){html:root:not([data-modo]){
+  --gf1:#FFDC8F;--gf2:#D9A06A;--gf3:#7FD1A8;--gf4:#8FB0E6;--gf5:#F2A0A7;
+  --glow:rgba(255,220,143,.08);--glow2:rgba(217,160,106,.05);
+  --p-bg:linear-gradient(180deg,rgba(46,35,29,.92) 0%,rgba(33,25,20,.92) 100%);
+  --p-sh:0 1px 0 rgba(255,236,196,.06) inset,0 26px 50px -30px rgba(0,0,0,.85);
+  --p-sh-h:0 1px 0 rgba(255,236,196,.09) inset,0 34px 64px -28px rgba(0,0,0,.9),0 0 0 1px rgba(255,220,143,.06);
+  --p-fio:linear-gradient(90deg,transparent,rgba(255,220,143,.35),transparent);
+  --in-bg:rgba(255,236,196,.05);
+}}
+html:root[data-modo="noite"]{
+  --gf1:#FFDC8F;--gf2:#D9A06A;--gf3:#7FD1A8;--gf4:#8FB0E6;--gf5:#F2A0A7;
+  --glow:rgba(255,220,143,.08);--glow2:rgba(217,160,106,.05);
+  --p-bg:linear-gradient(180deg,rgba(46,35,29,.92) 0%,rgba(33,25,20,.92) 100%);
+  --p-sh:0 1px 0 rgba(255,236,196,.06) inset,0 26px 50px -30px rgba(0,0,0,.85);
+  --p-sh-h:0 1px 0 rgba(255,236,196,.09) inset,0 34px 64px -28px rgba(0,0,0,.9),0 0 0 1px rgba(255,220,143,.06);
+  --p-fio:linear-gradient(90deg,transparent,rgba(255,220,143,.35),transparent);
+  --in-bg:rgba(255,236,196,.05);
+}
+html:root[data-modo="pb"]{
+  --gf1:#111;--gf2:#555;--gf3:#888;--gf4:#333;--gf5:#AAA;--glow:rgba(0,0,0,.04);--glow2:rgba(0,0,0,.02);
+  --p-bg:#fff;--p-sh:0 1px 2px rgba(0,0,0,.06),0 18px 36px -24px rgba(0,0,0,.25);--p-sh-h:0 2px 6px rgba(0,0,0,.08),0 26px 50px -24px rgba(0,0,0,.3);
+  --p-fio:linear-gradient(90deg,transparent,rgba(0,0,0,.25),transparent);--in-bg:#F1F1F1;
+}
+
+/* fundo infinito: luz suave nas bordas da tela e textura fina (fixos, não pesam na rolagem) */
+body{background:var(--bg)}
+body::before{content:"";position:fixed;inset:-10vh -10vw;pointer-events:none;z-index:0;
+  background:radial-gradient(900px 520px at 88% -6%,var(--glow),transparent 62%),radial-gradient(760px 520px at -8% 104%,var(--glow2),transparent 60%),radial-gradient(600px 400px at 50% 50%,color-mix(in srgb,var(--glow) 40%,transparent),transparent 70%)}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.035;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.app,.main{position:relative;z-index:1}
+
+/* superfícies sem borda: a forma vem da luz e da sombra */
+.panel,.kpi,.tw,.cli-card,.bc,.esp-l,.gf-card{border:0!important}
+.panel,.tw,.cli-card{background:var(--p-bg)!important;box-shadow:var(--p-sh);border-radius:22px!important}
+.panel{position:relative;padding:20px 22px}
+.panel::after,.kpi::after{content:"";position:absolute;left:18%;right:18%;top:0;height:1px;background:var(--p-fio);opacity:.7;pointer-events:none}
+.kpi{position:relative;border-radius:20px!important;box-shadow:var(--p-sh);overflow:hidden}
+@media (hover:hover){.panel:hover,.kpi:hover{box-shadow:var(--p-sh-h)}.kpi:hover{transform:translateY(-2px)}}
+.tw{overflow:auto}
+.tw table thead th{background:transparent;border-bottom:0;letter-spacing:.12em}
+.tw td,.tw th{border-color:color-mix(in srgb,var(--line) 55%,transparent)!important}
+.row-ag+.row-ag,.ct+.ct{border-top-color:color-mix(in srgb,var(--line) 55%,transparent)}
+
+/* barra do topo derrete no fundo (sem caixa, sem linha) */
+.top{border-bottom:0!important;background:linear-gradient(180deg,var(--bg) 0%,color-mix(in srgb,var(--bg) 88%,transparent) 70%,transparent 100%)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+.top .bell,.top .btn,.top .seg{border:0;box-shadow:var(--p-sh)}
+
+/* menu lateral: sem divisória, item ativo em luz dourada */
+.side{border-right:0!important;box-shadow:20px 0 60px -40px rgba(0,0,0,.55)}
+.side::after{content:"";position:absolute;top:0;right:0;bottom:0;width:1px;background:linear-gradient(180deg,transparent,rgba(255,220,143,.25),transparent);pointer-events:none}
+.navi{transition:background-color .25s,color .25s,padding .25s var(--ease)}
+.navi.on{background:linear-gradient(90deg,rgba(255,220,143,.18),rgba(255,220,143,.04))!important;box-shadow:inset 2px 0 0 var(--gold),0 8px 24px -14px rgba(255,220,143,.45)}
+@media (hover:hover){.navi:not(.on):hover{padding-left:16px;background:rgba(255,220,143,.06)}}
+
+/* barra de baixo do celular: vidro, sem linha, item ativo com brilho */
+@media (max-width:900px){
+  .bnav{border-top:0!important;background:color-mix(in srgb,var(--surface) 86%,transparent)!important;backdrop-filter:blur(18px) saturate(1.25);-webkit-backdrop-filter:blur(18px) saturate(1.25);box-shadow:0 -18px 40px -24px rgba(0,0,0,.45)}
+  .bnav button{transition:color .25s,transform .25s var(--ease)}
+  .bnav button[aria-current="page"]::before,.bnav button.on::before{content:"";position:absolute;top:2px;left:50%;width:34px;height:3px;border-radius:3px;transform:translateX(-50%);background:linear-gradient(90deg,transparent,var(--gold),transparent);box-shadow:0 0 12px rgba(255,220,143,.7)}
+}
+
+/* botões e campos sem contorno */
+:is(.app,.md) .btn{border-color:transparent!important;background:var(--in-bg);box-shadow:0 1px 0 rgba(255,255,255,.35) inset}
+:is(.app,.md) .btn:not(.pri):not(.wa):not(.gold):hover{background:color-mix(in srgb,var(--in-bg) 70%,var(--gold))}
+.btn.pri{position:relative;overflow:hidden;background:linear-gradient(135deg,color-mix(in srgb,var(--pri) 88%,#000),var(--pri) 55%,color-mix(in srgb,var(--pri) 80%,var(--gold)))!important;box-shadow:0 10px 24px -12px color-mix(in srgb,var(--pri) 70%,transparent),inset 0 1px 0 rgba(255,236,196,.18)}
+.btn.pri::after{content:"";position:absolute;top:0;bottom:0;left:-60%;width:40%;background:linear-gradient(100deg,transparent,rgba(255,236,196,.35),transparent);transform:skewX(-18deg);transition:left .7s var(--ease);pointer-events:none}
+@media (hover:hover){.btn.pri:hover::after{left:130%}.btn.pri:hover{transform:translateY(-1px)}}
+.btn.ghost{background:transparent;box-shadow:none}
+.btn.wa{background:var(--wa)!important;color:var(--wa-ink)!important}
+:is(.app,.md) :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]),select,textarea){border-color:transparent!important;background:var(--in-bg)!important;transition:box-shadow .2s,background-color .2s}
+:is(.app,.md) :is(input:not([type=checkbox]):not([type=radio]),select,textarea):focus{outline:0;box-shadow:0 0 0 2px color-mix(in srgb,var(--gold) 70%,transparent),0 8px 22px -12px rgba(201,152,58,.5)!important}
+.seg{border:0!important;background:var(--in-bg)!important;box-shadow:inset 0 1px 2px rgba(0,0,0,.06)}
+.seg button.on,.seg button[aria-selected="true"]{box-shadow:0 6px 16px -8px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.25)}
+
+/* campos que já ficam dentro de uma caixa própria (busca de cliente, buscas com lupa) não ganham fundo extra */
+:is(.app,.md) :is(.cpk-in,.po-busca-c,.lg-in) input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]){background:transparent!important;box-shadow:none!important}
+/* títulos de seção com fio dourado */
+.sec{display:flex;align-items:center;gap:10px}
+.sec::before{content:"";width:22px;height:1px;background:linear-gradient(90deg,var(--gold),transparent);flex:none}
+
+/* destaque de abertura (hero): luz que passa, brilho dourado no nome e marca d'água flutuando */
+.hero{border-radius:26px!important;box-shadow:0 30px 70px -36px rgba(20,12,8,.8),inset 0 1px 0 rgba(255,236,196,.12);isolation:isolate;
+  background:radial-gradient(120% 160% at 100% 0%,rgba(255,220,143,.20),transparent 52%),radial-gradient(90% 120% at 0% 100%,rgba(217,160,106,.12),transparent 55%),linear-gradient(135deg,#3A2B21 0%,#2A1F18 55%,#1E1611 100%)!important}
+.hero::before{content:"";position:absolute;width:420px;height:420px;right:-120px;top:-180px;border-radius:50%;z-index:-1;background:radial-gradient(circle,rgba(255,220,143,.22),transparent 65%);filter:blur(10px);animation:heroOrbe 14s ease-in-out infinite alternate}
+.hero::after{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;background:linear-gradient(105deg,transparent 35%,rgba(255,236,196,.10) 48%,transparent 60%);transform:translateX(-120%);animation:heroLuz 9s ease-in-out 1.4s infinite}
+.hero h1{background:linear-gradient(92deg,#FFF7E6 0%,#FFE6B0 45%,#E6B866 100%);-webkit-background-clip:text;background-clip:text;color:transparent!important}
+.hero-wm{animation:heroWm 18s ease-in-out infinite alternate}
+.hero-stats div{border-left:0!important;position:relative}
+.hero-stats div::before{content:"";position:absolute;left:0;top:6%;bottom:6%;width:1px;background:linear-gradient(180deg,transparent,rgba(255,220,143,.7),transparent)}
+html:root[data-modo="pb"] .hero{background:#111!important}
+html:root[data-modo="pb"] .hero h1{background:none;color:#fff!important}
+@keyframes heroLuz{0%,55%{transform:translateX(-120%)}100%{transform:translateX(120%)}}
+@keyframes heroOrbe{from{transform:translate(0,0) scale(1)}to{transform:translate(-60px,40px) scale(1.15)}}
+@keyframes heroWm{from{transform:translateY(0) rotate(0)}to{transform:translateY(10px) rotate(-4deg)}}
+
+/* entrada das telas: sobe devagar, em cascata */
+@keyframes sobePremium{from{opacity:.001;transform:translateY(16px) scale(.992)}to{opacity:1;transform:none}}
+.page.enter>*,.page.enter .stack>*,.page.enter .grid>*{animation:sobePremium .55s cubic-bezier(.16,1,.3,1) both}
+.page.enter .grid>*:nth-child(2){animation-delay:.05s}.page.enter .grid>*:nth-child(3){animation-delay:.1s}.page.enter .grid>*:nth-child(4){animation-delay:.15s}
+.page.enter .stack>*:nth-child(2){animation-delay:.06s}.page.enter .stack>*:nth-child(3){animation-delay:.12s}.page.enter .stack>*:nth-child(4){animation-delay:.18s}.page.enter .stack>*:nth-child(n+5){animation-delay:.22s}
+
+/* janelas: vidro claro e cantos suaves */
+.md{border:0!important;border-radius:24px!important;box-shadow:0 40px 90px -30px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.12)}
+.md-h,.md-f{border-color:color-mix(in srgb,var(--line) 50%,transparent)!important}
+
+/* gráficos */
+.gfc1{stop-color:var(--gf1)}.gfc2{stop-color:var(--gf2)}.gfc3{stop-color:var(--gf3)}.gfc4{stop-color:var(--gf4)}.gfc5{stop-color:var(--gf5)}
+.gft1{stroke:var(--gf1)}.gft2{stroke:var(--gf2)}.gft3{stroke:var(--gf3)}.gft4{stroke:var(--gf4)}.gft5{stroke:var(--gf5)}
+circle.gft1{fill:var(--gf1)}circle.gft2{fill:var(--gf2)}circle.gft3{fill:var(--gf3)}circle.gft4{fill:var(--gf4)}circle.gft5{fill:var(--gf5)}
+.gfc-bg1{background:var(--gf1)}.gfc-bg2{background:var(--gf2)}.gfc-bg3{background:var(--gf3)}.gfc-bg4{background:var(--gf4)}.gfc-bg5{background:var(--gf5)}
+.gf-svg{width:100%;height:auto;display:block;overflow:hidden;margin-top:6px}
+.gf-grade{stroke:color-mix(in srgb,var(--line) 70%,transparent);stroke-width:1;stroke-dasharray:2 4}
+.gf-eixo{font-size:11px;fill:var(--muted);font-family:var(--f-body)}.gf-eixo.on{fill:var(--ink);font-weight:700}
+.gf-bar{transform-box:fill-box;transform-origin:50% 100%;animation:gfSobe .8s cubic-bezier(.16,1,.3,1) both;animation-delay:calc(var(--i) * 35ms)}
+.gf-linha{fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1;stroke-dashoffset:1;animation:gfLinha 1.3s cubic-bezier(.65,0,.35,1) .2s forwards}
+.gf-area{animation:fade 1s ease .3s both}
+.gf-ponto{stroke:var(--surface);stroke-width:1.5;animation:fade .4s ease 1.1s both}
+.gf-l2{stroke:var(--ink);opacity:.55}circle.gf-l2{fill:var(--ink)}.gf-l2t{fill:var(--muted);font-size:10.5px}
+.gf-leg{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:8px;font-size:12.5px;color:var(--muted)}
+.gf-leg span{display:inline-flex;align-items:center;gap:6px}.gf-leg i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.gf-leg i.gf-l2b{height:2px;width:14px;background:var(--ink);opacity:.55;border-radius:2px}
+.gf-hd{display:flex;justify-content:space-between;align-items:flex-start;gap:6px 12px;flex-wrap:wrap}
+.gf-hd b{font-size:15px}
+.panel .eyebrow{color:var(--accent)}
+.gf-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:12px}
+.gf-grid>.gf-card:first-child:nth-last-child(odd){grid-column:1/-1}
+@media (max-width:900px){.gf-grid{grid-template-columns:minmax(0,1fr)}}
+.gf-var{font-weight:800;font-size:15px;color:var(--muted)}.gf-var small{font-weight:500;font-size:12px;color:var(--muted)}
+.gf-var.sobe{color:var(--ok)}.gf-var.desce{color:var(--bad)}
+@keyframes gfSobe{from{transform:scaleY(.001);opacity:.2}to{transform:none;opacity:1}}
+@keyframes gfLinha{to{stroke-dashoffset:0}}
+
+/* barra de rolagem fina dourada */
+*{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--gold) 45%,transparent) transparent}
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--gold) 40%,transparent);border-radius:8px}::-webkit-scrollbar-track{background:transparent}
+
+/* quem pede menos movimento no aparelho fica sem animações */
+@media (prefers-reduced-motion:reduce){
+  .hero::before,.hero::after,.hero-wm,.gf-bar,.gf-linha,.gf-area,.gf-ponto,.page.enter>*,.page.enter .stack>*,.page.enter .grid>*{animation:none!important}
+  .gf-linha{stroke-dashoffset:0}
+}
 
 /* ===== Formulário do cliente — leitura fácil (letras grandes, alto contraste) =====
    Usado igual na página pública (agendar.html) e na pré-visualização do sistema.
@@ -6344,6 +6499,125 @@ document.addEventListener('click', e => {
   const t = e.target.closest && e.target.closest('[data-bc-limpa]'); if (!t) return;
   e.preventDefault(); e.stopImmediatePropagation(); const k = t.dataset.bcLimpa; UI['bc_' + k] = ''; render(); document.getElementById('bc-' + k)?.focus();
 }, true);
+
+/* =================== GRÁFICOS PREMIUM (relatórios e painel) =================== */
+/* períodos: mês a mês (12 meses até o mês final) ou semana a semana (semanas do período, no mínimo 8) */
+function baldes(gran, ini, fim) {
+  const out = [];
+  if (gran === 'mes') {
+    const [a, m] = fim.slice(0, 7).split('-').map(Number);
+    for (let i = 11; i >= 0; i--) { const d = new Date(a, m - 1 - i, 1); const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      out.push({ k, rot: MES_CURTO[d.getMonth()] + (d.getMonth() === 0 || i === 11 ? `/${String(d.getFullYear()).slice(2)}` : ''), ini: k + '-01', fim: iso(new Date(d.getFullYear(), d.getMonth() + 1, 0)) }); }
+    return out;
+  }
+  const ultima = weekStart(fim); let w = weekStart(ini);
+  const minIni = addDays(ultima, -7 * 7); if (w > minIni) w = minIni;
+  const maxIni = addDays(ultima, -7 * 25); if (w < maxIni) w = maxIni;
+  for (; w <= ultima; w = addDays(w, 7)) out.push({ k: w, rot: dBR(w).slice(0, 5), ini: w, fim: addDays(w, 6) });
+  return out;
+}
+const chaveBalde = (gran, d) => gran === 'mes' ? d.slice(0, 7) : weekStart(d);
+/* números do período por balde: faturamento, atendimentos, comissões, formas e profissionais */
+function serieEvolucao(gran, ini, fim, fid) {
+  const B = baldes(gran, ini, fim), idx = new Map(B.map((b, i) => [b.k, i])), n = B.length;
+  const z = () => Array(n).fill(0);
+  const r = { B, fat: z(), at: z(), com: z(), formas: {}, prof: {} };
+  const vc = x => isOwner(ACTOR) || x.funcId === ACTOR.funcId;
+  const pAt = new Map(); for (const p of DB.parcelas) { const a = pAt.get(p.atendimentoId); if (a) a.push(p); else pAt.set(p.atendimentoId, [p]); }
+  for (const x of ver(DB, ACTOR, 'atendimentos')) {
+    if (x.status !== 'concluido' || (fid && x.funcId !== fid)) continue;
+    const i = idx.get(chaveBalde(gran, x.data)); if (i === undefined) continue;
+    r.fat[i] += x.valorFinal || 0; r.at[i]++; if (vc(x)) r.com[i] += x.comissaoTotal || 0;
+    (r.prof[x.funcId] || (r.prof[x.funcId] = z()))[i] += x.valorFinal || 0;
+    for (const p of pAt.get(x.id) || []) (r.formas[p.forma] || (r.formas[p.forma] = z()))[i] += p.valor || 0;
+  }
+  return r;
+}
+/* escala "bonita" para o eixo */
+function escala(max, partes = 4) {
+  if (!(max > 0)) return { topo: partes, passo: 1 };
+  const bruto = max / partes, p10 = 10 ** Math.floor(Math.log10(bruto));
+  const passo = [1, 2, 2.5, 5, 10].map(k => k * p10).find(p => p >= bruto) || 10 * p10;
+  return { topo: passo * Math.ceil(max / passo), passo };
+}
+const fmtCurto = v => { const r = v / 100; return r >= 1e6 ? `${(r / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mi` : r >= 1000 ? `${(r / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mil` : String(Math.round(r)); };
+let GF_N = 0;
+/* gráfico SVG: barras, barras empilhadas, linhas ou área; linha extra opcional no eixo da direita */
+function grafico(o) {
+  const cel = CELULAR.matches, W = cel ? 400 : (o.largo ? 1100 : 620), H = o.altura || (cel ? 210 : 230), L = cel ? 46 : 54, R = o.linha ? (cel ? 34 : 40) : 10, T = 14, Bm = 26;
+  const n = o.labels.length, cw = (W - L - R) / Math.max(1, n), uid = 'gf' + (++GF_N);
+  const empil = o.modo === 'empilhado', barras = o.modo === 'barras' || empil;
+  const somas = o.labels.map((_, i) => empil ? o.series.reduce((s, x) => s + (x.valores[i] || 0), 0) : Math.max(0, ...o.series.map(x => x.valores[i] || 0)));
+  const { topo, passo } = escala(Math.max(o.minimo ?? (o.fmt ? 4 : 10000), ...somas));   // sem movimento: R$ 0 a R$ 100 (ou 0 a 4)
+  const y = v => T + (H - T - Bm) * (1 - v / topo), fmt = o.fmt || (v => 'R$ ' + fmtCurto(v));
+  let g = `<defs>${o.series.map((s, k) => `<linearGradient id="${uid}-${k}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="gfc${s.cor || k + 1}" stop-opacity="${o.modo === 'area' ? .45 : 1}"/><stop offset="1" class="gfc${s.cor || k + 1}" stop-opacity="${o.modo === 'area' ? 0 : .55}"/></linearGradient>`).join('')}</defs>`;
+  for (let v = 0, i = 0; v <= topo + passo / 2 && i < 8; i++, v = i * passo) g += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" class="gf-grade"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" class="gf-eixo">${fmt(v).replace('R$ ', cel ? '' : 'R$ ')}</text>`;
+  const passoRot = n > 14 ? Math.ceil(n / (cel ? 6 : 10)) : n > 8 && cel ? 2 : 1;
+  o.labels.forEach((l, i) => { if (i % passoRot === 0 || i === n - 1) g += `<text x="${L + i * cw + cw / 2}" y="${H - 8}" text-anchor="middle" class="gf-eixo${i === n - 1 ? ' on' : ''}">${esc(l)}</text>`; });
+  if (barras) {
+    const bw = empil ? Math.min(30, cw * .62) : Math.min(22, (cw * .78) / o.series.length);
+    o.labels.forEach((l, i) => {
+      let base = 0;
+      o.series.forEach((s, k) => {
+        const v = s.valores[i] || 0; if (!v) return;
+        const x = empil ? L + i * cw + (cw - bw) / 2 : L + i * cw + (cw - bw * o.series.length) / 2 + k * bw, y1 = y(base + v), y0 = y(base);
+        g += `<rect x="${x + (empil ? 0 : 1)}" y="${y1}" width="${Math.max(2, bw - (empil ? 0 : 2))}" height="${Math.max(1, y0 - y1)}" rx="${empil ? 2 : 4}" fill="url(#${uid}-${k})" class="gf-bar" style="--i:${i}"><title>${esc(l)} · ${esc(s.nome)}: ${esc(fmt(v))}</title></rect>`;
+        if (empil) base += v;
+      });
+    });
+  } else {
+    o.series.forEach((s, k) => {
+      const pts = s.valores.map((v, i) => [L + i * cw + cw / 2, y(v || 0)]);
+      if (o.modo === 'area') g += `<path d="M${pts[0][0]},${y(0)} ${pts.map(p => 'L' + p.join(',')).join(' ')} L${pts[pts.length - 1][0]},${y(0)} Z" fill="url(#${uid}-${k})" class="gf-area"/>`;
+      g += `<polyline points="${pts.map(p => p.join(',')).join(' ')}" pathLength="1" class="gf-linha gft${s.cor || k + 1}"/>`;
+      g += pts.map((p, i) => `<circle cx="${p[0]}" cy="${p[1]}" r="${i === pts.length - 1 ? 4 : 2.6}" class="gf-ponto gft${s.cor || k + 1}"><title>${esc(o.labels[i])} · ${esc(s.nome)}: ${esc(fmt(s.valores[i] || 0))}</title></circle>`).join('');
+    });
+  }
+  if (o.linha) {
+    const ml = escala(Math.max(4, ...o.linha.valores)), y2 = v => T + (H - T - Bm) * (1 - v / ml.topo);
+    const pts = o.linha.valores.map((v, i) => [L + i * cw + cw / 2, y2(v || 0)]);
+    g += `<polyline points="${pts.map(p => p.join(',')).join(' ')}" pathLength="1" class="gf-linha gf-l2"/>` + pts.map((p, i) => `<circle cx="${p[0]}" cy="${p[1]}" r="3" class="gf-ponto gf-l2"><title>${esc(o.labels[i])} · ${esc(o.linha.nome)}: ${o.linha.valores[i] || 0}</title></circle>`).join('');
+    for (let v = 0, i = 0; v <= ml.topo + ml.passo / 2 && i < 8; i++, v = i * ml.passo) g += `<text x="${W - R + 6}" y="${y2(v) + 4}" class="gf-eixo gf-l2t">${Math.round(v)}</text>`;
+  }
+  const leg = [...o.series.map((s, k) => `<span><i class="gfc-bg${s.cor || k + 1}"></i>${esc(s.nome)}</span>`), o.linha ? `<span><i class="gf-l2b"></i>${esc(o.linha.nome)}</span>` : ''].join('');
+  return `<svg viewBox="0 0 ${W} ${H}" class="gf-svg" role="img" aria-label="${esc(o.titulo || 'Gráfico')}">${g}</svg>${o.semLegenda ? '' : `<div class="gf-leg">${leg}</div>`}`;
+}
+function cartaoGrafico(titulo, sub, corpo) { return `<div class="panel gf-card"><div class="gf-hd"><b>${esc(titulo)}</b>${sub ? `<span class="muted small">${sub}</span>` : ''}</div>${corpo}</div>`; }
+/* bloco de evolução dos relatórios */
+function evolucaoRelatorio(ini, fim, fid) {
+  const gran = UI.relGran || ((fromIso(fim) - fromIso(ini)) / 864e5 > 70 ? 'mes' : 'semana');
+  const S = serieEvolucao(gran, ini, fim, fid), lab = S.B.map(b => b.rot), fat = veFaturamento() || fid === ACTOR.funcId;
+  const tot = a => brl(sum(a)), cards = [], cg = (titulo, sub, cfg) => ({ titulo, sub, cfg });
+  if (fat) cards.push(cg('Faturamento e atendimentos', `${tot(S.fat)} · ${sum(S.at)} atendimento(s)`, ({ labels: lab, series: [{ nome: 'Faturamento', valores: S.fat }], modo: 'barras', linha: { nome: 'Atendimentos', valores: S.at } })));
+  else cards.push(cg('Atendimentos', `${sum(S.at)} no total`, ({ labels: lab, series: [{ nome: 'Atendimentos', valores: S.at }], modo: 'barras', fmt: v => String(Math.round(v)) })));
+  if (fat) { const tk = S.fat.map((v, i) => S.at[i] ? Math.round(v / S.at[i]) : 0); cards.push(cg('Ticket médio', `média ${brl(sum(S.at) ? Math.round(sum(S.fat) / sum(S.at)) : 0)}`, ({ labels: lab, series: [{ nome: 'Ticket médio', valores: tk, cor: 3 }], modo: 'area' }))); }
+  if (sum(S.com)) cards.push(cg(isOwner(ACTOR) ? 'Comissões' : 'Minhas comissões', tot(S.com), ({ labels: lab, series: [{ nome: 'Comissão', valores: S.com, cor: 2 }], modo: 'barras' })));
+  if (veFaturamento() && Object.keys(S.formas).length) {
+    const fs = Object.entries(S.formas).sort((a, b) => sum(b[1]) - sum(a[1]));
+    cards.push(cg('Formas de pagamento', 'quanto entrou por cada forma', ({ labels: lab, series: fs.map(([f, v], k) => ({ nome: (n => n.charAt(0).toUpperCase() + n.slice(1))(FORMAS[f].replace('Cartão de ', '')), valores: v, cor: k + 1 })), modo: 'empilhado' })));
+  }
+  if (isOwner(ACTOR) && !fid && Object.keys(S.prof).length > 1) {
+    const ps = Object.entries(S.prof).sort((a, b) => sum(b[1]) - sum(a[1])).slice(0, 5);
+    cards.push(cg('Faturamento por profissional', 'as 5 que mais faturaram no gráfico', ({ labels: lab, series: ps.map(([id, v], k) => ({ nome: (F(id)?.nome || '').split(' ')[0], valores: v, cor: k + 1 })), modo: 'linhas' })));
+  }
+  if (cards.length % 2) cards[0].cfg.largo = true;
+  const html = cards.map(c => cartaoGrafico(c.titulo, c.sub, grafico(c.cfg))).join('');
+  return `<div class="gf-sec"><div class="split" style="flex-wrap:wrap;gap:10px"><div class="sec" style="margin:0">Evolução ${gran === 'mes' ? 'mês a mês' : 'semana a semana'}</div>
+    <div class="seg" role="tablist"><button class="${gran === 'semana' ? 'on' : ''}" data-rel-gran="semana">Semana a semana</button><button class="${gran === 'mes' ? 'on' : ''}" data-rel-gran="mes">Mês a mês</button></div></div>
+    <div class="gf-grid">${html}</div><p class="muted small" style="margin:8px 2px 0">A última coluna é ${gran === 'mes' ? 'o mês' : 'a semana'} em andamento. Toque ou passe o mouse sobre as barras e pontos para ver os valores.</p></div>`;
+}
+/* painel da proprietária: ritmo das últimas 12 semanas */
+function ritmoPainelHTML() {
+  if (!isOwner(ACTOR)) return '';
+  const S = serieEvolucao('semana', addDays(TODAY, -7 * 11), TODAY, '');
+  // compara os últimos 7 dias com os 7 anteriores (a semana atual ainda está em andamento)
+  const somaDias = (a, b) => sum(ver(DB, ACTOR, 'atendimentos').filter(x => x.status === 'concluido' && x.data > addDays(TODAY, -a) && x.data <= addDays(TODAY, -b)).map(x => x.valorFinal || 0));
+  const ult = somaDias(7, 0), ant = somaDias(14, 7), var_ = ant ? Math.round((ult - ant) * 100 / ant) : null;
+  return `<div class="panel gf-card gf-ritmo"><div class="gf-hd"><div><span class="eyebrow" style="margin:0 0 4px">Ritmo do salão</span><b>Faturamento das últimas 12 semanas</b></div>
+    <span class="gf-var ${var_ === null ? '' : var_ >= 0 ? 'sobe' : 'desce'}">${var_ === null ? brl(ult) + ' nos últimos 7 dias' : `${var_ >= 0 ? '▲' : '▼'} ${Math.abs(var_)}% <small>últimos 7 dias vs. 7 anteriores</small>`}</span></div>
+    ${grafico({ labels: S.B.map(b => b.rot), series: [{ nome: 'Faturamento', valores: S.fat }], modo: 'area', linha: { nome: 'Atendimentos', valores: S.at }, altura: CELULAR.matches ? 190 : 230, largo: true })}</div>`;
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-rel-gran]'); if (!b) return; UI.relGran = b.dataset.relGran; render(); });
 /* =========================================================================
    INTERFACE — lê sempre pela camada de acesso (ver/linhasObrig) e grava só
    pelos serviços. Nenhuma fórmula financeira é escrita aqui.
@@ -6919,6 +7193,7 @@ function pgPainel() {
   ${avisoEspacoHTML()}
   ${hero(a.nome, proxHoje(ags), [[agHoje.length, 'atendimentos hoje'], [brl(sum(ats.map(x => x.valorFinal))), 'faturado no período'], [brl(sum(L.map(r => r.aPagar))), 'comissões a pagar']])}
   <div class="stack">
+    ${ritmoPainelHTML()}
     <div class="bar" style="justify-content:space-between"><div class="sec" style="margin:0">Visão do período</div>${perBar()}</div>
     ${cardAlertas()}
     ${painelContatos(ags)}
@@ -8571,6 +8846,7 @@ function pgRelatorios() {
   <div class="stack">
     <div class="bar"><select id="rl-t" aria-label="Relatório">${opt(tipos, UI.relTipo)}</select>${['convconf', 'convparcelas'].includes(UI.relTipo) ? `<select id="rl-c" aria-label="Convênio">${opt([['', 'Todos os convênios'], ...DB.convenios.filter(c => !c.excluido).map(c => [c.id, c.nome + (c.ativo === false ? ' (inativo)' : '')])], UI.relConv)}</select>` : ''}${own ? '' : `<select id="rl-f" aria-label="Funcionário">${funcOpts(UI.relFunc)}</select>`}${perBar()}</div>
     ${R.resumo ? `<div class="grid g4">${R.resumo.map(([l, v]) => kpi(l, v)).join('')}</div>` : ''}
+    ${evolucaoRelatorio(ini, fim, relFid())}
     ${UI.relTipo === 'convconf' ? '<div class="note">Leve o PDF ao convênio ou compare com o extrato dele: cada serviço tem data e hora, autorização e o que já foi pago. A coluna "Confere" é para marcar à mão, e no fim há espaço para as assinaturas.</div>' : ''}
     ${R.rows.length ? `<div class="tw"><table><thead><tr>${R.cols.map((c, i) => `<th class="${i && /Valor|Total|Pago|Saldo|Comiss|Fatur|Ticket|Calcul|Liber|Bloque|Pendente|Acertado|Salão|Conferido|Parcelas|Quantidade/.test(c) ? 'r' : ''}">${c}</th>`).join('')}</tr></thead><tbody>
       ${R.rows.slice(0, LIM('relMax', 150)).map(r => `<tr>${r.map((c, i) => `<td class="${i && /^R\$|^-R\$|^\d+$|%$/.test(String(c).trim()) ? 'r' : ''}">${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody>${R.foot ? `<tfoot><tr>${R.foot.map((c, i) => `<td class="${i && /R\$/.test(c) ? 'r' : ''}">${esc(c)}</td>`).join('')}</tr></tfoot>` : ''}</table></div>${R.rows.length > LIM('relMax', 150) ? `<div class="mais-linhas"><span class="muted small">Na tela: ${LIM('relMax', 150)} de ${R.rows.length} linhas. O PDF e o CSV saem completos.</span><button class="btn" data-mais="relMax">Mostrar mais</button></div>` : ''}`
