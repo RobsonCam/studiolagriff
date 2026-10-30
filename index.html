@@ -2890,6 +2890,8 @@ function excluirServico(S, a, id) {
   audit(S, a, 'Serviço excluído', `${sv.nome}${usado ? ' (o histórico continua nos registros antigos)' : ''}`);
   return usado ? 'arquivado' : 'apagado';
 }
+/* pessoa excluída: o e-mail fica guardado só no histórico e fica livre para um novo cadastro */
+function liberarEmail(x) { if (x && x.email) { x.emailExcluido = x.email; x.email = ''; } }
 function excluirFuncionario(S, a, id) {
   exigirDono(a);
   const f = S.funcionarios.find(x => x.id === id); if (!f || f.excluido) throw new Error('Pessoa não encontrada.');
@@ -2901,7 +2903,7 @@ function excluirFuncionario(S, a, id) {
   if (dev > 0) throw new Error(`${f.nome} ainda tem ${brl(dev)} de adiantamento em aberto. Acerte antes de excluir.`);
   const usado = S.atendimentos.some(x => x.funcId === id) || S.agendamentos.some(x => x.funcId === id) || S.pagamentos.some(x => x.funcId === id) || S.bloqueios.some(x => x.funcId === id);
   S.servicos.forEach(sv => { sv.funcs = sv.funcs.filter(x => x !== id); });
-  if (usado) { Object.assign(f, { excluido: true, ativo: false, acesso: 'bloqueado', excluidoEm: stamp(), excluidoPor: a.nome }); const u = S.users.find(x => x.funcId === id); if (u) { delete u.senha; delete u.convite; u.excluido = true; } }
+  if (usado) { Object.assign(f, { excluido: true, ativo: false, acesso: 'bloqueado', excluidoEm: stamp(), excluidoPor: a.nome }); liberarEmail(f); const u = S.users.find(x => x.funcId === id); if (u) { delete u.senha; delete u.convite; u.excluido = true; liberarEmail(u); } }
   else { S.funcionarios = S.funcionarios.filter(x => x.id !== id); S.users = S.users.filter(x => x.funcId !== id); }
   audit(S, a, 'Funcionária excluída', `${f.nome}${usado ? ' (acesso removido; o histórico continua)' : ''}`);
   return usado ? 'arquivado' : 'apagado';
@@ -2952,7 +2954,7 @@ function excluirProprietario(S, a, id) {
   if (u.id === a.id) throw new Error('Você não pode excluir o seu próprio acesso.');
   if (S.users.filter(x => x.papel === 'proprietaria' && !x.excluido).length <= 1) throw new Error('O salão precisa ter pelo menos um proprietário.');
   const d = S.funcionarios.find(f => f.dona && f.userId === id); if (d) throw new Error('Esta pessoa também atende no salão. Tire os atendimentos dela antes.');
-  Object.assign(u, { excluido: true, papel: 'excluido', excluidoEm: stamp(), excluidoPor: a.nome }); delete u.senha; delete u.convite;
+  Object.assign(u, { excluido: true, papel: 'excluido', excluidoEm: stamp(), excluidoPor: a.nome }); delete u.senha; delete u.convite; liberarEmail(u);
   audit(S, a, 'Proprietário excluído', u.nome);
 }
 
@@ -3224,8 +3226,8 @@ function salvarFuncionario(S, a, d) {
   if (!(pct >= 0 && pct <= 100)) throw new Error('O percentual de comissão deve estar entre 0 e 100.');
   const email = String(d.email || '').trim().toLowerCase();
   if (d.acesso !== 'bloqueado' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Informe um e-mail válido. Ele é o login de acesso da funcionária.');
-  if (email && S.funcionarios.some(f => f.id !== d.id && (f.email || '').toLowerCase() === email)) throw new Error('Já existe outra pessoa da equipe com este e-mail.');
-  if (email && S.users.some(u => !u.funcId && (u.email || '').toLowerCase() === email)) throw new Error('Este e-mail já é usado pela administração do sistema.');
+  if (email && S.funcionarios.some(f => f.id !== d.id && !f.excluido && (f.email || '').toLowerCase() === email)) throw new Error('Já existe outra pessoa da equipe com este e-mail.');
+  if (email && S.users.some(u => !u.funcId && !u.excluido && (u.email || '').toLowerCase() === email)) throw new Error('Este e-mail já é usado pela administração do sistema.');
   const perm = { ...CARGOS[cargo].perm, ...(d.perm || {}) };
   PERMS.forEach(x => { perm[x.k] = !!perm[x.k]; });
   if (d.id && ehDona(S.funcionarios.find(x => x.id === d.id))) throw new Error('Os serviços da proprietária são ajustados em Equipe → Meus atendimentos.');
@@ -3864,6 +3866,8 @@ const ehEmailDemo = e => /@([\w-]+\.)*exemplo(\.com)?$/i.test(String(e || '').tr
 function senhasDemo(D) { D.users.forEach(u => { if (!u.senha && ehEmailDemo(u.email)) u.senha = { ...SENHA_DEMO }; }); }
 function migrarDados(D) {
   if (!D || !Array.isArray(D.agendamentos) || !Array.isArray(D.funcionarios) || !Array.isArray(D.users)) return null;
+  // pessoas já excluídas: libera o e-mail para um novo cadastro (fica guardado só no histórico)
+  (D.funcionarios || []).forEach(f => { if (f.excluido) liberarEmail(f); }); (D.users || []).forEach(u => { if (u.excluido) liberarEmail(u); });
   const base = seedBase();
   D.config = D.config || {}; D.config.nome = D.config.nome || 'Studio La Griff';
   if (!D.config.whatsapp) D.config.whatsapp = waPadrao();
@@ -4384,6 +4388,16 @@ function runTests() {
     const vazia = addCategoria(S6, d6, 'Teste vazia'); excluirCategoria(S6, d6, vazia);
     const m = excluirCategoria(S6, d6, c, outra);
     return (negado && semDestino && m === n && !S6.categorias.some(x => x.id === c || x.id === vazia) && !S6.servicos.some(x => x.catId === c)) || JSON.stringify([negado, semDestino, m, n]);
+  });
+  T('Excluir pessoa libera o e-mail: dá para cadastrar de novo com o mesmo e-mail', () => {
+    const S8 = seedBase(), d8 = S8.users.find(u => u.id === 'u0');
+    const f = S8.funcionarios.find(x => !x.dona && !x.excluido && x.email), em = f.email;
+    registrarAtendimento(S8, d8, { funcId: f.id, servicoId: S8.servicos.find(s => s.funcs.includes(f.id)).id, clienteId: 'k1', data: TODAY, valorCobrado: 7000, parcelas: [{ forma: 'pix', valor: 7000 }] });
+    S8.fechamentos.filter(x => x.funcId === f.id).forEach(x => { x.pago = x.total; });
+    const r = excluirFuncionario(S8, d8, f.id);
+    const novo = salvarFuncionario(S8, d8, { nome: 'Nova Pessoa Teste', email: em, cargo: 'profissional', pct: 40 });
+    const u = usuarioPorEmail(S8, em);
+    return (r === 'arquivado' && f.emailExcluido === em && !f.email && !!novo && u && u.funcId === novo) || JSON.stringify([r, f.email, f.emailExcluido, novo, u && u.funcId]);
   });
   T('Proprietários: dá para cadastrar mais donos com acesso total; não exclui a si mesmo nem o último', () => {
     const S5 = seedBase(), d5 = S5.users.find(u => u.id === 'u0');
