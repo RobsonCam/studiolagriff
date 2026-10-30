@@ -1995,7 +1995,7 @@ function salvarConfigWhatsApp(S, a, d) {
   S.config.whatsapp = { ...S.config.whatsapp, ...d };
   audit(S, a, 'Configuração do WhatsApp', `${d.modelos.length} mensagens · equipe ${d.funcionarios ? 'pode' : 'não pode'} usar`);
 }
-function registrarContatoWhatsApp(S, a, { clienteId, modeloId, agendamentoId, pacoteVendaId }) {
+function registrarContatoWhatsApp(S, a, { clienteId, modeloId, agendamentoId, pacoteVendaId, atendimentoId }) {
   exigirAcesso(S, a);
   if (!podeWhatsApp(S, a, modeloId)) throw new Error('Seu usuário não tem permissão para usar esta mensagem.');
   const cl = S.clientes.find(c => c.id === clienteId);
@@ -2003,7 +2003,7 @@ function registrarContatoWhatsApp(S, a, { clienteId, modeloId, agendamentoId, pa
   const ag = agendamentoId && S.agendamentos.find(x => x.id === agendamentoId);
   if (ag) ag.historico.push({ quando: stamp(), usuario: a.nome, texto: `WhatsApp aberto · ${m ? m.nome : 'mensagem'}` });
   S.contatos = S.contatos || [];
-  S.contatos.unshift({ id: uid('wa'), quando: stamp(), usuario: a.nome, funcId: a.funcId, clienteId, modelo: m ? m.nome : 'Mensagem', agendamentoId: agendamentoId || null });
+  S.contatos.unshift({ id: uid('wa'), quando: stamp(), usuario: a.nome, funcId: a.funcId, clienteId, modelo: m ? m.nome : 'Mensagem', modeloId: modeloId || '', agendamentoId: agendamentoId || null, atendimentoId: atendimentoId || null });
   if (modeloId === 'nivel' && typeof marcarNivelAvisado === 'function') marcarNivelAvisado(S, clienteId);
   const pv = pacoteVendaId && (S.pacoteVendas || []).find(x => x.id === pacoteVendaId);
   let det = '';
@@ -4985,15 +4985,45 @@ function escolherPacote(col, rec) {
     if ((SYNC.tam[col + '/' + b] || 0) < SYNC_LIMITE) return b;
   }
 }
+/* o que ainda não chegou ao banco fica guardado neste aparelho: se o app for fechado no meio do envio
+   (ex.: o celular fecha o sistema ao abrir o WhatsApp), é enviado de novo quando o sistema abrir */
+const PEND_K = 'lagriff.pendentes', PEND_VALIDADE = 24 * 36e5;
+SYNC.voo = new Map();
+let PEND_T = 0;
+function gravarPendentes() {
+  clearTimeout(PEND_T); PEND_T = 0;
+  try {
+    const o = {};
+    for (const [k, v] of SYNC.voo) if (!k.startsWith('meta/')) o[k] = { ...v };
+    for (const [k, v] of SYNC.fila) if (!k.startsWith('meta/')) o[k] = { ...(o[k] || {}), ...v };
+    if (!Object.keys(o).length) { localStorage.removeItem(PEND_K); return; }
+    const sv = JSON.stringify({ t: Date.now(), p: o }); if (sv.length < 1500000) localStorage.setItem(PEND_K, sv);
+  } catch (e) { }
+}
+const marcarPendentes = () => { if (!PEND_T) PEND_T = setTimeout(gravarPendentes, 250); };
+window.addEventListener('pagehide', gravarPendentes);
+document.addEventListener('visibilitychange', () => { if (document.hidden) gravarPendentes(); });
+function reenviarPendentes() {
+  let o = null; try { o = JSON.parse(localStorage.getItem(PEND_K) || 'null'); } catch (e) { }
+  try { localStorage.removeItem(PEND_K); } catch (e) { }
+  if (!o || !o.p || !(Date.now() - (o.t || 0) < PEND_VALIDADE)) return 0;
+  let n = 0;
+  for (const [k, campos] of Object.entries(o.p)) {
+    const i = k.indexOf('/'), col = k.slice(0, i), b = k.slice(i + 1);
+    if (!col || col === 'meta' || !campos || typeof campos !== 'object') continue;
+    aplicarPacote(col, b, campos, true); enfileirar(col, b, campos); n += Object.keys(campos).length;
+  }
+  return n;
+}
 function enfileirar(col, b, campos) {
   const k = col + '/' + b;
-  const f = SYNC.fila.get(k) || {}; Object.assign(f, campos); SYNC.fila.set(k, f);
+  const f = SYNC.fila.get(k) || {}; Object.assign(f, campos); SYNC.fila.set(k, f); marcarPendentes();
   SYNC.tam[k] = (SYNC.tam[k] || 0) + Object.entries(campos).reduce((s, [i, v]) => s + i.length + v.length + 6, 0);
   descarregar(k);
 }
 async function descarregar(k) {
   if (SYNC.gravando.has(k) || !SYNC.fila.has(k) || !SYNC.db) return;
-  const campos = SYNC.fila.get(k); SYNC.fila.delete(k); SYNC.gravando.add(k);
+  const campos = SYNC.fila.get(k); SYNC.fila.delete(k); SYNC.gravando.add(k); SYNC.voo.set(k, campos);
   const ref = SYNC.db.doc(k);
   let tentarDepois = false;
   try {
@@ -5002,7 +5032,7 @@ async function descarregar(k) {
       try { await ref.update(campos); }
       catch (e) { if (e && e.code === 'invalid_argument') await ref.set(campos); else throw e; }
     }
-    SYNC.existe.add(k);
+    SYNC.existe.add(k); SYNC.voo.delete(k); marcarPendentes();
     if (SYNC.estado === 'erro') syncEstado('aovivo');
   } catch (e) {
     const c = e && e.code;
@@ -5010,7 +5040,7 @@ async function descarregar(k) {
     else if (c === 'quota_exceeded') { toast('O banco compartilhado está cheio. Fale com o suporte do sistema.', 'bad'); }
     else if (c === 'revoked' || c === 'not_granted' || c === 'capability_disabled' || c === 'capability_removed') { syncEstado('local'); SYNC.db = null; }
     else {   // falha passageira: devolve para a fila e tenta de novo
-      const f = SYNC.fila.get(k) || {}; SYNC.fila.set(k, { ...campos, ...f });
+      const f = SYNC.fila.get(k) || {}; SYNC.fila.set(k, { ...campos, ...f }); SYNC.voo.delete(k);
       tentarDepois = true; syncEstado('erro'); setTimeout(() => descarregar(k), 2500 + Math.random() * 2500);
     }
   } finally {
@@ -5156,6 +5186,7 @@ function assinarTudo(cols) {
     DB = migrado;
     SYNC.pronto = true; carregado = true;
     syncEstado('aovivo');
+    try { reenviarPendentes(); } catch (e) { console.error(e); }   // o que ficou sem enviar da última vez
     renderRemoto();
     syncEnviar();   // envia o que a migração completou e o que foi feito enquanto conectava
   };
@@ -7261,7 +7292,7 @@ function waContexto({ clienteId, agendamentoId, atendimentoId, parcelaId, pacote
   const cid = clienteId || base?.clienteId || pv?.clienteId;
   const cl = CL(cid), c = DB.config.whatsapp;
   const valor = pc ? pc.valor : at ? sum(DB.parcelas.filter(p => p.atendimentoId === at.id && p.status === 'pendente').map(p => p.valor)) || at.valorFinal : ag?.preco;
-  return { clienteId: cid, agendamentoId: ag?.id, pacoteVendaId: pv?.id, telefone: cl?.telefone || '', ctx: {
+  return { clienteId: cid, agendamentoId: ag?.id, atendimentoId: at?.id, pacoteVendaId: pv?.id, telefone: cl?.telefone || '', ctx: {
     cliente: cl?.nome || '', primeiro_nome: (cl?.nome || '').split(' ')[0], servico: base ? SV(base.servicoId)?.nome : '',
     data: base ? dBR(base.data) : '', hora: ag ? ag.inicio : '', profissional: base ? first(base.funcId) : '',
     valor: valor ? brl(valor) : '', pix: c.pix, endereco: c.endereco, salao: DB.config.nome, telefone_salao: c.numeroSalao, link_avaliacao: typeof linkAvaliacao === 'function' ? linkAvaliacao() : '', ...waExtras(ag, cid), ...(pv ? waPacoteCtx(DB, pv) : {}) } };
@@ -7288,8 +7319,12 @@ function modalWhatsApp(ref = {}, modeloId) {
   q('#wa-chips').onclick = e => { const b = e.target.closest('[data-m]'); if (!b) return; mid = b.dataset.m; q('#wa-chips').querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x === b)); fill(); };
   q('#wa-txt').oninput = upd; q('#wa-tel').oninput = upd;
   q('#wa-cl')?.addEventListener('change', e => { W = waContexto({ clienteId: e.target.value }); q('#wa-nome').textContent = W.ctx.cliente || 'Escolha o cliente'; q('.wa-av').textContent = (W.ctx.cliente || '?').slice(0, 1); q('#wa-tel').value = W.telefone; fill(); });
-  q('#wa-go').onclick = e => { if (!q('#wa-go').href) { e.preventDefault(); return; } try { registrarContatoWhatsApp(DB, ACTOR, { clienteId: W.clienteId, modeloId: mid, agendamentoId: W.agendamentoId, pacoteVendaId: W.pacoteVendaId }); save(); } catch (err) { e.preventDefault(); toast(err.message, 'bad'); return; } setTimeout(() => { closeModal(); render(); toast('Conversa aberta no WhatsApp'); }, 300); };
-  q('#wa-copy').onclick = () => { const t = q('#wa-txt'); const ok = () => toast('Texto copiado'); const fb = () => { t.select(); toast('Texto selecionado. Use Copiar do aparelho.'); };
+  q('#wa-go').onclick = e => { if (!q('#wa-go').href) { e.preventDefault(); return; } registrado = false; if (!registrar()) { e.preventDefault(); return; } setTimeout(() => { closeModal(); render(); toast('Conversa aberta no WhatsApp'); }, 300); };
+  ov.addEventListener('click', e => { if (registrado && e.target.closest('[data-close]')) setTimeout(render, 50); });
+  // copiar o texto também conta como feito (a pessoa vai colar no WhatsApp): o botão sai da lista
+  let registrado = false;
+  const registrar = () => { if (registrado) return true; try { registrarContatoWhatsApp(DB, ACTOR, { clienteId: W.clienteId, modeloId: mid, agendamentoId: W.agendamentoId, pacoteVendaId: W.pacoteVendaId, atendimentoId: W.atendimentoId }); registrado = true; save(); try { gravarPendentes(); } catch (x) { } return true; } catch (err) { toast(err.message, 'bad'); return false; } };
+  q('#wa-copy').onclick = () => { const t = q('#wa-txt'); const ok = () => { if (W.clienteId) registrar(); toast('Texto copiado'); }; const fb = () => { t.select(); toast('Texto selecionado. Use Copiar do aparelho.'); };
     try { navigator.clipboard.writeText(t.value).then(ok, fb); } catch (err) { fb(); } };
   fill();
 }
@@ -7319,11 +7354,11 @@ function painelContatos(ags) {
   const aniv = DB.clientes.filter(c => (c.aniversario || '').slice(0, 5) === hojeDM);
   // depois do atendimento (hoje e ontem): agradecer e pedir a avaliação, uma vez por comanda
   const ontem = addDays(TODAY, -1), feitos = (DB.contatos || []);
-  const jaFez = (cid, nomeModelo, desde) => feitos.some(c => c.clienteId === cid && c.modelo === nomeModelo && (() => { const m = String(c.quando || '').match(/(\d{2})\/(\d{2})\/(\d{2,4})/); if (!m) return false; const y = m[3].length === 2 ? '20' + m[3] : m[3]; return `${y}-${m[2]}-${m[1]}` >= desde; })());
+  const jaFez = (cid, nomeModelo, desde, idModelo) => feitos.some(c => c.clienteId === cid && (c.modelo === nomeModelo || (idModelo && c.modeloId === idModelo)) && (() => { const m = String(c.quando || '').match(/(\d{2})\/(\d{2})\/(\d{2,4})/); if (!m) return false; const y = m[3].length === 2 ? '20' + m[3] : m[3]; return `${y}-${m[2]}-${m[1]}` >= desde; })());
   const mod = id => DB.config.whatsapp.modelos.find(m => m.id === id);
   const posAt = (() => { const m = new Map(); for (const at of DB.atendimentos) { if (at.status !== 'concluido' || at.data < ontem || at.data > TODAY) continue; const k = at.clienteId, o = m.get(k); if (!o || at.data > o.data) m.set(k, at); } return [...m.values()].sort((p, q) => q.data.localeCompare(p.data)); })();
-  const agradecer = mod('agradecimento') ? posAt.filter(at => !jaFez(at.clienteId, mod('agradecimento').nome, at.data)) : [];
-  const avaliar = mod('avaliacao') ? posAt.filter(at => !jaFez(at.clienteId, mod('avaliacao').nome, at.data) && !(DB.avaliacoes || []).some(a => a.clienteId === at.clienteId && a.data >= at.data)) : [];
+  const agradecer = mod('agradecimento') ? posAt.filter(at => !jaFez(at.clienteId, mod('agradecimento').nome, at.data, 'agradecimento')) : [];
+  const avaliar = mod('avaliacao') ? posAt.filter(at => !jaFez(at.clienteId, mod('avaliacao').nome, at.data, 'avaliacao') && !(DB.avaliacoes || []).some(a => a.clienteId === at.clienteId && a.data >= at.data)) : [];
   const item = (t, s, btn) => btn ? `<div class="ct"><div style="min-width:0;flex:1"><div class="b ell">${t}</div><div class="muted small ct-s">${s}</div></div>${btn}</div>` : '';
   const html = [
     ...contatosGestao(ags, item),
@@ -10246,7 +10281,9 @@ async function bootProd() {
     aplicarTema(TEMA); return window.supabase ? telaSemConfig() : telaProd(`<div class="lg-hd"><h2>Sem conexão</h2><p>Não foi possível carregar o sistema. Verifique a internet e tente de novo.</p></div><button class="lg-btn" onclick="location.reload()"><span>Tentar de novo</span>${lgi('seta')}</button>`);
   }
   aplicarTema(TEMA);
-  PROD.sb = window.supabase.createClient(PROD_CFG.supabaseUrl, PROD_CFG.supabaseAnonKey, { auth: { persistSession: true, autoRefreshToken: true, storageKey: 'lagriff-auth' } });
+  // envios pequenos continuam mesmo se o app for para o fundo (ex.: abrir o WhatsApp)
+  const fetchFirme = (u, o) => { const b = o && o.body; return fetch(u, (typeof b === 'string' && b.length < 60000) ? { ...o, keepalive: true } : o); };
+  PROD.sb = window.supabase.createClient(PROD_CFG.supabaseUrl, PROD_CFG.supabaseAnonKey, { auth: { persistSession: true, autoRefreshToken: true, storageKey: 'lagriff-auth' }, global: { fetch: fetchFirme } });
   // página da cliente: agendar, avaliar ou confirmar (não pede login)
   if (codigoDoLink() || pedeAvaliacao() || tokenConfirmacao()) return iniciarPublico();
   PROD.modo = 'equipe';
