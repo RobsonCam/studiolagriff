@@ -9647,8 +9647,20 @@ function telaEntrar(msg, tipo = 'bad') {
       if (ENTRAR.modo === 'entrar') {
         const senha = v('en-s');
         if (!email || !senha) return parar('Preencha o e-mail e a senha.');
-        const er = await entrarNoBanco(email, senha);
-        if (er) return parar(semRede(er) ? 'Sem conexão com a internet. Tente de novo.' : 'E-mail ou senha incorretos. Se é o seu primeiro acesso, toque em "Primeiro acesso ou código" e use o código que a proprietária enviou.');
+        let er = await entrarNoBanco(email, senha);
+        if (er && semRede(er)) return parar('Sem conexão com a internet. Tente de novo.');
+        if (er) {
+          // primeira vez neste aparelho (ou no aplicativo instalado): confere a senha de sempre e cria a conta na hora
+          const sl = await rpcProd('sal_login', { p_email: email });
+          if (sl.erro) return parar(semRede(sl.erro) ? 'Sem conexão com a internet. Tente de novo.' : 'O acesso pelo aplicativo ainda não foi liberado no banco de dados. Avise a proprietária para rodar a atualização do Supabase.');
+          let h = ''; try { h = await pbkdf2(senha, sl.data.sal, sl.data.it || 120000); } catch (x) { return parar(x.message); }
+          const lg = await rpcProd('entrar_legado', { p_email: email, p_h: h, p_senha: senha });
+          if (lg.erro) return parar(semRede(lg.erro) ? 'Sem conexão com a internet. Tente de novo.' : 'Não foi possível entrar agora. Tente de novo em instantes.');
+          if (lg.data === 'espera') return parar('Muitas tentativas erradas. Espere 15 minutos e tente de novo.');
+          if (lg.data !== 'ok') return parar('E-mail ou senha incorretos. Se é o seu primeiro acesso, toque em "Primeiro acesso ou código" e use o código que a proprietária enviou.');
+          er = await entrarNoBanco(email, senha);
+          if (er) return parar('Não foi possível entrar agora. Tente de novo em instantes.');
+        }
         PROD.pendente = { email, senha, manter: !!(q('#en-m') || {}).checked, modo: 'entrar' };
         return bootEquipe();
       }
