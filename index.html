@@ -9720,6 +9720,8 @@ const ENTRAR = { modo: 'entrar', email: '', aviso: '', tipo: 'bad', codigo: '' }
 const MSG_CONVITE = { sem_convite: 'E-mail ou código incorretos. Confira com a proprietária.', errado: 'E-mail ou código incorretos. Confira com a proprietária.',
   vencido: 'Este código venceu. Peça um novo à proprietária.', bloqueado: 'Este código foi bloqueado depois de 5 tentativas erradas. Peça um novo à proprietária.',
   fora: 'Este e-mail não está na equipe do salão. Confira com a proprietária.', senha: 'A senha precisa ter pelo menos 8 caracteres, com letras e números.' };
+/* e-mail cortado no celular (ex.: "@gmail.c"): avisa antes de tentar */
+const emailIncompleto = e => { const m = String(e || '').match(/@(gmail|hotmail|outlook|yahoo|icloud|live|bol|uol)\.([a-z.]*)$/i); return !/^[^\s@]+@[^\s@]+\.[a-z]{2,}(\.[a-z]{2,})?$/i.test(e) || (m && !/^com(\.br)?$/i.test(m[2])); };
 const semRede = e => /fetch|network|Failed|Load failed|timeout/i.test((e && e.message) || '') || !navigator.onLine;
 async function entrarNoBanco(email, senha) {
   try { const { error } = await PROD.sb.auth.signInWithPassword({ email, password: senha }); return error || null; }
@@ -9772,6 +9774,7 @@ function telaEntrar(msg, tipo = 'bad') {
     e.preventDefault(); if (b.disabled) return;
     const email = v('en-e').trim().toLowerCase(); ENTRAR.email = email;
     const parar = m => { b.disabled = false; b.classList.remove('carregando'); erroNaTela(m); };
+    if (email && ENTRAR.modo !== 'dono' && emailIncompleto(email)) return erroNaTela(`O e-mail parece incompleto: "${email}". Confira o final (por exemplo, @gmail.com).`);
     b.disabled = true; b.classList.add('carregando');
     try {
       if (ENTRAR.modo === 'entrar') {
@@ -9847,6 +9850,7 @@ function ligarContasEquipe() {
   if (PROD.contas) return; PROD.contas = true;
   const _entrar = acaoEntrar, _prim = acaoPrimeiro;
   acaoEntrar = async function (email, senha, manter) {
+    if (emailIncompleto(String(email || '').trim())) throw new Error(`O e-mail parece incompleto: "${String(email || '').trim()}". Confira o final (por exemplo, @gmail.com).`);
     const u = usuarioPorEmail(DB, email);
     if (!u || !u.senha || !senha || esperaLogin() || !navigator.onLine) return _entrar(email, senha, manter);   // primeiro acesso, espera ou sem internet: como antes
     const er = await entrarNoBanco(u.email, senha);
