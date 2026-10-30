@@ -2892,6 +2892,40 @@ function excluirServico(S, a, id) {
 }
 /* pessoa excluída: o e-mail fica guardado só no histórico e fica livre para um novo cadastro */
 function liberarEmail(x) { if (x && x.email) { x.emailExcluido = x.email; x.email = ''; } }
+/* troca um código de pessoa por outro em todos os registros (agenda, serviços, comissões, pagamentos...) */
+function trocarIdEmTudo(D, de, para, pular) {
+  const andar = v => {
+    if (Array.isArray(v)) { for (let i = 0; i < v.length; i++) { if (v[i] === de) v[i] = para; else if (v[i] && typeof v[i] === 'object' && !pular.has(v[i])) andar(v[i]); } return; }
+    for (const k of Object.keys(v)) {
+      let x = v[k];
+      if (x === de) v[k] = x = para; else if (x && typeof x === 'object' && !pular.has(x)) andar(x);
+      if (k === de) { const y = v[k]; delete v[k]; v[para] = (typeof y === 'number' && typeof v[para] === 'number') ? v[para] + y : (v[para] === undefined ? y : v[para]); }
+    }
+  };
+  for (const k of Object.keys(D)) if (D[k] && typeof D[k] === 'object') andar(D[k]);
+}
+/* cadastro novo de quem já tinha sido excluída (mesmo e-mail): volta o cadastro antigo, com todo o histórico */
+function reunirCadastro(D, antigo, novo, quem) {
+  const pular = new Set([antigo, novo]);
+  trocarIdEmTudo(D, novo.id, antigo.id, pular);
+  const tel = antigo.telefone, { id, cadastro, ...resto } = novo;
+  ['excluido', 'excluidoEm', 'excluidoPor', 'emailExcluido'].forEach(k => delete antigo[k]);
+  Object.assign(antigo, resto, { ativo: novo.ativo !== false });
+  if (!novo.telefone && tel) antigo.telefone = tel;
+  D.funcionarios = D.funcionarios.filter(f => f !== novo);
+  D.users = D.users.filter(u => !(u.excluido && u.funcId === antigo.id));
+  const u = D.users.find(x => x.funcId === antigo.id); if (u) u.nome = antigo.nome;
+  (D.auditoria = D.auditoria || []).unshift({ id: uid('lg'), quando: stamp(), usuario: quem || 'Sistema', acao: 'Cadastro reunido', detalhe: `${antigo.nome} · o cadastro novo voltou a usar o histórico antigo (serviços, comissões e pagamentos)` });
+  return antigo.id;
+}
+function reunirRecadastros(D) {
+  let n = 0;
+  (D.funcionarios || []).filter(f => !f.excluido && f.email).forEach(f => {
+    const e = f.email.toLowerCase(), velho = D.funcionarios.find(g => g !== f && g.excluido && (g.emailExcluido || '').toLowerCase() === e);
+    if (velho && !velho.dona && !f.dona) { reunirCadastro(D, velho, f); n++; }
+  });
+  return n;
+}
 function excluirFuncionario(S, a, id) {
   exigirDono(a);
   const f = S.funcionarios.find(x => x.id === id); if (!f || f.excluido) throw new Error('Pessoa não encontrada.');
@@ -3246,7 +3280,9 @@ function salvarFuncionario(S, a, d) {
   const f = { id: uid('fn'), telefone: '', especialidades: '', ativo: true, acesso: 'convite', ...d, cargo, email, pct, perm, cadastro: TODAY };
   S.funcionarios.push(f);
   S.users.push({ id: uid('us'), nome: f.nome, papel: 'funcionario', funcId: f.id, email });
-  audit(S, a, 'Funcionário cadastrado', `${f.nome} · ${CARGOS[cargo].nome} · ${pct}% · convite para ${email}`); return f.id;
+  audit(S, a, 'Funcionário cadastrado', `${f.nome} · ${CARGOS[cargo].nome} · ${pct}% · convite para ${email}`);
+  const velho = email && S.funcionarios.find(g => g.excluido && !g.dona && (g.emailExcluido || '').toLowerCase() === email);
+  return velho ? reunirCadastro(S, velho, f, a.nome) : f.id;
 }
 function alterarPermissao(S, a, funcId, k, v) {
   exigirDono(a);
@@ -3868,6 +3904,7 @@ function migrarDados(D) {
   if (!D || !Array.isArray(D.agendamentos) || !Array.isArray(D.funcionarios) || !Array.isArray(D.users)) return null;
   // pessoas já excluídas: libera o e-mail para um novo cadastro (fica guardado só no histórico)
   (D.funcionarios || []).forEach(f => { if (f.excluido) liberarEmail(f); }); (D.users || []).forEach(u => { if (u.excluido) liberarEmail(u); });
+  reunirRecadastros(D);
   const base = seedBase();
   D.config = D.config || {}; D.config.nome = D.config.nome || 'Studio La Griff';
   if (!D.config.whatsapp) D.config.whatsapp = waPadrao();
@@ -4395,9 +4432,26 @@ function runTests() {
     registrarAtendimento(S8, d8, { funcId: f.id, servicoId: S8.servicos.find(s => s.funcs.includes(f.id)).id, clienteId: 'k1', data: TODAY, valorCobrado: 7000, parcelas: [{ forma: 'pix', valor: 7000 }] });
     S8.fechamentos.filter(x => x.funcId === f.id).forEach(x => { x.pago = x.total; });
     const r = excluirFuncionario(S8, d8, f.id);
+    const exc = f.emailExcluido === em && !f.email;
     const novo = salvarFuncionario(S8, d8, { nome: 'Nova Pessoa Teste', email: em, cargo: 'profissional', pct: 40 });
-    const u = usuarioPorEmail(S8, em);
-    return (r === 'arquivado' && f.emailExcluido === em && !f.email && !!novo && u && u.funcId === novo) || JSON.stringify([r, f.email, f.emailExcluido, novo, u && u.funcId]);
+    const u = usuarioPorEmail(S8, em), hist = S8.atendimentos.filter(x => x.funcId === novo).length;
+    return (r === 'arquivado' && exc && novo === f.id && !f.excluido && f.pct === 40 && hist >= 1 && u && u.funcId === novo && S8.funcionarios.filter(x => x.email === em).length === 1 && S8.users.filter(x => x.funcId === novo).length === 1) || JSON.stringify([r, exc, novo, f.id, f.excluido, hist, u && u.funcId]);
+  });
+  T('Recadastro feito antes: ao abrir, o cadastro novo é reunido ao antigo com serviços, agenda e comissões', () => {
+    const S9 = seedBase(), d9 = S9.users.find(u => u.id === 'u0');
+    const f = S9.funcionarios.find(x => !x.dona && !x.excluido && x.email), em = f.email, sv = S9.servicos.find(s => s.funcs.includes(f.id));
+    registrarAtendimento(S9, d9, { funcId: f.id, servicoId: sv.id, clienteId: 'k1', data: TODAY, valorCobrado: 7000, parcelas: [{ forma: 'pix', valor: 7000 }] });
+    S9.fechamentos.filter(x => x.funcId === f.id).forEach(x => { x.pago = x.total; });
+    excluirFuncionario(S9, d9, f.id);
+    // como era antes: cadastro novo separado, com serviço e agendamento no código novo
+    const nf = { id: 'fnNovo', nome: f.nome, email: em, telefone: '', cargo: 'profissional', pct: 45, perm: f.perm, ativo: true, acesso: 'convite' };
+    S9.funcionarios.push(nf); S9.users.push({ id: 'usNovo', nome: f.nome, papel: 'funcionario', funcId: 'fnNovo', email: em }); sv.funcs.push('fnNovo');
+    S9.agendamentos.push({ id: 'agN', funcId: 'fnNovo', clienteId: 'k1', servicoId: sv.id, data: addDays(TODAY, 1), inicio: '10:00', fim: '11:00', status: 'aguardando', historico: [] });
+    const n = reunirRecadastros(S9);
+    const ok = n === 1 && !S9.funcionarios.some(x => x.id === 'fnNovo') && !f.excluido && f.email === em && f.pct === 45 && !!f.telefone
+      && sv.funcs.includes(f.id) && !sv.funcs.includes('fnNovo') && S9.agendamentos.find(x => x.id === 'agN').funcId === f.id
+      && S9.atendimentos.some(x => x.funcId === f.id) && S9.users.find(x => x.id === 'usNovo').funcId === f.id && !S9.users.some(x => x.excluido && x.funcId === f.id) && reunirRecadastros(S9) === 0;
+    return ok || JSON.stringify([n, f.excluido, f.email, f.pct, f.telefone, sv.funcs]);
   });
   T('Proprietários: dá para cadastrar mais donos com acesso total; não exclui a si mesmo nem o último', () => {
     const S5 = seedBase(), d5 = S5.users.find(u => u.id === 'u0');
