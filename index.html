@@ -9729,8 +9729,8 @@ function ligarContasEquipe() {
     if (!(await confere(senha, u.senha))) { marcarFalha(); throw new Error('E-mail ou senha incorretos.'); }
     const g = await rpcProd('garantir_conta', { p_email: u.email, p_senha: senha });
     if (g.erro) return _entrar(email, senha, manter);   // banco ainda sem esta atualização: entra como antes
-    if (g.data === 'ok') { const e2 = await entrarNoBanco(u.email, senha); if (!e2) PROD.email = u.email.toLowerCase(); return _entrar(email, senha, manter); }
-    marcarFalha(); throw new Error('E-mail ou senha incorretos.');
+    if (g.data === 'ok') { const e2 = await entrarNoBanco(u.email, senha); if (!e2) PROD.email = u.email.toLowerCase(); }
+    return _entrar(email, senha, manter);   // a senha deste aparelho confere: entra (a conta do banco continua a do aparelho)
   };
   acaoPrimeiro = async function (email, codigo, senha, conf) {
     const w = esperaLogin(); if (w) return _prim(email, codigo, senha, conf);
