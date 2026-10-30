@@ -1440,6 +1440,10 @@ circle.gft1{fill:var(--gf1)}circle.gft2{fill:var(--gf2)}circle.gft3{fill:var(--g
   .hero::before,.hero::after,.hero-wm,.gf-bar,.gf-linha,.gf-area,.gf-ponto,.page.enter>*,.page.enter .stack>*,.page.enter .grid>*{animation:none!important}
   .gf-linha{stroke-dashoffset:0}
 }
+.cat-cab{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 8px}
+.cat-cab .sec{margin:0}
+.cat-n{font-size:11px;letter-spacing:0;font-weight:600;color:var(--muted);background:color-mix(in srgb,var(--gold) 14%,transparent);border-radius:99px;padding:1px 8px;margin-left:2px}
+.cat-lixo{opacity:.75}.cat-lixo:hover{opacity:1}
 
 /* ===== Formulário do cliente — leitura fácil (letras grandes, alto contraste) =====
    Usado igual na página pública (agendar.html) e na pré-visualização do sistema.
@@ -2119,7 +2123,7 @@ function catalogoPublico(S) {
   return {
     salao: S.config.nome, whatsapp: waTelefone(S.config.whatsapp?.numeroSalao), endereco: S.config.whatsapp?.endereco || '',
     servicos: S.servicos.filter(s => s.ativo !== false && s.funcs.some(id => ativos.some(f => f.id === id)))
-      .map(s => ({ id: s.id, nome: s.nome, categoria: (S.categorias.find(c => c.id === s.catId) || {}).nome || '', duracao: s.duracao, preco: s.preco,
+      .map(s => ({ id: s.id, nome: s.nome, categoria: (S.categorias.find(c => c.id === s.catId) || {}).nome || s.catNome || '', duracao: s.duracao, preco: s.preco,
         profissionais: s.funcs.filter(id => ativos.some(f => f.id === id)).map(id => ({ id, nome: ativos.find(f => f.id === id).nome.split(' ')[0] })) })),
     profissionais: ativos.map(f => ({ id: f.id, nome: f.nome.split(' ')[0] }))
   };
@@ -3255,6 +3259,19 @@ function addCategoria(S, a, nome) {
   if (S.categorias.some(c => c.nome.toLowerCase() === nome.trim().toLowerCase())) throw new Error('Essa categoria já existe.');
   const c = { id: uid('ct'), nome: nome.trim() }; S.categorias.push(c); audit(S, a, 'Categoria criada', c.nome); return c.id;
 }
+// apaga uma categoria; os serviços dela vão para a categoria escolhida (os serviços já excluídos guardam o nome antigo)
+function excluirCategoria(S, a, id, destinoId) {
+  exigirDono(a);
+  const c = S.categorias.find(x => x.id === id); if (!c) throw new Error('Categoria não encontrada.');
+  if (S.categorias.length <= 1) throw new Error('O sistema precisa de pelo menos uma categoria.');
+  const ativos = S.servicos.filter(s => s.catId === id && !s.excluido);
+  const dest = destinoId && destinoId !== id ? S.categorias.find(x => x.id === destinoId) : null;
+  if (ativos.length && !dest) throw new Error(`Escolha para qual categoria vão os ${ativos.length} serviço(s) de ${c.nome}.`);
+  S.servicos.filter(s => s.catId === id).forEach(s => { if (s.excluido && !dest) { s.catNome = c.nome; s.catId = null; } else s.catId = dest.id; });
+  S.categorias = S.categorias.filter(x => x.id !== id);
+  audit(S, a, 'Categoria excluída', `${c.nome}${ativos.length ? ` (${ativos.length} serviço(s) movido(s) para ${dest.nome})` : ''}`);
+  return ativos.length;
+}
 function salvarBloqueio(S, a, d) {
   exigirAcesso(S, a);
   if (!podeBloquearPara(S, a, d.funcId)) throw new Error(pode(S, a, 'bloquear') ? 'Você só pode bloquear a sua própria agenda.' : 'Seu usuário não pode bloquear horários. Peça à proprietária.');
@@ -4333,6 +4350,14 @@ function runTests() {
     const f = excluirFuncionario(S4, d4, 'f3'), semF = !S4.servicos.some(x => x.funcs.includes('f3')), semLogin = !S4.users.some(u => u.funcId === 'f3');
     const o = excluirOrigem(S4, d4, 'or2');
     return (negado && r1 === 'apagado' && !S4.servicos.some(x => x.id === 's6') && r2 === 'arquivado' && S4.servicos.find(x => x.id === 's4').excluido && cv === 'apagado' && semCv && f === 'apagado' && semF && semLogin && o === 'apagado') || JSON.stringify([negado, r1, r2, cv, f, o]);
+  });
+  T('Categorias: só proprietários excluem; os serviços vão para a categoria escolhida', () => {
+    const S6 = seedBase(), d6 = S6.users.find(u => u.id === 'u0'), lu = S6.users.find(u => u.id === 'u4');
+    const c = S6.servicos.find(x => !x.excluido).catId, outra = S6.categorias.find(x => x.id !== c).id, n = S6.servicos.filter(x => x.catId === c).length;
+    const negado = deveFalhar(() => excluirCategoria(S6, lu, c, outra)), semDestino = deveFalhar(() => excluirCategoria(S6, d6, c));
+    const vazia = addCategoria(S6, d6, 'Teste vazia'); excluirCategoria(S6, d6, vazia);
+    const m = excluirCategoria(S6, d6, c, outra);
+    return (negado && semDestino && m === n && !S6.categorias.some(x => x.id === c || x.id === vazia) && !S6.servicos.some(x => x.catId === c)) || JSON.stringify([negado, semDestino, m, n]);
   });
   T('Proprietários: dá para cadastrar mais donos com acesso total; não exclui a si mesmo nem o último', () => {
     const S5 = seedBase(), d5 = S5.users.find(u => u.id === 'u0');
@@ -9098,9 +9123,19 @@ function modalFuncionario(id) {
   if (nu && nu.email) setTimeout(() => gerarCodigoAcesso(nu.id), 250); };
 }
 function pgServicos() {
+  const b = (UI.svBusca || '').trim(), bn = nomeChave(b);
+  const casa = (s, c) => !bn || nomeChave([s.nome, s.descricao, c.nome, s.funcs.map(id => F(id)?.nome || '').join(' ')].join(' ')).includes(bn);
+  let achados = 0;
+  const blocos = DB.categorias.map(c => {
+    const todos = DB.servicos.filter(s => s.catId === c.id && !s.excluido), l = todos.filter(s => casa(s, c)); achados += l.length;
+    if (bn && !l.length) return '';
+    const apagar = isOwner(ACTOR) && DB.categorias.length > 1 ? `<button class="btn sm ghost lixo cat-lixo" type="button" data-del-cat="${c.id}" title="Excluir a categoria ${esc(c.nome)}" aria-label="Excluir a categoria ${esc(c.nome)}">${icon('lixo')}</button>` : '';
+    return `<div><div class="cat-cab"><div class="sec">${esc(c.nome)}<span class="cat-n">${todos.length}</span></div>${apagar}</div>${l.length ? `<div class="tw"><table><thead><tr><th>Serviço</th><th>Descrição</th><th class="r">Preço padrão</th><th class="r">Duração</th><th>Habilitados</th><th>Situação</th><th></th></tr></thead><tbody>${l.map(s => `<tr class="click" data-serv="${s.id}"><td class="b">${esc(s.nome)}</td><td class="small muted">${esc(s.descricao) || '—'}</td><td class="r">${brl(s.preco)}</td><td class="r">${s.duracao} min</td><td class="small">${s.funcs.map(first).join(', ') || '—'}</td><td>${s.ativo ? pill('Ativo', 'ok') : pill('Inativo', 'bad')}</td><td class="acts">${lixo('servico', s.id, s.nome)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="muted small">Nenhum serviço nesta categoria.</div>'}</div>`;
+  }).join('');
   return `
   <div class="ph"><div><h1>Serviços</h1><p>Mudar o preço padrão não altera serviços já registrados: o valor cobrado fica salvo em cada atendimento.</p></div><div class="act"><button class="btn" data-new-cat>Nova categoria</button><button class="btn pri" data-new-serv>Novo serviço</button></div></div>
-  <div class="stack">${DB.categorias.map(c => { const l = DB.servicos.filter(s => s.catId === c.id && !s.excluido); return `<div><div class="sec" style="margin:0 0 8px">${esc(c.nome)}</div>${l.length ? `<div class="tw"><table><thead><tr><th>Serviço</th><th>Descrição</th><th class="r">Preço padrão</th><th class="r">Duração</th><th>Habilitados</th><th>Situação</th><th></th></tr></thead><tbody>${l.map(s => `<tr class="click" data-serv="${s.id}"><td class="b">${esc(s.nome)}</td><td class="small muted">${esc(s.descricao) || '—'}</td><td class="r">${brl(s.preco)}</td><td class="r">${s.duracao} min</td><td class="small">${s.funcs.map(first).join(', ') || '—'}</td><td>${s.ativo ? pill('Ativo', 'ok') : pill('Inativo', 'bad')}</td><td class="acts">${lixo('servico', s.id, s.nome)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="muted small">Nenhum serviço nesta categoria.</div>'}</div>`; }).join('')}</div>`;
+  <div class="po-busca"><label for="sv-b" class="po-busca-l">Pesquisar serviço</label><div class="po-busca-c">${icon('lupa')}<input id="sv-b" type="text" enterkeyhint="search" autocomplete="off" placeholder="Nome do serviço, categoria ou profissional" value="${esc(b)}">${b ? '<button type="button" class="btn sm ghost" data-sv-limpa aria-label="Limpar pesquisa">Limpar</button>' : ''}</div>${b ? `<div class="muted small" style="margin-top:6px">${achados ? `${achados} serviço(s) encontrado(s)` : ''}</div>` : ''}</div>
+  <div class="stack">${bn && !achados ? `<div class="panel">${empty('Nenhum serviço com essa busca', 'Confira a grafia ou toque em "Novo serviço" para cadastrar.')}</div>` : blocos}</div>`;
 }
 function modalServico(id) {
   const s = id ? SV(id) : { nome: '', catId: DB.categorias[0].id, descricao: '', preco: 0, duracao: 60, funcs: [], ativo: true };
@@ -9113,6 +9148,14 @@ function modalServico(id) {
     <label class="chk"><input type="checkbox" id="s-a" ${s.ativo ? 'checked' : ''}> Ativo</label></div>`,
     `<button class="btn" data-close>Cancelar</button><button class="btn pri" id="s-ok">Salvar</button>`);
   ov.querySelector('#s-ok').onclick = () => run(() => salvarServico(DB, ACTOR, { ...(id ? { id } : {}), nome: val('s-n'), catId: val('s-c'), preco: toCents(val('s-p')), duracao: parseInt(val('s-d'), 10), descricao: val('s-x'), funcs: [...ov.querySelectorAll('.s-f:checked')].map(i => i.value), ativo: ov.querySelector('#s-a').checked, exclusivo: ov.querySelector('#s-ex').checked }), 'Serviço salvo').ok && closeModal();
+}
+function modalExcluirCategoria(id) {
+  const c = DB.categorias.find(x => x.id === id); if (!c) return;
+  const n = DB.servicos.filter(s => s.catId === id && !s.excluido).length, outras = DB.categorias.filter(x => x.id !== id);
+  const ov = openModal('Excluir categoria', `<div class="del-box">${icon('lixo')}<div><p style="margin:0 0 6px">Excluir a categoria <b>${esc(c.nome)}</b>?</p><p class="muted small" style="margin:0">${n ? `Ela tem <b>${n} serviço(s)</b>. Eles não são apagados: vão para a categoria que você escolher abaixo.` : 'Ela não tem nenhum serviço. Só o nome da categoria sai da lista.'} Os serviços já registrados e o financeiro não mudam.</p></div></div>
+    ${n ? `<label class="f" style="margin-top:14px">Mover os serviços para<select id="ct-dest">${opt(outras.map(x => [x.id, x.nome]), '')}</select></label>` : ''}`,
+    `<button class="btn" data-close>Cancelar</button><button class="btn bad-b" id="ct-del">${icon('lixo')}<span>Excluir categoria</span></button>`);
+  ov.querySelector('#ct-del').onclick = () => run(() => excluirCategoria(DB, ACTOR, id, n ? val('ct-dest') : null), m => m ? `Categoria ${c.nome} excluída. ${m} serviço(s) movido(s).` : `Categoria ${c.nome} excluída.`).ok && closeModal();
 }
 function modalCategoria() {
   const ov = openModal('Nova categoria', `<label class="f">Nome da categoria<input id="ct-n" placeholder="Ex.: Sobrancelhas"></label>`, `<button class="btn" data-close>Cancelar</button><button class="btn pri" id="ct-ok">Criar</button>`);
@@ -9255,6 +9298,9 @@ const AFTER = {
     bindSel('rl-t', 'relTipo'); bindSel('rl-f', 'relFunc'); bindSel('rl-c', 'relConv');
     document.getElementById('rel-csv').onclick = () => { const [i, f] = periodo(); const R = relatorio(UI.relTipo, i, f, relFid()); csvBaixar(`CSV · ${RELS[UI.relTipo]}`, csvDe([[RELS[UI.relTipo], `${dBR(i)} a ${dBR(f)}`], R.cols, ...R.rows, ...(R.foot ? [R.foot] : [])]), `${nomeArq(RELS[UI.relTipo])}-${i}-a-${f}.csv`); };
   },
+  servicos() {
+    const sb = document.getElementById('sv-b'); if (sb) sb.oninput = () => { clearTimeout(sb._t); sb._t = setTimeout(() => { UI.svBusca = sb.value; render(); const nb = document.getElementById('sv-b'); nb.focus(); nb.setSelectionRange(nb.value.length, nb.value.length); }, 200); };
+  },
   pacotes() {
     const b = document.getElementById('pk-b'); if (b) b.oninput = () => { clearTimeout(b._t); b._t = setTimeout(() => { UI.pkBusca = b.value; render(); const nb = document.getElementById('pk-b'); nb.focus(); nb.setSelectionRange(nb.value.length, nb.value.length); }, 200); };
   },
@@ -9282,7 +9328,7 @@ const AFTER = {
 
 /* ---------- eventos globais (delegação) ---------- */
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-al-todos],[data-pk-limpa],[data-po-limpa],[data-ct-todos],[data-del],[data-dono-novo],[data-dono-edit],[data-podo-aba],[data-podo-nova],[data-podo-ficha],[data-cxcentro],[data-comanda],[data-av-teste],[data-av-qr],[data-av-copiar],[data-av-dl],[data-av-nota],[data-pk-novo],[data-pk-edit],[data-pk-vender],[data-pk-filtro],[data-pk-sessao],[data-cli-nivel],[data-dona-serv],[data-mov],[data-mov-ed],[data-mov-ex],[data-cxper],[data-cxnav],[data-cxtipo],[data-cli-acao],[data-conv-membros],[data-receb-com],[data-conf-com],[data-acerto-com],[data-pagar-cli],[data-cvst],[data-liberar],[data-conta],[data-sair],[data-codigo],[data-repasse],[data-adiant],[data-extrato],[data-abater],[data-conv-novo],[data-conv-edit],[data-conv-filtro],[data-alertas],[data-fechar],[data-faltou],[data-chegou],[data-tema],[data-pdf],[data-wa-ag],[data-wa-cli],[data-wa-cob],[data-wa-at],[data-fab],[data-go],[data-menu],[data-per],[data-agv],[data-agnav],[data-ag],[data-bl],[data-slot],[data-goday],[data-new-ag],[data-new-bl],[data-new-reg],[data-at-open],[data-receb],[data-conf],[data-acerto],[data-fesem],[data-fe-ver],[data-pagar],[data-new-cli],[data-cli],[data-new-func],[data-func],[data-new-serv],[data-serv],[data-new-cat],[data-mais],[data-pub-abrir],[data-pub-cliente],[data-origem-nova],[data-origem],[data-ped-agendar],[data-ped-recusar],[data-qr-copiar],[data-qr-dl],[data-qr-ver],[data-ped-dia]');
+  const t = e.target.closest('[data-al-todos],[data-pk-limpa],[data-sv-limpa],[data-del-cat],[data-po-limpa],[data-ct-todos],[data-del],[data-dono-novo],[data-dono-edit],[data-podo-aba],[data-podo-nova],[data-podo-ficha],[data-cxcentro],[data-comanda],[data-av-teste],[data-av-qr],[data-av-copiar],[data-av-dl],[data-av-nota],[data-pk-novo],[data-pk-edit],[data-pk-vender],[data-pk-filtro],[data-pk-sessao],[data-cli-nivel],[data-dona-serv],[data-mov],[data-mov-ed],[data-mov-ex],[data-cxper],[data-cxnav],[data-cxtipo],[data-cli-acao],[data-conv-membros],[data-receb-com],[data-conf-com],[data-acerto-com],[data-pagar-cli],[data-cvst],[data-liberar],[data-conta],[data-sair],[data-codigo],[data-repasse],[data-adiant],[data-extrato],[data-abater],[data-conv-novo],[data-conv-edit],[data-conv-filtro],[data-alertas],[data-fechar],[data-faltou],[data-chegou],[data-tema],[data-pdf],[data-wa-ag],[data-wa-cli],[data-wa-cob],[data-wa-at],[data-fab],[data-go],[data-menu],[data-per],[data-agv],[data-agnav],[data-ag],[data-bl],[data-slot],[data-goday],[data-new-ag],[data-new-bl],[data-new-reg],[data-at-open],[data-receb],[data-conf],[data-acerto],[data-fesem],[data-fe-ver],[data-pagar],[data-new-cli],[data-cli],[data-new-func],[data-func],[data-new-serv],[data-serv],[data-new-cat],[data-mais],[data-pub-abrir],[data-pub-cliente],[data-origem-nova],[data-origem],[data-ped-agendar],[data-ped-recusar],[data-qr-copiar],[data-qr-dl],[data-qr-ver],[data-ped-dia]');
   if (!t) return;
   const ds = t.dataset;
   if ('waAg' in ds) { e.stopPropagation(); const x = DB.agendamentos.find(a => a.id === ds.waAg); return modalWhatsApp({ agendamentoId: ds.waAg }, ds.waM || waModeloPadrao(x)); }
@@ -9311,6 +9357,8 @@ document.addEventListener('click', e => {
   if ('movEx' in ds) return modalExcluirMovimento(ds.movEx);
   if ('cxper' in ds) { UI.cxPer = ds.cxper; UI.cxMax = 0; render(); return; }
   if ('cxnav' in ds) { UI.cxRef = ds.cxnav === '0' ? TODAY : passoCaixa(UI.cxPer || 'mes', UI.cxRef || TODAY, +ds.cxnav); UI.cxMax = 0; render(); return; }
+  if ('svLimpa' in ds) { UI.svBusca = ''; render(); document.getElementById('sv-b')?.focus(); return; }
+  if ('delCat' in ds) { e.stopPropagation(); return modalExcluirCategoria(ds.delCat); }
   if ('pkLimpa' in ds) { UI.pkBusca = ''; render(); document.getElementById('pk-b')?.focus(); return; }
   if ('poLimpa' in ds) { UI.podoBusca = ''; render(); document.getElementById('po-b')?.focus(); return; }
   if ('ctTodos' in ds) { UI.ctTodos = !UI.ctTodos; render(); return; }
