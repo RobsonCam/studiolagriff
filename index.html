@@ -5849,9 +5849,10 @@ async function gerarCodigoAcesso(userId) {
   const f = DB.funcionarios.find(x => x.id === u.funcId), tel = digits(f?.telefone || '');
   const msg = `Olá, ${u.nome.split(' ')[0]}! Este é o seu acesso ao sistema do ${DB.config.nome}.\n\n1. Abra o sistema e toque em "Primeiro acesso ou código".\n2. E-mail: ${u.email}\n3. Código: ${cod}\n\nCom o código você cria a sua senha. Ele vale por 7 dias e só funciona uma vez. Não passe para ninguém.`;
   openModal('Código de acesso', `<div class="cod-box"><span class="muted small">Código de ${esc(u.nome)}</span><b class="cod">${cod.slice(0, 3)} ${cod.slice(3)}</b><span class="muted small">Vale até ${dBR(new Date(u.convite.ate).toISOString().slice(0, 10))} · uso único</span></div>
+    ${tel ? '' : '<div class="note warn small">A ficha desta pessoa está sem telefone. O botão abre o WhatsApp para você escolher o contato. Para ir direto na conversa, coloque o telefone na ficha.</div>'}
     <div class="note small">Envie o código só para a própria pessoa. Com ele, ela cria a senha em <b>Primeiro acesso ou código</b>, na tela de entrada. ${u.senha ? 'A senha atual dela continua valendo até ela criar a nova.' : ''}</div>
     <pre class="cod-msg">${esc(msg)}</pre>`,
-    `<button class="btn" id="cod-cp">Copiar mensagem</button>${tel ? `<a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/${tel.length <= 11 ? '55' + tel : tel}?text=${encodeURIComponent(msg)}">${icon('wa')}<span>Enviar no WhatsApp</span></a>` : ''}<button class="btn pri" data-close>Pronto</button>`);
+    `<button class="btn" id="cod-cp">Copiar mensagem</button><a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/${tel ? (tel.length <= 11 ? '55' + tel : tel) : ''}?text=${encodeURIComponent(msg)}" title="${tel ? 'Abre a conversa com a pessoa' : 'Sem telefone na ficha: escolha o contato no WhatsApp'}">${icon('wa')}<span>Enviar no WhatsApp</span></a><button class="btn pri" data-close>Pronto</button>`);
   document.getElementById('cod-cp').onclick = () => { navigator.clipboard?.writeText(msg).then(() => toast('Mensagem copiada'), () => toast('Não foi possível copiar. Selecione o texto.', 'bad')); };
 }
 function modalConta() {
