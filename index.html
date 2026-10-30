@@ -1956,7 +1956,7 @@ const WA_MODELOS = [
   { id: 'reagendar', nome: 'Reagendar', func: true, texto: 'Olá, {primeiro_nome}! Precisamos falar sobre seu horário de {servico} em {data} às {hora}. Qual outro dia e horário ficam bons para você?' },
   { id: 'falta', nome: 'Após falta', func: true, texto: 'Oi, {primeiro_nome}! Sentimos sua falta no horário das {hora}. Quer remarcar seu {servico}? É só responder aqui.' },
   { id: 'agradecimento', nome: 'Agradecimento pós-atendimento', func: true, texto: 'Obrigada pela visita, {primeiro_nome}! Foi um prazer cuidar de você. Até a próxima.\n{salao}' },
-  { id: 'avaliacao', nome: 'Pedir avaliação', func: true, texto: 'Oi, {primeiro_nome}! Obrigada por escolher o {salao}. Sua opinião é muito importante para nós: avalie seu atendimento de {servico}, leva menos de 1 minuto.\n{link_avaliacao}' },
+  { id: 'avaliacao', nome: 'Pedir avaliação', func: true, texto: 'Oi, {primeiro_nome}! Obrigada pela visita e por escolher o {salao}. Foi um prazer cuidar de você. 💛\n\nSua opinião é muito importante para nós: conta como foi o seu atendimento de {servico}? Leva menos de 1 minuto.\n{link_avaliacao}' },
   { id: 'sinal', nome: 'Pedir sinal', func: false, texto: 'Olá, {primeiro_nome}! Para garantir seu horário de {servico} em {data} às {hora}, pedimos um sinal de {sinal} pelo Pix: {pix}. O valor é descontado no dia do atendimento. Assim que pagar, é só mandar o comprovante aqui.' },
   { id: 'nivel', nome: 'Parabéns pelo nível', func: true, texto: 'Parabéns, {primeiro_nome}! Você agora é cliente {nivel} do {salao}. Como agradecimento pela confiança, você tem: {beneficio}. Obrigada por estar com a gente!' },
   { id: 'pacote', nome: 'Saldo do pacote', func: true, texto: 'Olá, {primeiro_nome}! Aqui é do {salao}. Atualização do seu {pacote}:\nVocê já usou {pacote_usadas} de {pacote_total} sessões e ainda tem {pacote_restantes} para usar.\n\n{pacote_sessoes}\n\n{pacote_validade}\nQuais dias você quer agendar as próximas sessões?' },
@@ -3989,6 +3989,12 @@ function migrarDados(D) {
   if (D.config.whatsapp && Array.isArray(D.config.whatsapp.modelos) && !D.config.whatsapp.modelos.some(m => m.id === 'avaliacao')) {
     const m = WA_MODELOS.find(x => x.id === 'avaliacao'), i = D.config.whatsapp.modelos.findIndex(x => x.id === 'agradecimento');
     D.config.whatsapp.modelos.splice(i >= 0 ? i + 1 : D.config.whatsapp.modelos.length, 0, { ...m, padrao: true });
+  }
+  // "Pedir avaliação" agora agradece junto (um botão só no pós-atendimento): troca o texto padrão antigo
+  if (D.config.whatsapp && Array.isArray(D.config.whatsapp.modelos)) {
+    const av = D.config.whatsapp.modelos.find(m => m.id === 'avaliacao'), antigo = 'Oi, {primeiro_nome}! Obrigada por escolher o {salao}. Sua opinião é muito importante para nós: avalie seu atendimento de {servico}, leva menos de 1 minuto.\n{link_avaliacao}';
+    const so = t => String(t || '').replace(/\s+/g, '');
+    if (av && so(av.texto) === so(antigo)) av.texto = WA_MODELOS.find(x => x.id === 'avaliacao').texto;
   }
   // modelo "Saldo do pacote" para quem já tinha o WhatsApp configurado
   if (D.config.whatsapp && Array.isArray(D.config.whatsapp.modelos) && !D.config.whatsapp.modelos.some(m => m.id === 'pacote')) {
@@ -7352,20 +7358,20 @@ function painelContatos(ags) {
   const am = addDays(TODAY, 1), hojeDM = dBR(TODAY).slice(0, 5);
   const lembrar = ags.filter(x => x.data === am && x.status === 'confirmado').sort((a, b) => a.inicio.localeCompare(b.inicio));
   const aniv = DB.clientes.filter(c => (c.aniversario || '').slice(0, 5) === hojeDM);
-  // depois do atendimento (hoje e ontem): agradecer e pedir a avaliação, uma vez por comanda
+  // depois do atendimento (hoje e ontem): pedir a avaliação (a mensagem já agradece), uma vez por comanda
   const ontem = addDays(TODAY, -1), feitos = (DB.contatos || []);
   const jaFez = (cid, nomeModelo, desde, idModelo) => feitos.some(c => c.clienteId === cid && (c.modelo === nomeModelo || (idModelo && c.modeloId === idModelo)) && (() => { const m = String(c.quando || '').match(/(\d{2})\/(\d{2})\/(\d{2,4})/); if (!m) return false; const y = m[3].length === 2 ? '20' + m[3] : m[3]; return `${y}-${m[2]}-${m[1]}` >= desde; })());
   const mod = id => DB.config.whatsapp.modelos.find(m => m.id === id);
   const posAt = (() => { const m = new Map(); for (const at of DB.atendimentos) { if (at.status !== 'concluido' || at.data < ontem || at.data > TODAY) continue; const k = at.clienteId, o = m.get(k); if (!o || at.data > o.data) m.set(k, at); } return [...m.values()].sort((p, q) => q.data.localeCompare(p.data)); })();
-  const agradecer = mod('agradecimento') ? posAt.filter(at => !jaFez(at.clienteId, mod('agradecimento').nome, at.data, 'agradecimento')) : [];
   const avaliar = mod('avaliacao') ? posAt.filter(at => !jaFez(at.clienteId, mod('avaliacao').nome, at.data, 'avaliacao') && !(DB.avaliacoes || []).some(a => a.clienteId === at.clienteId && a.data >= at.data)) : [];
   const item = (t, s, btn) => btn ? `<div class="ct"><div style="min-width:0;flex:1"><div class="b ell">${t}</div><div class="muted small ct-s">${s}</div></div>${btn}</div>` : '';
   const html = [
     ...contatosGestao(ags, item),
     ...lembrar.map(x => item(cliNome(x.clienteId, 'nome'), `Lembrete · amanhã ${x.inicio} · ${esc(SV(x.servicoId)?.nome)}`, waBtn(`data-wa-ag="${x.id}" data-wa-m="lembrete"`, 'Lembrar', 'lembrete'))),
     ...aniv.map(c => item(cliNome(c.id, 'nome'), 'Aniversário hoje', waBtn(`data-wa-cli="${c.id}" data-wa-m="aniversario"`, 'Parabenizar', 'aniversario'))),
-    ...posAt.filter(at => agradecer.includes(at) || avaliar.includes(at)).map(at => item(cliNome(at.clienteId, 'nome'), `Pós-atendimento · ${at.data === TODAY ? 'hoje' : 'ontem'} · ${esc(SV(at.servicoId)?.nome)}`,
-      `<div class="ct-bts">${agradecer.includes(at) ? waBtn(`data-wa-at="${at.id}" data-wa-m="agradecimento"`, 'Agradecer', 'agradecimento') : ''}${avaliar.includes(at) ? waBtn(`data-wa-at="${at.id}" data-wa-m="avaliacao"`, 'Pedir avaliação', 'avaliacao') : ''}</div>`))
+    // um botão só: a mensagem de "Pedir avaliação" já agradece a visita e leva o link da avaliação
+    ...posAt.filter(at => avaliar.includes(at)).map(at => item(cliNome(at.clienteId, 'nome'), `Pós-atendimento · ${at.data === TODAY ? 'hoje' : 'ontem'} · ${esc(SV(at.servicoId)?.nome)}`,
+      `<div class="ct-bts">${waBtn(`data-wa-at="${at.id}" data-wa-m="avaliacao"`, 'Pedir avaliação', 'avaliacao')}</div>`))
   ].filter(Boolean);
   if (!html.length) return '';
   // pesquisa: pelo nome da cliente, o serviço ou o tipo de contato (confirmar, aniversário, falta...)

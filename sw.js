@@ -1,6 +1,6 @@
 /* Studio La Griff: funcionamento como aplicativo e sem internet.
    A página e os arquivos ficam guardados no aparelho; os dados vêm do Supabase. */
-const VERSAO = 'f3f0c7b509';
+const VERSAO = '1b49c0718f';
 const CACHE = 'lagriff-' + VERSAO;
 const SUPA = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js';
 const BASE = ['/', '/index.html', '/config.js', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png', SUPA];
