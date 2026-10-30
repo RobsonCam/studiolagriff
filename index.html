@@ -2910,7 +2910,8 @@ function reunirCadastro(D, antigo, novo, quem) {
   trocarIdEmTudo(D, novo.id, antigo.id, pular);
   const tel = antigo.telefone, { id, cadastro, ...resto } = novo;
   ['excluido', 'excluidoEm', 'excluidoPor', 'emailExcluido'].forEach(k => delete antigo[k]);
-  Object.assign(antigo, resto, { ativo: novo.ativo !== false });
+  const reunidos = [...new Set([...(antigo.idsReunidos || []), ...(novo.idsReunidos || []), novo.id])];
+  Object.assign(antigo, resto, { ativo: novo.ativo !== false, idsReunidos: reunidos });
   if (!novo.telefone && tel) antigo.telefone = tel;
   D.funcionarios = D.funcionarios.filter(f => f !== novo);
   D.users = D.users.filter(u => !(u.excluido && u.funcId === antigo.id));
@@ -2920,6 +2921,8 @@ function reunirCadastro(D, antigo, novo, quem) {
 }
 function reunirRecadastros(D) {
   let n = 0;
+  // registro gravado depois por um aparelho que ainda usava o cadastro novo: passa para o cadastro reunido
+  (D.funcionarios || []).forEach(f => (f.idsReunidos || []).forEach(id => { if (!D.funcionarios.some(g => g.id === id)) trocarIdEmTudo(D, id, f.id, new Set([f])); }));
   (D.funcionarios || []).filter(f => !f.excluido && f.email).forEach(f => {
     const e = f.email.toLowerCase(), velho = D.funcionarios.find(g => g !== f && g.excluido && (g.emailExcluido || '').toLowerCase() === e);
     if (velho && !velho.dona && !f.dona) { reunirCadastro(D, velho, f); n++; }
@@ -4451,7 +4454,12 @@ function runTests() {
     const ok = n === 1 && !S9.funcionarios.some(x => x.id === 'fnNovo') && !f.excluido && f.email === em && f.pct === 45 && !!f.telefone
       && sv.funcs.includes(f.id) && !sv.funcs.includes('fnNovo') && S9.agendamentos.find(x => x.id === 'agN').funcId === f.id
       && S9.atendimentos.some(x => x.funcId === f.id) && S9.users.find(x => x.id === 'usNovo').funcId === f.id && !S9.users.some(x => x.excluido && x.funcId === f.id) && reunirRecadastros(S9) === 0;
-    return ok || JSON.stringify([n, f.excluido, f.email, f.pct, f.telefone, sv.funcs]);
+    // um aparelho atrasado grava um atendimento com o código novo: ao abrir de novo, passa para o cadastro reunido
+    S9.agendamentos.push({ id: 'agAtrasado', funcId: 'fnNovo', clienteId: 'k1', servicoId: sv.id, data: TODAY, inicio: '15:00', fim: '16:00', status: 'concluido', historico: [] });
+    reunirRecadastros(S9);
+    const ok2 = S9.agendamentos.find(x => x.id === 'agAtrasado').funcId === f.id && (f.idsReunidos || []).includes('fnNovo');
+    return (ok && ok2) || JSON.stringify([n, f.excluido, f.email, f.pct, f.telefone, sv.funcs, ok2]);
+
   });
   T('Proprietários: dá para cadastrar mais donos com acesso total; não exclui a si mesmo nem o último', () => {
     const S5 = seedBase(), d5 = S5.users.find(u => u.id === 'u0');
