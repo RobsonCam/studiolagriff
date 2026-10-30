@@ -1449,6 +1449,19 @@ circle.gft1{fill:var(--gf1)}circle.gft2{fill:var(--gf2)}circle.gft3{fill:var(--g
 /* barra de rolagem sempre visível e larga o bastante para arrastar com o mouse */
 html,*{scrollbar-width:auto}
 @media (pointer:fine){::-webkit-scrollbar{width:12px;height:12px}::-webkit-scrollbar-thumb{min-height:40px}}
+.online-b{display:inline-flex;align-items:center;gap:7px;border:0;cursor:pointer;font:inherit;font-size:13px;font-weight:600;color:var(--ink);background:color-mix(in srgb,var(--ok,#2e7d5b) 12%,transparent);padding:7px 12px;border-radius:99px;white-space:nowrap}
+.online-b i{width:8px;height:8px;border-radius:50%;background:#2fae6e;box-shadow:0 0 0 0 rgba(47,174,110,.6);animation:onPulso 2s infinite}
+@keyframes onPulso{0%{box-shadow:0 0 0 0 rgba(47,174,110,.55)}70%{box-shadow:0 0 0 7px rgba(47,174,110,0)}100%{box-shadow:0 0 0 0 rgba(47,174,110,0)}}
+@media (prefers-reduced-motion:reduce){.online-b i{animation:none}}
+.on-l{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent)}
+.on-l:last-child{border-bottom:0}
+.on-av{flex:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-weight:700;background:color-mix(in srgb,var(--muted) 18%,transparent);color:var(--muted);position:relative}
+.on-av.on{background:color-mix(in srgb,var(--gold) 22%,transparent);color:var(--ink)}
+.on-av.on::after{content:"";position:absolute;right:-1px;bottom:-1px;width:11px;height:11px;border-radius:50%;background:#2fae6e;border:2px solid var(--card,#fff)}
+.on-t{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.on-ap{color:var(--ink);opacity:.85}
+.on-pill{flex:none;align-self:center}
+@media (max-width:700px){.top .online-b span{display:none}.top .online-b{padding:9px}}
 
 /* ===== Formulário do cliente — leitura fácil (letras grandes, alto contraste) =====
    Usado igual na página pública (agendar.html) e na pré-visualização do sistema.
@@ -7015,7 +7028,7 @@ function renderTela() {
     <aside class="side"><div class="brand" aria-label="${esc(DB.config.nome)}"><div class="mark mono"></div>${DB.config.nome === 'Studio La Griff' ? '<div class="mark word" role="img" aria-label="Studio La Griff"></div>' : `<div style="font-family:var(--f-display);font-size:24px;color:var(--gold)">${esc(DB.config.nome)}</div>`}<div><div class="tag">Salão de beleza e podologia</div><div class="tag by">by Claudia Medina</div></div></div>${groups}</aside>
     <main class="main">
       <div class="top"><div class="mbrand"><span class="mark mono" aria-hidden="true"></span>${esc(DB.config.nome)}</div>${DB.config.producao ? '' : '<span class="demo">Demonstração · dados fictícios</span>'}${syncBadge()}${GUARDA_OK || SYNC.estado === 'aovivo' ? '' : '<span class="demo warn-store" title="Os dados não estão sendo guardados neste aparelho">Dados não ficam salvos neste aparelho</span>'}<div class="grow"></div><button class="bell" data-alertas aria-label="Alertas da agenda" title="Alertas da agenda">${icon('sino')}<span id="bell-n" hidden></span></button>
-        ${isOwner(REAL) ? `<label class="who" for="who">Ver como <select id="who">${opt(usuarios.map(u => [u.id, u.id === REAL.id ? `${u.nome} (você)` : `${u.nome} · ${cargoNome(DB, u)}`]), ACTOR.id)}</select></label>` : ''}${temaSeg('tm')}<button class="conta-b" data-conta title="Minha conta e sair" aria-label="Minha conta"><span class="mn-av">${esc((REAL.nome || '?')[0])}</span><span class="conta-n">${esc(REAL.nome.split(' ')[0])}</span></button></div>
+        ${isOwner(REAL) ? `<label class="who" for="who">Ver como <select id="who">${opt(usuarios.map(u => [u.id, u.id === REAL.id ? `${u.nome} (você)` : `${u.nome} · ${cargoNome(DB, u)}`]), ACTOR.id)}</select></label>` : ''}${isOwner(REAL) ? onlineBotao() : ''}${temaSeg('tm')}<button class="conta-b" data-conta title="Minha conta e sair" aria-label="Minha conta"><span class="mn-av">${esc((REAL.nome || '?')[0])}</span><span class="conta-n">${esc(REAL.nome.split(' ')[0])}</span></button></div>
       <div id="alert-strip"></div>
       <div class="page ${entering ? 'enter' : ''}">${faixaPedidos()}${page}</div>
     </main>
@@ -9149,6 +9162,44 @@ function modalCliente(id) {
 }
 const ACESSO_TONE = { ativo: 'ok', convite: 'info', bloqueado: 'bad' };
 const iniciais = n => n.split(' ').filter(Boolean).slice(0, 2).map(x => x[0]).join('').toUpperCase();
+/* =================== QUEM ESTÁ ONLINE ===================
+   No sistema publicado, cada aparelho conectado avisa quem está usando (canal ao vivo, sem gravar nada).
+   Na demonstração aparece só este aparelho. */
+const TELAS = () => Object.fromEntries(NAV.map(n => [n.id, n.t]));
+const tipoAparelho = () => { const ua = navigator.userAgent || ''; const app = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  return (/iPad|Tablet/i.test(ua) ? 'Tablet' : /Mobi|Android|iPhone/i.test(ua) ? 'Celular' : 'Computador') + (app ? ' · app' : ' · navegador'); };
+const ONLINE_DESDE = { uid: '', t: 0 };
+function onlineAgora() {
+  if (Array.isArray(window.ONLINE_PROD)) return window.ONLINE_PROD.filter(x => x && x.uid && DB.users.some(u => u.id === x.uid && !u.excluido));
+  const u = usuarioSessao(); if (!u) return [];
+  if (ONLINE_DESDE.uid !== u.id) { ONLINE_DESDE.uid = u.id; ONLINE_DESDE.t = Date.now(); }
+  return [{ uid: u.id, nome: u.nome, aparelho: tipoAparelho(), tela: UI.route, desde: ONLINE_DESDE.t, eu: true }];
+}
+const pessoasOnline = L => [...new Set(L.map(x => x.uid))];
+const haQuanto = t => { const m = Math.max(0, Math.round((Date.now() - (t || Date.now())) / 60000)); return m < 1 ? 'agora' : m < 60 ? `há ${m} min` : `há ${Math.floor(m / 60)} h${m % 60 ? ' ' + (m % 60) + ' min' : ''}`; };
+function onlineBotao() { const n = pessoasOnline(onlineAgora()).length; return `<button class="online-b" data-online title="Quem está online agora" aria-label="${n} pessoa(s) online agora"><i></i><span>${n} online</span></button>`; }
+function onlineListaHTML() {
+  const L = onlineAgora(), tl = TELAS(), por = new Map();
+  L.forEach(x => { if (!por.has(x.uid)) por.set(x.uid, []); por.get(x.uid).push(x); });
+  const ativos = DB.users.filter(u => !u.excluido && u.papel !== 'suporte' && (isOwner(u) || (F(u.funcId)?.ativo && F(u.funcId)?.acesso !== 'bloqueado')));
+  const on = [...por.entries()].map(([uid, ap]) => ({ u: DB.users.find(x => x.id === uid), ap: ap.sort((a, b) => (a.desde || 0) - (b.desde || 0)) })).filter(x => x.u).sort((a, b) => a.u.nome.localeCompare(b.u.nome));
+  const fora = ativos.filter(u => !por.has(u.id)).sort((a, b) => a.nome.localeCompare(b.nome));
+  const linha = (u, ap) => `<div class="on-l"><span class="on-av ${ap ? 'on' : ''}">${esc((u.nome || '?')[0])}</span><div class="on-t"><b>${esc(u.nome)}</b><span class="muted small">${esc(cargoNome(DB, u))}</span>
+      ${ap ? ap.map(x => `<span class="small on-ap">${esc(x.aparelho || 'Aparelho')}${x.tela && tl[x.tela] ? ` · em <b>${esc(tl[x.tela])}</b>` : ''} · conectada ${haQuanto(x.desde)}${x.eu || (window.ID_APARELHO && x.ap === window.ID_APARELHO) ? ' · <i>este aparelho</i>' : ''}</span>`).join('') : `<span class="small muted">${u.ultimoAcesso ? 'Último acesso: ' + esc(u.ultimoAcesso) : 'Ainda não entrou no sistema'}</span>`}</div>
+      ${ap ? '<span class="pill ok on-pill">Online</span>' : ''}</div>`;
+  return `<div class="on-box"><div class="sec" style="margin:0 0 8px">Online agora · ${on.length}</div>${on.length ? on.map(x => linha(x.u, x.ap)).join('') : '<div class="muted small">Ninguém conectado agora.</div>'}
+    ${fora.length ? `<div class="sec" style="margin:16px 0 8px">Fora do sistema · ${fora.length}</div>${fora.map(u => linha(u, null)).join('')}` : ''}
+    ${Array.isArray(window.ONLINE_PROD) ? '' : '<div class="note small" style="margin-top:12px">Na demonstração aparece só este aparelho. No sistema publicado aparecem todos os aparelhos conectados, ao vivo.</div>'}</div>`;
+}
+function modalOnline() { openModal('Quem está online', `<div id="online-modal">${onlineListaHTML()}</div>`, `<button class="btn pri" data-close>Fechar</button>`); }
+/* chegou a lista nova: atualiza só os pedaços da tela (sem redesenhar a página) */
+function atualizarOnline() {
+  if (!REAL || !isOwner(REAL)) return;
+  const b = document.querySelector('.online-b'); if (b) b.outerHTML = onlineBotao();
+  const m = document.getElementById('online-modal'); if (m) m.innerHTML = onlineListaHTML();
+  const e = document.getElementById('online-eq'); if (e) e.innerHTML = onlineListaHTML();
+}
+setInterval(() => { if (document.getElementById('online-modal') || document.getElementById('online-eq')) atualizarOnline(); }, 30000);
 function pgEquipe() {
   const dona = donaFunc(DB);
   const fs = DB.funcionarios.filter(f => !f.dona && !f.excluido).sort((a, b) => (b.ativo - a.ativo) || (CARGOS[cargoDe(a)].nivel - CARGOS[cargoDe(b)].nivel) || a.nome.localeCompare(b.nome));
@@ -9163,6 +9214,7 @@ function pgEquipe() {
   <div class="ph"><div><h1>Equipe e permissões</h1><p>Quatro cargos, do mais alto ao mais baixo. Cada pessoa da recepção ou profissional começa com as permissões do cargo, e você pode liberar ou tirar permissões de cada uma.</p></div>
     <div class="act"><button class="btn" data-dono-novo>+ Novo proprietário</button><button class="btn pri" data-new-func>+ Nova funcionária</button></div></div>
   <div class="stack">
+    ${isOwner(REAL) ? `<div class="panel" id="online-eq">${onlineListaHTML()}</div>` : ''}
     <div class="cargos">
       ${cargoCard(1, ADMINS.suporte.nome, ADMINS.suporte.desc, admins.filter(x => x.papel === 'suporte').map(x => x.nome))}
       ${cargoCard(2, ADMINS.proprietaria.nome, ADMINS.proprietaria.desc, admins.filter(x => x.papel === 'proprietaria').map(x => x.nome))}
@@ -9469,7 +9521,7 @@ const AFTER = {
 
 /* ---------- eventos globais (delegação) ---------- */
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-al-todos],[data-wa-pk],[data-pk-limpa],[data-sv-limpa],[data-del-cat],[data-po-limpa],[data-ct-todos],[data-del],[data-dono-novo],[data-dono-edit],[data-podo-aba],[data-podo-nova],[data-podo-ficha],[data-cxcentro],[data-comanda],[data-av-teste],[data-av-qr],[data-av-copiar],[data-av-dl],[data-av-nota],[data-pk-novo],[data-pk-edit],[data-pk-vender],[data-pk-filtro],[data-pk-sessao],[data-cli-nivel],[data-dona-serv],[data-mov],[data-mov-ed],[data-mov-ex],[data-cxper],[data-cxnav],[data-cxtipo],[data-cli-acao],[data-conv-membros],[data-receb-com],[data-conf-com],[data-acerto-com],[data-pagar-cli],[data-cvst],[data-liberar],[data-conta],[data-sair],[data-codigo],[data-repasse],[data-adiant],[data-extrato],[data-abater],[data-conv-novo],[data-conv-edit],[data-conv-filtro],[data-alertas],[data-fechar],[data-faltou],[data-chegou],[data-tema],[data-pdf],[data-wa-ag],[data-wa-cli],[data-wa-cob],[data-wa-at],[data-fab],[data-go],[data-menu],[data-per],[data-agv],[data-agnav],[data-ag],[data-bl],[data-slot],[data-goday],[data-new-ag],[data-new-bl],[data-new-reg],[data-at-open],[data-receb],[data-conf],[data-acerto],[data-fesem],[data-fe-ver],[data-pagar],[data-new-cli],[data-cli],[data-new-func],[data-func],[data-new-serv],[data-serv],[data-new-cat],[data-mais],[data-pub-abrir],[data-pub-cliente],[data-origem-nova],[data-origem],[data-ped-agendar],[data-ped-recusar],[data-qr-copiar],[data-qr-dl],[data-qr-ver],[data-ped-dia]');
+  const t = e.target.closest('[data-al-todos],[data-online],[data-wa-pk],[data-pk-limpa],[data-sv-limpa],[data-del-cat],[data-po-limpa],[data-ct-todos],[data-del],[data-dono-novo],[data-dono-edit],[data-podo-aba],[data-podo-nova],[data-podo-ficha],[data-cxcentro],[data-comanda],[data-av-teste],[data-av-qr],[data-av-copiar],[data-av-dl],[data-av-nota],[data-pk-novo],[data-pk-edit],[data-pk-vender],[data-pk-filtro],[data-pk-sessao],[data-cli-nivel],[data-dona-serv],[data-mov],[data-mov-ed],[data-mov-ex],[data-cxper],[data-cxnav],[data-cxtipo],[data-cli-acao],[data-conv-membros],[data-receb-com],[data-conf-com],[data-acerto-com],[data-pagar-cli],[data-cvst],[data-liberar],[data-conta],[data-sair],[data-codigo],[data-repasse],[data-adiant],[data-extrato],[data-abater],[data-conv-novo],[data-conv-edit],[data-conv-filtro],[data-alertas],[data-fechar],[data-faltou],[data-chegou],[data-tema],[data-pdf],[data-wa-ag],[data-wa-cli],[data-wa-cob],[data-wa-at],[data-fab],[data-go],[data-menu],[data-per],[data-agv],[data-agnav],[data-ag],[data-bl],[data-slot],[data-goday],[data-new-ag],[data-new-bl],[data-new-reg],[data-at-open],[data-receb],[data-conf],[data-acerto],[data-fesem],[data-fe-ver],[data-pagar],[data-new-cli],[data-cli],[data-new-func],[data-func],[data-new-serv],[data-serv],[data-new-cat],[data-mais],[data-pub-abrir],[data-pub-cliente],[data-origem-nova],[data-origem],[data-ped-agendar],[data-ped-recusar],[data-qr-copiar],[data-qr-dl],[data-qr-ver],[data-ped-dia]');
   if (!t) return;
   const ds = t.dataset;
   if ('waAg' in ds) { e.stopPropagation(); const x = DB.agendamentos.find(a => a.id === ds.waAg); return modalWhatsApp({ agendamentoId: ds.waAg }, ds.waM || waModeloPadrao(x)); }
@@ -9579,6 +9631,7 @@ document.addEventListener('click', e => {
   if ('pagarCli' in ds) { const ids = [...new Set(pendCache().lista.filter(x => x.at.clienteId === ds.pagarCli).map(x => x.parcela.id))]; return modalPagarConvenio(ids, `Pagamento do convênio · ${CL(ds.pagarCli)?.nome || ''}`); }
   if ('cvst' in ds) { const [c, v] = ds.cvst.split('|'); return modalStatusConvenio(c, v); }
   if ('liberar' in ds) { const box = t.closest('.lib-cv'); const r = run(() => liberarConvenio(DB, ACTOR, ds.liberar, { autorizadoPor: box?.querySelector('[data-lib-quem]')?.value, motivo: box?.querySelector('[data-lib-mot]')?.value }), 'Liberação registrada: o próximo lançamento no convênio está liberado'); if (r.ok) atualizarPendencias(); return; }
+  if ('online' in ds) return modalOnline();
   if ('conta' in ds) return modalConta();
   if ('sair' in ds) return sair();
   if ('codigo' in ds) return gerarCodigoAcesso(ds.codigo);
@@ -10232,9 +10285,36 @@ async function medirEspaco() {
     if (antes !== JSON.stringify(data) && typeof renderRemoto === 'function' && SYNC.pronto) renderRemoto();
   } catch (e) { }
 }
+/* quem está online: cada aparelho conectado avisa quem está usando e em qual tela (canal ao vivo, não grava no banco) */
+const PRESENCA = { canal: null, j: '', t: 0, uid: '', desde: 0 };
+const idAparelho = () => { try { let x = localStorage.getItem('lagriff.aparelho'); if (!x) { x = 'ap' + Math.random().toString(36).slice(2, 10); localStorage.setItem('lagriff.aparelho', x); } return x; } catch (e) { return PRESENCA.ap || (PRESENCA.ap = 'ap' + Math.random().toString(36).slice(2, 10)); } };
+function anunciarPresenca() {
+  const ch = PRESENCA.canal; if (!ch) return;
+  const u = typeof usuarioSessao === 'function' && DB ? usuarioSessao() : null;
+  if (!u) { if (PRESENCA.j) { PRESENCA.j = ''; PRESENCA.uid = ''; try { ch.untrack(); } catch (e) { } } return; }
+  if (PRESENCA.uid !== u.id) { PRESENCA.uid = u.id; PRESENCA.desde = Date.now(); }
+  const st = { uid: u.id, nome: u.nome, aparelho: tipoAparelho(), tela: UI.route || '', desde: PRESENCA.desde, ap: idAparelho() };
+  const j = JSON.stringify(st); if (j === PRESENCA.j) return;
+  PRESENCA.j = j; try { ch.track(st); } catch (e) { PRESENCA.j = ''; }
+}
+function ligarPresenca() {
+  if (PRESENCA.canal || !PROD.sb) return;
+  const ch = PROD.sb.channel('lagriff-online', { config: { presence: { key: idAparelho() } } });
+  ch.on('presence', { event: 'sync' }, () => {
+    const st = ch.presenceState() || {};
+    window.ONLINE_PROD = Object.values(st).map(l => (l || [])[(l || []).length - 1]).filter(Boolean);
+    try { atualizarOnline(); } catch (e) { }
+  });
+  ch.subscribe(s => { if (s === 'SUBSCRIBED') { PRESENCA.canal = ch; PRESENCA.j = ''; anunciarPresenca(); } });
+  window.ONLINE_PROD = window.ONLINE_PROD || []; window.ID_APARELHO = idAparelho();
+  const _r = render; render = function () { _r.apply(this, arguments); clearTimeout(PRESENCA.t); PRESENCA.t = setTimeout(anunciarPresenca, 400); };
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { PRESENCA.j = ''; anunciarPresenca(); } });
+}
+
 /* recebe os envios das clientes e mantém a página pública atualizada */
 function ligarEquipe() {
   if (PROD.ligado) return; PROD.ligado = true;
+  ligarPresenca();
   PROD.sb.channel('lagriff-entradas').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'entradas' }, () => agendarEntradas()).subscribe();
   setInterval(() => { agendarEntradas(0); publicarPublico(); }, 45000);
   setInterval(medirEspaco, 6 * 3600e3);
