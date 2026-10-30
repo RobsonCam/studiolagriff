@@ -1444,6 +1444,11 @@ circle.gft1{fill:var(--gf1)}circle.gft2{fill:var(--gf2)}circle.gft3{fill:var(--g
 .cat-cab .sec{margin:0}
 .cat-n{font-size:11px;letter-spacing:0;font-weight:600;color:var(--muted);background:color-mix(in srgb,var(--gold) 14%,transparent);border-radius:99px;padding:1px 8px;margin-left:2px}
 .cat-lixo{opacity:.75}.cat-lixo:hover{opacity:1}
+.pk-aviso{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
+.pk-aviso>div{min-width:0;flex:1 1 220px}
+/* barra de rolagem sempre visível e larga o bastante para arrastar com o mouse */
+html,*{scrollbar-width:auto}
+@media (pointer:fine){::-webkit-scrollbar{width:12px;height:12px}::-webkit-scrollbar-thumb{min-height:40px}}
 
 /* ===== Formulário do cliente — leitura fácil (letras grandes, alto contraste) =====
    Usado igual na página pública (agendar.html) e na pré-visualização do sistema.
@@ -1930,7 +1935,7 @@ function horariosLivres(S, funcId, data, aPartir = 0) {
    texto preenchido; quem envia é a pessoa, no WhatsApp do aparelho.
    ========================================================================= */
 const WA_VARS = [['primeiro_nome', 'Primeiro nome'], ['cliente', 'Nome completo'], ['servico', 'Serviço'], ['data', 'Data'], ['hora', 'Hora'],
-  ['profissional', 'Profissional'], ['valor', 'Valor'], ['pix', 'Chave Pix'], ['endereco', 'Endereço'], ['salao', 'Nome do salão'], ['telefone_salao', 'Telefone do salão'], ['link_avaliacao', 'Link da avaliação'], ['link_confirmacao', 'Link para confirmar'], ['sinal', 'Valor do sinal'], ['nivel', 'Nível da cliente'], ['beneficio', 'Benefícios do nível']];
+  ['profissional', 'Profissional'], ['valor', 'Valor'], ['pix', 'Chave Pix'], ['endereco', 'Endereço'], ['salao', 'Nome do salão'], ['telefone_salao', 'Telefone do salão'], ['link_avaliacao', 'Link da avaliação'], ['link_confirmacao', 'Link para confirmar'], ['sinal', 'Valor do sinal'], ['nivel', 'Nível da cliente'], ['beneficio', 'Benefícios do nível'], ['pacote', 'Nome do pacote'], ['pacote_usadas', 'Sessões usadas'], ['pacote_restantes', 'Sessões restantes'], ['pacote_total', 'Sessões do pacote'], ['pacote_sessoes', 'Lista das sessões'], ['pacote_validade', 'Validade do pacote']];
 const WA_MODELOS = [
   { id: 'confirmacao', nome: 'Confirmar agendamento', func: true, texto: 'Olá, {primeiro_nome}! Aqui é do {salao}. Seu horário de {servico} está marcado para {data} às {hora}, com {profissional}. Podemos confirmar? É só responder SIM.\n{link_confirmacao}' },
   { id: 'lembrete', nome: 'Lembrete do horário', func: true, texto: 'Oi, {primeiro_nome}! Passando para lembrar do seu horário de {servico} em {data}, às {hora}, com {profissional}. Te esperamos!\n{endereco}' },
@@ -1941,6 +1946,7 @@ const WA_MODELOS = [
   { id: 'avaliacao', nome: 'Pedir avaliação', func: true, texto: 'Oi, {primeiro_nome}! Obrigada por escolher o {salao}. Sua opinião é muito importante para nós: avalie seu atendimento de {servico}, leva menos de 1 minuto.\n{link_avaliacao}' },
   { id: 'sinal', nome: 'Pedir sinal', func: false, texto: 'Olá, {primeiro_nome}! Para garantir seu horário de {servico} em {data} às {hora}, pedimos um sinal de {sinal} pelo Pix: {pix}. O valor é descontado no dia do atendimento. Assim que pagar, é só mandar o comprovante aqui.' },
   { id: 'nivel', nome: 'Parabéns pelo nível', func: true, texto: 'Parabéns, {primeiro_nome}! Você agora é cliente {nivel} do {salao}. Como agradecimento pela confiança, você tem: {beneficio}. Obrigada por estar com a gente!' },
+  { id: 'pacote', nome: 'Saldo do pacote', func: true, texto: 'Olá, {primeiro_nome}! Aqui é do {salao}. Atualização do seu {pacote}:\nVocê já usou {pacote_usadas} de {pacote_total} sessões e ainda tem {pacote_restantes} para usar.\n\n{pacote_sessoes}\n\n{pacote_validade}\nQuais dias você quer agendar as próximas sessões?' },
   { id: 'cobranca', nome: 'Cobrança de valor em aberto', func: false, texto: 'Olá, {primeiro_nome}! Tudo bem? Consta em aberto o valor de {valor}, referente a {servico} do dia {data}. Você pode pagar pelo Pix: {pix}. Qualquer dúvida, estamos à disposição.' },
   { id: 'aniversario', nome: 'Feliz aniversário', func: true, texto: 'Feliz aniversário, {primeiro_nome}! A equipe do {salao} deseja um novo ano lindo para você.' },
   { id: 'livre', nome: 'Mensagem livre', func: true, texto: 'Olá, {primeiro_nome}! Aqui é do {salao}.' }
@@ -1976,7 +1982,7 @@ function salvarConfigWhatsApp(S, a, d) {
   S.config.whatsapp = { ...S.config.whatsapp, ...d };
   audit(S, a, 'Configuração do WhatsApp', `${d.modelos.length} mensagens · equipe ${d.funcionarios ? 'pode' : 'não pode'} usar`);
 }
-function registrarContatoWhatsApp(S, a, { clienteId, modeloId, agendamentoId }) {
+function registrarContatoWhatsApp(S, a, { clienteId, modeloId, agendamentoId, pacoteVendaId }) {
   exigirAcesso(S, a);
   if (!podeWhatsApp(S, a, modeloId)) throw new Error('Seu usuário não tem permissão para usar esta mensagem.');
   const cl = S.clientes.find(c => c.id === clienteId);
@@ -1986,7 +1992,12 @@ function registrarContatoWhatsApp(S, a, { clienteId, modeloId, agendamentoId }) 
   S.contatos = S.contatos || [];
   S.contatos.unshift({ id: uid('wa'), quando: stamp(), usuario: a.nome, funcId: a.funcId, clienteId, modelo: m ? m.nome : 'Mensagem', agendamentoId: agendamentoId || null });
   if (modeloId === 'nivel' && typeof marcarNivelAvisado === 'function') marcarNivelAvisado(S, clienteId);
-  audit(S, a, 'WhatsApp aberto', `${cl ? cl.nome : 'cliente'} · ${m ? m.nome : 'mensagem'}`);
+  const pv = pacoteVendaId && (S.pacoteVendas || []).find(x => x.id === pacoteVendaId);
+  let det = '';
+  if (pv) { const st = situacaoVenda(S, pv), r = Math.max(0, pv.sessoes - st.usadas);
+    pv.avisos = pv.avisos || []; pv.avisos.push({ quando: stamp(), usuario: a.nome, usadas: st.usadas, restantes: r, modelo: m ? m.nome : 'Mensagem' });
+    det = ` · ${pv.codigo}: ${st.usadas} usada(s), ${r} restante(s)`; S.contatos[0].pacoteVendaId = pv.id; S.contatos[0].detalhe = det.slice(3); }
+  audit(S, a, 'WhatsApp aberto', `${cl ? cl.nome : 'cliente'} · ${m ? m.nome : 'mensagem'}${det}`);
 }
 
 /* =========================================================================
@@ -3038,18 +3049,18 @@ function criarAvaliacao(S, d, agora = TODAY, opts = {}) {
   if (nota <= 2 && obs.length < 3) throw new Error('Conte em poucas palavras o que não foi bom. Isso ajuda o estúdio a melhorar.');
   const func = d.funcId ? S.funcionarios.find(f => f.id === d.funcId && f.ativo) : null;
   const cli = acharCliente(S, nome, tel);
-  // só avalia quem foi atendida: o WhatsApp precisa ser de uma cliente com serviço concluído nos últimos 60 dias,
-  // e cada atendimento recebe uma avaliação só (evita avaliação falsa ou repetida)
+  // só avalia quem foi atendida: o WhatsApp precisa ser de uma cliente com serviço concluído nos últimos 60 dias.
+  // A mesma cliente pode avaliar quantas vezes quiser: cada avaliação fica registrada, ligada ao último atendimento dela
+  let ult = null;
   if (opts.validar !== false) {
     const k = S.clientes.find(c => !c.excluido && telChave(c.telefone) === telChave(tel));
-    const ult = k && S.atendimentos.filter(x => x.clienteId === k.id && x.status === 'concluido' && x.data <= agora && x.data >= addDays(agora, -60)).sort((p, q) => q.data.localeCompare(p.data))[0];
+    ult = k && S.atendimentos.filter(x => x.clienteId === k.id && x.status === 'concluido' && x.data <= agora && x.data >= addDays(agora, -60)).sort((p, q) => q.data.localeCompare(p.data))[0];
     if (!ult) throw new Error('Não encontramos um atendimento recente com este WhatsApp. A avaliação é só para clientes atendidas nos últimos 60 dias. Use o mesmo número que você deu no estúdio.');
-    if ((S.avaliacoes || []).some(a => a.clienteId === k.id && a.data >= ult.data)) throw new Error('Você já avaliou o seu último atendimento. Obrigada! Depois do próximo, você pode avaliar de novo.');
     cli.cli = k;
   }
   S.seq.av = (S.seq.av || 0) + 1;
   const av = { id: uid('av'), codigo: 'AV-' + S.seq.av, nome, telefone: formatarTel(tel), clienteId: cli.cli ? cli.cli.id : null,
-    nota, obs, funcId: func ? func.id : '', data: agora, verificada: opts.validar !== false, criadoIso: agora, criadoEm: stamp(), lida: false };
+    nota, obs, funcId: func ? func.id : (ult ? ult.funcId || '' : ''), atId: ult ? ult.id : '', servicoId: ult ? ult.servicoId || '' : '', data: agora, verificada: opts.validar !== false, criadoIso: agora, criadoEm: stamp(), lida: false };
   S.avaliacoes.push(av);
   S.auditoria.unshift({ id: uid('lg'), quando: stamp(), usuario: 'Cliente (avaliação)', acao: 'Avaliação recebida', detalhe: `${av.codigo} · ${nota} estrela(s) · ${nome}` });
   return av;
@@ -3088,6 +3099,16 @@ function situacaoVenda(S, v) {
   const ags = sessoesDaVenda(S, v.id), usadas = ags.filter(x => ['concluido', 'faltou'].includes(x.status)).length, marcadas = ags.filter(x => ABERTOS.includes(x.status)).length;
   const livres = Math.max(0, v.sessoes - usadas - marcadas), vencido = v.validoAte && v.validoAte < TODAY && (livres + marcadas) > 0;
   return { ags, usadas, marcadas, livres, concluidas: ags.filter(x => x.status === 'concluido').length, vencido, encerrado: usadas >= v.sessoes, proxima: ags.find(x => ABERTOS.includes(x.status) && x.data >= TODAY) || null };
+}
+/* texto do saldo do pacote para o WhatsApp: quantas usou, quantas restam e cada sessão com data */
+function waPacoteCtx(S, v) {
+  const st = situacaoVenda(S, v), ags = st.ags.filter(x => x.status !== 'cancelado'), dia = d => `${['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][fromIso(d).getDay()]}, ${dBR(d).slice(0, 5)}`;
+  const linhas = Array.from({ length: v.sessoes }, (_, i) => { const x = ags[i];
+    if (!x) return `${i + 1}ª sessão: a agendar`;
+    const quando = `${dia(x.data)} às ${x.inicio}`;
+    return `${i + 1}ª sessão: ${quando} · ${x.status === 'concluido' ? 'feita ✓' : x.status === 'faltou' ? 'falta (contou como usada)' : 'marcada'}`; });
+  return { pacote: `${v.nome} (${v.codigo})`, pacote_usadas: st.usadas, pacote_restantes: Math.max(0, v.sessoes - st.usadas), pacote_total: v.sessoes, pacote_sessoes: linhas.join('\n'),
+    pacote_validade: v.validoAte ? `Seu pacote vale até ${dBR(v.validoAte)}.` : '', servico: (S.servicos.find(x => x.id === v.servicoId) || {}).nome || '', profissional: (S.funcionarios.find(f => f.id === v.funcId)?.nome || '').split(' ')[0] };
 }
 function agendarSessaoPacote(S, a, vendaId, d) {
   const v = (S.pacoteVendas || []).find(x => x.id === vendaId); if (!v) throw new Error('Pacote não encontrado.');
@@ -3912,6 +3933,11 @@ function migrarDados(D) {
     const m = WA_MODELOS.find(x => x.id === 'avaliacao'), i = D.config.whatsapp.modelos.findIndex(x => x.id === 'agradecimento');
     D.config.whatsapp.modelos.splice(i >= 0 ? i + 1 : D.config.whatsapp.modelos.length, 0, { ...m, padrao: true });
   }
+  // modelo "Saldo do pacote" para quem já tinha o WhatsApp configurado
+  if (D.config.whatsapp && Array.isArray(D.config.whatsapp.modelos) && !D.config.whatsapp.modelos.some(m => m.id === 'pacote')) {
+    const m = WA_MODELOS.find(x => x.id === 'pacote'), i = D.config.whatsapp.modelos.findIndex(x => x.id === 'cobranca');
+    D.config.whatsapp.modelos.splice(i >= 0 ? i : D.config.whatsapp.modelos.length, 0, { ...m, padrao: true });
+  }
   // comanda: serviços da mesma cliente no mesmo dia (registrados separados antes) passam a ser uma comanda só
   {
     const m = new Map();
@@ -4394,7 +4420,7 @@ function runTests() {
     const form = deveFalhar(() => criarPedido(S8, { nome: 'Carla Mendes', telefone: S8.clientes[1].telefone, itens: [{ servicoId: 's1' }], data: addDays(TODAY, 2), hora: '10:00' }));
     return (e.every(Boolean) && /segundo nome/.test(e[0]) && /já está no cadastro/.test(e[2]) && !!ok && dup3 && edita && /outro nome/.test(form)) || JSON.stringify([e, dup3, edita, form]);
   });
-  T('Avaliação: nota de 1 a 5, nome e telefone obrigatórios, nota baixa pede comentário', () => {
+  T('Avaliação: nota de 1 a 5, nome e telefone obrigatórios, nota baixa pede comentário; a mesma cliente pode avaliar várias vezes', () => {
     const S1 = seedBase();
     const e = [deveFalhar(() => criarAvaliacao(S1, { nome: 'Ana', telefone: '(55) 97777-1111', nota: 5 })), deveFalhar(() => criarAvaliacao(S1, { nome: 'Ana Paula', telefone: '9777', nota: 5 })),
       deveFalhar(() => criarAvaliacao(S1, { nome: 'Ana Paula', telefone: '(55) 97777-1111', nota: 0 })), deveFalhar(() => criarAvaliacao(S1, { nome: 'Ana Paula', telefone: '(55) 97777-1111', nota: 1, obs: '' }))];
@@ -4402,10 +4428,20 @@ function runTests() {
     const d1 = S1.users.find(u => u.id === 'u0');
     registrarAtendimento(S1, d1, { funcId: 'f1', servicoId: 's1', clienteId: 'k1', data: TODAY, valorCobrado: 7000, parcelas: [{ forma: 'pix', valor: 7000 }] });
     const av = criarAvaliacao(S1, { nome: 'Mariana Alves', telefone: S1.clientes[0].telefone, nota: 5, obs: 'Amei' });
-    const repetida = deveFalhar(() => criarAvaliacao(S1, { nome: 'Mariana Alves', telefone: S1.clientes[0].telefone, nota: 4 }));
+    const av2 = criarAvaliacao(S1, { nome: 'Mariana Alves', telefone: S1.clientes[0].telefone, nota: 4 }), av3 = criarAvaliacao(S1, { nome: 'Mariana Alves', telefone: S1.clientes[0].telefone, nota: 5 });
     const estranha = deveFalhar(() => criarAvaliacao(S1, { nome: 'Pessoa Qualquer', telefone: '(55) 97777-9999', nota: 1, obs: 'ruim demais' }));
     const r = resumoAvaliacoes(S1.avaliacoes);
-    return (e.every(Boolean) && /atendimento recente/.test(semAtend) && /já avaliou/.test(repetida) && /atendimento recente/.test(estranha) && av.clienteId === 'k1' && av.codigo === 'AV-1' && r.media === 5 && r.n === 1) || JSON.stringify([e, semAtend, repetida, estranha, av.clienteId]);
+    return (e.every(Boolean) && /atendimento recente/.test(semAtend) && av2.codigo === 'AV-2' && av3.codigo === 'AV-3' && av2.funcId === 'f1' && /atendimento recente/.test(estranha) && av.clienteId === 'k1' && av.codigo === 'AV-1' && r.n === 3) || JSON.stringify([e, semAtend, av2 && av2.codigo, estranha, av.clienteId]);
+  });
+  T('Pacote: mensagem de saldo no WhatsApp mostra usadas e restantes e fica registrada no pacote', () => {
+    const S7 = seedBase(), d7 = S7.users.find(u => u.id === 'u0'); S7.config.whatsapp = S7.config.whatsapp || waPadrao(); S7.config.whatsapp.ativo = true;
+    if (!S7.config.whatsapp.modelos.some(m => m.id === 'pacote')) S7.config.whatsapp.modelos.push({ ...WA_MODELOS.find(m => m.id === 'pacote') });
+    const pc = salvarPacote(S7, d7, { nome: 'Pacote 4 escovas', servicoId: 's5', sessoes: 4, preco: 16000, validadeDias: 60 });
+    const vid = venderPacote(S7, d7, { pacoteId: pc.id, clienteId: 'k1', funcId: 'f3', parcelas: [{ forma: 'pix', valor: 16000 }] }).id;
+    const v = S7.pacoteVendas.find(x => x.id === vid), c0 = waPacoteCtx(S7, v);
+    registrarContatoWhatsApp(S7, d7, { clienteId: 'k1', modeloId: 'pacote', pacoteVendaId: vid });
+    const msg = waMensagem(WA_MODELOS.find(m => m.id === 'pacote').texto, { primeiro_nome: 'Mariana', salao: 'Studio', ...c0 });
+    return (c0.pacote_usadas === 0 && c0.pacote_restantes === 4 && /4ª sessão: a agendar/.test(c0.pacote_sessoes) && /usou 0 de 4 sessões e ainda tem 4/.test(msg) && v.avisos.length === 1 && v.avisos[0].restantes === 4 && /restante/.test(S7.auditoria[0].detalhe)) || JSON.stringify([c0, v.avisos, msg]);
   });
   T('Pacote: paga uma vez, marca as sessões na agenda e concluir sessão não cobra de novo', () => {
     const S2 = seedBase(), d2 = S2.users.find(u => u.id === 'u0');
@@ -5795,6 +5831,7 @@ async function gerarCodigoAcesso(userId) {
   const n = crypto.getRandomValues(new Uint32Array(1))[0] % 1000000, cod = String(n).padStart(6, '0');
   try { u.convite = { ...(await criarHash(cod)), ate: Date.now() + 7 * 864e5, por: real.nome, em: stamp() }; } catch (e) { toast(e.message, 'bad'); return; }
   audit(DB, real, 'Código de acesso gerado', `${u.nome} · vale 7 dias`); save();
+  if (typeof window.PROD_CONVITE === 'function') window.PROD_CONVITE(u.email, cod, 168);   // versão publicada: o código vale em qualquer aparelho
   const f = DB.funcionarios.find(x => x.id === u.funcId), tel = digits(f?.telefone || '');
   const msg = `Olá, ${u.nome.split(' ')[0]}! Este é o seu acesso ao sistema do ${DB.config.nome}.\n\n1. Abra o sistema e toque em "Primeiro acesso ou código".\n2. E-mail: ${u.email}\n3. Código: ${cod}\n\nCom o código você cria a sua senha. Ele vale por 7 dias e só funciona uma vez. Não passe para ninguém.`;
   openModal('Código de acesso', `<div class="cod-box"><span class="muted small">Código de ${esc(u.nome)}</span><b class="cod">${cod.slice(0, 3)} ${cod.slice(3)}</b><span class="muted small">Vale até ${dBR(new Date(u.convite.ate).toISOString().slice(0, 10))} · uso único</span></div>
@@ -5815,6 +5852,7 @@ function modalConta() {
     try {
       if (!(await confere(val('ct-a'), real.senha))) throw new Error('A senha atual não confere.');
       validarNovaSenha(val('ct-n'), val('ct-c'));
+      if (typeof window.PROD_TROCAR_SENHA === 'function') await window.PROD_TROCAR_SENHA(real.email, val('ct-a'), val('ct-n'));
       real.senha = await criarHash(val('ct-n')); real.senhaEm = stamp(); audit(DB, real, 'Senha alterada', ''); save(); closeModal(); toast('Senha alterada');
     } catch (err) { toast(err.message, 'bad'); b.disabled = false; }
   };
@@ -5837,7 +5875,7 @@ function campoLg(id, rot, tipo, ic, extra = '') {
 function formLogin() {
   const m = LOGIN.modo, aviso = LOGIN.msg ? `<div class="lg-msg ${LOGIN.tipo || 'bad'}" role="alert">${esc(LOGIN.msg)}</div>` : '';
   if (m === 'esqueci') return `<div class="lg-hd"><button class="lg-back" data-lg="entrar">${lgi('voltar')}<span>Voltar</span></button><h2>Esqueceu a senha?</h2><p>Por segurança, a senha não é enviada por e-mail. É assim que se cria uma nova:</p></div>
-    <ol class="lg-passos"><li><b>Equipe do salão:</b> peça à proprietária um código de acesso. Ela gera em <i>Equipe e permissões</i>, na sua ficha.</li><li>Com o código, toque em <b>Primeiro acesso ou código</b> e crie a nova senha.</li><li><b>Proprietária:</b> ${typeof window.PROD_RECUPERAR_DONO === 'function' ? 'use a senha da conta do estúdio (a mesma usada para ativar os aparelhos) para gerar o seu código.' : 'fale com o suporte da FX Mídia Social para receber o seu código.'}</li></ol>
+    <ol class="lg-passos"><li><b>Equipe do salão:</b> peça à proprietária um código de acesso. Ela gera em <i>Equipe e permissões</i>, na sua ficha.</li><li>Com o código, toque em <b>Primeiro acesso ou código</b> e crie a nova senha.</li><li><b>Proprietária:</b> ${typeof window.PROD_RECUPERAR_DONO === 'function' ? 'use o e-mail e a senha da conta do estúdio para gerar o seu código.' : 'fale com o suporte da FX Mídia Social para receber o seu código.'}</li></ol>
     ${typeof window.PROD_RECUPERAR_DONO === 'function' ? `<button class="lg-sec" type="button" data-dono-rec>${lgi('escudo')}<span>Sou a proprietária: gerar meu código</span></button>` : ''}
     <button class="lg-btn" data-lg="primeiro"><span>Já tenho um código</span>${lgi('seta')}</button>`;
   if (m === 'primeiro') return `<div class="lg-hd"><button class="lg-back" data-lg="entrar">${lgi('voltar')}<span>Voltar</span></button><h2>Primeiro acesso</h2><p>Use o código de 6 números que a proprietária enviou e crie a sua senha.</p></div>${aviso}
@@ -6766,7 +6804,8 @@ function openModal(title, body, foot = '', wide = false) {
   closeModal();
   const ov = document.createElement('div'); ov.className = 'ov';
   ov.innerHTML = `<div class="md ${wide ? 'wide' : ''}" role="dialog" aria-modal="true" aria-label="${esc(title)}"><i class="grab" aria-hidden="true"></i><div class="md-h"><h2>${esc(title)}</h2><button class="btn ghost sm" data-close aria-label="Fechar">Fechar</button></div><div class="md-b">${body}</div>${foot ? `<div class="md-f">${foot}</div>` : ''}</div>`;
-  ov.addEventListener('click', e => { if (e.target === ov || e.target.closest('[data-close]')) closeModal(); });
+  // a janela só fecha pelo Cancelar/Fechar, pelo Salvar ou pelo Esc: clicar fora não fecha (para não perder o que foi digitado)
+  ov.addEventListener('click', e => { if (e.target.closest('[data-close]')) closeModal(); });
   document.getElementById('modal-root').appendChild(ov); MODAL = ov; rotularTabelas(ov);
   document.documentElement.classList.add('trava-rolagem');   // a página de trás não rola enquanto a janela está aberta
   // cursor no primeiro campo, mas só se a pessoa ainda não estiver digitando em outro
@@ -6778,6 +6817,23 @@ function openModal(title, body, foot = '', wide = false) {
   return ov;
 }
 function closeModal() { if (MODAL) { MODAL.remove(); MODAL = null; } document.documentElement.classList.remove('trava-rolagem'); }
+/* rolagem pelo teclado: setas, Page Up/Down, Home/End rolam a janela aberta, o card clicado ou a página */
+let ROLA_ALVO = null;
+const rolavel = el => { for (let n = el; n && n.nodeType === 1 && n !== document.body && n !== document.documentElement; n = n.parentElement) { const cs = getComputedStyle(n); if (/(auto|scroll)/.test(cs.overflowY) && n.scrollHeight > n.clientHeight + 2) return n; } return null; };
+document.addEventListener('pointerdown', e => { ROLA_ALVO = e.target; }, true);
+function rolarTeclado(e) {
+  const k = e.key; if (!['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End'].includes(k) || e.altKey || e.ctrlKey || e.metaKey || e.defaultPrevented) return;
+  const t = e.target; if (t && t.closest && t.closest('input,textarea,select,[contenteditable=""],[contenteditable="true"],[role=listbox],[role=combobox],.cpk-list')) return;
+  let alvo = null;
+  if (MODAL) { const base = ROLA_ALVO && MODAL.contains(ROLA_ALVO) ? ROLA_ALVO : MODAL.querySelector('.md-b'); alvo = rolavel(base) || [MODAL.querySelector('.md-b'), MODAL.querySelector('.md')].find(x => x && x.scrollHeight > x.clientHeight + 2) || null; if (!alvo) return; }
+  else { alvo = ROLA_ALVO && document.contains(ROLA_ALVO) ? rolavel(ROLA_ALVO) : null; }
+  const pagina = !alvo, el = alvo || document.scrollingElement || document.documentElement, alto = pagina ? window.innerHeight : el.clientHeight;
+  const passo = { ArrowDown: 60, ArrowUp: -60, PageDown: alto * .85, PageUp: -alto * .85, Home: -1e9, End: 1e9 }[k];
+  const antes = el.scrollTop;
+  if (pagina) window.scrollBy({ top: passo, behavior: Math.abs(passo) > 100 && Math.abs(passo) < 1e8 ? 'smooth' : 'auto' }); else el.scrollTop += passo;
+  if (pagina || el.scrollTop !== antes) e.preventDefault();
+}
+document.addEventListener('keydown', rolarTeclado);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('[role=button][data-ag],[role=button][data-goday],[role=button][data-cli]')) { e.preventDefault(); e.target.click(); } });
 /* confirmação dentro da própria página (o visualizador não exibe confirm()) */
 function confirmar(ov, html, onOk, label = 'Confirmar') {
@@ -7106,18 +7162,19 @@ function csvBaixar(titulo, csv, nome) { if (DL) return baixar(nome, '﻿' + csv,
 /* =================== WHATSAPP (interface) =================== */
 const waModeloPadrao = ag => ag.status === 'aguardando' ? 'confirmacao' : ag.status === 'faltou' ? 'falta' : ag.status === 'cancelado' ? 'reagendar' : ag.status === 'concluido' ? 'agradecimento' : 'lembrete';
 const waBtn = (attrs, label = '', modelo) => podeWhatsApp(DB, ACTOR, modelo) ? `<button class="btn wa ${label ? 'sm' : 'icon'}" ${attrs} aria-label="${esc(label || 'Abrir WhatsApp')}" title="${esc(label || 'WhatsApp')}">${icon('wa')}${label ? `<span>${esc(label)}</span>` : ''}</button>` : '';
-function waContexto({ clienteId, agendamentoId, atendimentoId, parcelaId }) {
+function waContexto({ clienteId, agendamentoId, atendimentoId, parcelaId, pacoteVendaId }) {
+  const pv = pacoteVendaId ? (DB.pacoteVendas || []).find(x => x.id === pacoteVendaId) : null;
   const ag = agendamentoId ? DB.agendamentos.find(x => x.id === agendamentoId) : null;
   const at = atendimentoId ? DB.atendimentos.find(x => x.id === atendimentoId) : null;
   const pc = parcelaId ? DB.parcelas.find(x => x.id === parcelaId) : null;
   const base = ag || at;
-  const cid = clienteId || base?.clienteId;
+  const cid = clienteId || base?.clienteId || pv?.clienteId;
   const cl = CL(cid), c = DB.config.whatsapp;
   const valor = pc ? pc.valor : at ? sum(DB.parcelas.filter(p => p.atendimentoId === at.id && p.status === 'pendente').map(p => p.valor)) || at.valorFinal : ag?.preco;
-  return { clienteId: cid, agendamentoId: ag?.id, telefone: cl?.telefone || '', ctx: {
+  return { clienteId: cid, agendamentoId: ag?.id, pacoteVendaId: pv?.id, telefone: cl?.telefone || '', ctx: {
     cliente: cl?.nome || '', primeiro_nome: (cl?.nome || '').split(' ')[0], servico: base ? SV(base.servicoId)?.nome : '',
     data: base ? dBR(base.data) : '', hora: ag ? ag.inicio : '', profissional: base ? first(base.funcId) : '',
-    valor: valor ? brl(valor) : '', pix: c.pix, endereco: c.endereco, salao: DB.config.nome, telefone_salao: c.numeroSalao, link_avaliacao: typeof linkAvaliacao === 'function' ? linkAvaliacao() : '', ...waExtras(ag, cid) } };
+    valor: valor ? brl(valor) : '', pix: c.pix, endereco: c.endereco, salao: DB.config.nome, telefone_salao: c.numeroSalao, link_avaliacao: typeof linkAvaliacao === 'function' ? linkAvaliacao() : '', ...waExtras(ag, cid), ...(pv ? waPacoteCtx(DB, pv) : {}) } };
 }
 function modalWhatsApp(ref = {}, modeloId) {
   const c = DB.config.whatsapp;
@@ -7141,7 +7198,7 @@ function modalWhatsApp(ref = {}, modeloId) {
   q('#wa-chips').onclick = e => { const b = e.target.closest('[data-m]'); if (!b) return; mid = b.dataset.m; q('#wa-chips').querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x === b)); fill(); };
   q('#wa-txt').oninput = upd; q('#wa-tel').oninput = upd;
   q('#wa-cl')?.addEventListener('change', e => { W = waContexto({ clienteId: e.target.value }); q('#wa-nome').textContent = W.ctx.cliente || 'Escolha o cliente'; q('.wa-av').textContent = (W.ctx.cliente || '?').slice(0, 1); q('#wa-tel').value = W.telefone; fill(); });
-  q('#wa-go').onclick = e => { if (!q('#wa-go').href) { e.preventDefault(); return; } try { registrarContatoWhatsApp(DB, ACTOR, { clienteId: W.clienteId, modeloId: mid, agendamentoId: W.agendamentoId }); save(); } catch (err) { e.preventDefault(); toast(err.message, 'bad'); return; } setTimeout(() => { closeModal(); render(); toast('Conversa aberta no WhatsApp'); }, 300); };
+  q('#wa-go').onclick = e => { if (!q('#wa-go').href) { e.preventDefault(); return; } try { registrarContatoWhatsApp(DB, ACTOR, { clienteId: W.clienteId, modeloId: mid, agendamentoId: W.agendamentoId, pacoteVendaId: W.pacoteVendaId }); save(); } catch (err) { e.preventDefault(); toast(err.message, 'bad'); return; } setTimeout(() => { closeModal(); render(); toast('Conversa aberta no WhatsApp'); }, 300); };
   q('#wa-copy').onclick = () => { const t = q('#wa-txt'); const ok = () => toast('Texto copiado'); const fb = () => { t.select(); toast('Texto selecionado. Use Copiar do aparelho.'); };
     try { navigator.clipboard.writeText(t.value).then(ok, fb); } catch (err) { fb(); } };
   fill();
@@ -8498,9 +8555,16 @@ function pgPacotes() {
       <div class="pk-ses">${Array.from({ length: v.sessoes }, (_, i) => { const ags = st.ags.filter(x => !['cancelado'].includes(x.status)), x = ags[i];
         return x ? `<button class="pk-s s-${x.status}" data-ag="${x.id}"><b>${i + 1}</b><span>${dataCurta(x.data)} · ${x.inicio}</span><em>${x.status === 'concluido' ? 'Feita' : x.status === 'faltou' ? 'Faltou' : 'Marcada'}</em></button>`
           : `<button class="pk-s livre" ${!st.encerrado && pode(DB, ACTOR, 'agendar') ? `data-pk-sessao="${v.id}"` : 'disabled'}><b>${i + 1}</b><span>Sem data</span><em>${pode(DB, ACTOR, 'agendar') ? '+ Marcar' : 'A marcar'}</em></button>`; }).join('')}</div>
-      ${st.vencido ? '<div class="note warn small">Pacote vencido com sessões ainda sem uso.</div>' : ''}</article>`).join('')}</div>`
+      ${st.vencido ? '<div class="note warn small">Pacote vencido com sessões ainda sem uso.</div>' : ''}
+      ${pkAvisoHTML(v, st)}</article>`).join('')}</div>`
       : `<div class="panel">${empty(pb ? 'Nenhum pacote encontrado' : filtro === 'encerrados' ? 'Nenhum pacote encerrado' : 'Nenhum pacote em uso', pb ? 'Confira o nome, telefone ou CPF, ou troque o filtro (Em uso, Encerrados, Todos).' : 'Os pacotes vendidos aparecem aqui com as sessões.')}</div>`}
   </div>`;
+}
+/* rodapé do pacote: botão para mandar o saldo no WhatsApp e o registro do último aviso */
+function pkAvisoHTML(v, st) {
+  const r = Math.max(0, v.sessoes - st.usadas), ult = (v.avisos || []).slice(-1)[0];
+  const bt = waBtn(`data-wa-pk="${v.id}"`, st.encerrado ? 'Avisar no WhatsApp' : 'Enviar saldo no WhatsApp', 'pacote');
+  return `<div class="pk-aviso"><div class="small"><b>${st.usadas} usada(s) · ${r} restante(s)</b>${ult ? `<div class="muted">Saldo enviado no WhatsApp em ${esc(ult.quando)} por ${esc((ult.usuario || '').split(' ')[0])} (${ult.usadas} usada(s), ${ult.restantes} restante(s))${v.avisos.length > 1 ? ` · ${v.avisos.length} avisos no total` : ''}</div>` : '<div class="muted">A cliente ainda não recebeu o saldo pelo WhatsApp.</div>'}</div>${bt}</div>`;
 }
 function modalPacote(id) {
   const pc = id ? DB.pacotes.find(x => x.id === id) : { nome: '', servicoId: '', sessoes: 4, preco: 0, validadeDias: 60, descricao: '', ativo: true };
@@ -9328,10 +9392,11 @@ const AFTER = {
 
 /* ---------- eventos globais (delegação) ---------- */
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-al-todos],[data-pk-limpa],[data-sv-limpa],[data-del-cat],[data-po-limpa],[data-ct-todos],[data-del],[data-dono-novo],[data-dono-edit],[data-podo-aba],[data-podo-nova],[data-podo-ficha],[data-cxcentro],[data-comanda],[data-av-teste],[data-av-qr],[data-av-copiar],[data-av-dl],[data-av-nota],[data-pk-novo],[data-pk-edit],[data-pk-vender],[data-pk-filtro],[data-pk-sessao],[data-cli-nivel],[data-dona-serv],[data-mov],[data-mov-ed],[data-mov-ex],[data-cxper],[data-cxnav],[data-cxtipo],[data-cli-acao],[data-conv-membros],[data-receb-com],[data-conf-com],[data-acerto-com],[data-pagar-cli],[data-cvst],[data-liberar],[data-conta],[data-sair],[data-codigo],[data-repasse],[data-adiant],[data-extrato],[data-abater],[data-conv-novo],[data-conv-edit],[data-conv-filtro],[data-alertas],[data-fechar],[data-faltou],[data-chegou],[data-tema],[data-pdf],[data-wa-ag],[data-wa-cli],[data-wa-cob],[data-wa-at],[data-fab],[data-go],[data-menu],[data-per],[data-agv],[data-agnav],[data-ag],[data-bl],[data-slot],[data-goday],[data-new-ag],[data-new-bl],[data-new-reg],[data-at-open],[data-receb],[data-conf],[data-acerto],[data-fesem],[data-fe-ver],[data-pagar],[data-new-cli],[data-cli],[data-new-func],[data-func],[data-new-serv],[data-serv],[data-new-cat],[data-mais],[data-pub-abrir],[data-pub-cliente],[data-origem-nova],[data-origem],[data-ped-agendar],[data-ped-recusar],[data-qr-copiar],[data-qr-dl],[data-qr-ver],[data-ped-dia]');
+  const t = e.target.closest('[data-al-todos],[data-wa-pk],[data-pk-limpa],[data-sv-limpa],[data-del-cat],[data-po-limpa],[data-ct-todos],[data-del],[data-dono-novo],[data-dono-edit],[data-podo-aba],[data-podo-nova],[data-podo-ficha],[data-cxcentro],[data-comanda],[data-av-teste],[data-av-qr],[data-av-copiar],[data-av-dl],[data-av-nota],[data-pk-novo],[data-pk-edit],[data-pk-vender],[data-pk-filtro],[data-pk-sessao],[data-cli-nivel],[data-dona-serv],[data-mov],[data-mov-ed],[data-mov-ex],[data-cxper],[data-cxnav],[data-cxtipo],[data-cli-acao],[data-conv-membros],[data-receb-com],[data-conf-com],[data-acerto-com],[data-pagar-cli],[data-cvst],[data-liberar],[data-conta],[data-sair],[data-codigo],[data-repasse],[data-adiant],[data-extrato],[data-abater],[data-conv-novo],[data-conv-edit],[data-conv-filtro],[data-alertas],[data-fechar],[data-faltou],[data-chegou],[data-tema],[data-pdf],[data-wa-ag],[data-wa-cli],[data-wa-cob],[data-wa-at],[data-fab],[data-go],[data-menu],[data-per],[data-agv],[data-agnav],[data-ag],[data-bl],[data-slot],[data-goday],[data-new-ag],[data-new-bl],[data-new-reg],[data-at-open],[data-receb],[data-conf],[data-acerto],[data-fesem],[data-fe-ver],[data-pagar],[data-new-cli],[data-cli],[data-new-func],[data-func],[data-new-serv],[data-serv],[data-new-cat],[data-mais],[data-pub-abrir],[data-pub-cliente],[data-origem-nova],[data-origem],[data-ped-agendar],[data-ped-recusar],[data-qr-copiar],[data-qr-dl],[data-qr-ver],[data-ped-dia]');
   if (!t) return;
   const ds = t.dataset;
   if ('waAg' in ds) { e.stopPropagation(); const x = DB.agendamentos.find(a => a.id === ds.waAg); return modalWhatsApp({ agendamentoId: ds.waAg }, ds.waM || waModeloPadrao(x)); }
+  if ('waPk' in ds) return modalWhatsApp({ pacoteVendaId: ds.waPk }, 'pacote');
   if ('waCli' in ds) return modalWhatsApp({ clienteId: ds.waCli }, ds.waM || 'agendar');
   if ('waCob' in ds) { const pc = DB.parcelas.find(p => p.id === ds.waCob); return modalWhatsApp({ atendimentoId: pc.atendimentoId, parcelaId: pc.id }, 'cobranca'); }
   if ('waAt' in ds) return modalWhatsApp({ atendimentoId: ds.waAt }, ds.waM);
@@ -9475,7 +9540,7 @@ function iniciar(hot) {
    VERSÃO DEFINITIVA (Netlify + Supabase)
    Este arquivo só entra no pacote de produção. Ele faz o papel do banco
    compartilhado do claude.ai usando o Supabase, sem mudar o resto do sistema:
-   - ativação do aparelho com a conta do estúdio (uma vez por aparelho);
+   - entrada só com e-mail e senha, em qualquer aparelho (cada pessoa tem a própria conta);
    - primeira configuração (traz os cadastros da cópia de segurança);
    - página da cliente (agendar, avaliar, confirmar) sem login, que só ENVIA;
    - caixa de entrada: o sistema da equipe recebe os envios das clientes;
@@ -9518,35 +9583,194 @@ function telaSemConfig() {
     <ol class="lg-passos"><li>Supabase → <b>Project Settings → API</b>.</li><li>Copie <b>Project URL</b> e a chave <b>anon public</b>.</li><li>Cole no <b>config.js</b> e publique de novo.</li></ol>`);
 }
 
-/* ---------------- ativação do aparelho ---------------- */
-function telaAtivar(msg) {
-  telaProd(`<div class="lg-hd"><span class="lg-kick">Primeiro uso neste aparelho</span><h2>Ativar este aparelho</h2>
-    <p>Entre com a <b>conta do estúdio</b>. É feito uma vez só em cada celular ou computador. Depois, cada pessoa da equipe entra com o próprio e-mail e senha.</p></div>
-    ${msg ? msgProd(msg, 'info') : ''}
-    <form class="lg-form" id="at-f" novalidate>
-      ${campoLg('at-e', 'E-mail da conta do estúdio', 'text', 'mail', 'autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="email" name="ce-' + Math.random().toString(36).slice(2) + '" placeholder="conta@estudio.com"')}
-      ${campoLg('at-s', 'Senha da conta do estúdio', 'text', 'lock', 'class="lg-mask" autocomplete="off" autocapitalize="off" spellcheck="false" name="cs-' + Math.random().toString(36).slice(2) + '"')}
-      <button class="lg-btn" type="submit"><span>Ativar aparelho</span>${lgi('seta')}</button></form>
-    <div class="lg-pe"><span class="lg-seg">${lgi('escudo')}Acesso protegido</span></div>`, linkCliente());
-  const f = document.getElementById('at-f'), b = f.querySelector('.lg-btn');
-  semAutoPreencher(f);   // a senha do estúdio nunca é guardada nem preenchida pelo navegador
+/* ---------------- entrada: só e-mail e senha, em qualquer aparelho ----------------
+   Cada pessoa da equipe tem a própria conta de login no banco. Não existe mais "ativar o aparelho":
+   basta o e-mail e a senha. O primeiro acesso (ou a senha nova) é feito com o código da proprietária. */
+const ENTRAR = { modo: 'entrar', email: '', aviso: '', tipo: 'bad', codigo: '' };
+const MSG_CONVITE = { sem_convite: 'E-mail ou código incorretos. Confira com a proprietária.', errado: 'E-mail ou código incorretos. Confira com a proprietária.',
+  vencido: 'Este código venceu. Peça um novo à proprietária.', bloqueado: 'Este código foi bloqueado depois de 5 tentativas erradas. Peça um novo à proprietária.',
+  fora: 'Este e-mail não está na equipe do salão. Confira com a proprietária.', senha: 'A senha precisa ter pelo menos 8 caracteres, com letras e números.' };
+const semRede = e => /fetch|network|Failed|Load failed|timeout/i.test((e && e.message) || '') || !navigator.onLine;
+async function entrarNoBanco(email, senha) {
+  try { const { error } = await PROD.sb.auth.signInWithPassword({ email, password: senha }); return error || null; }
+  catch (e) { return e; }
+}
+async function rpcProd(nome, args) {
+  try { const { data, error } = await PROD.sb.rpc(nome, args); return error ? { erro: error } : { data }; } catch (e) { return { erro: e }; }
+}
+function telaEntrar(msg, tipo = 'bad') {
+  if (msg) { ENTRAR.aviso = msg; ENTRAR.tipo = tipo; }
+  const m = ENTRAR.modo, aviso = ENTRAR.aviso ? msgProd(ENTRAR.aviso, ENTRAR.tipo) : '';
+  const voltar = `<button class="lg-back" type="button" data-en="entrar">${lgi('voltar')}<span>Voltar</span></button>`;
+  const emailCampo = (rot = 'E-mail') => campoLg('en-e', rot, 'email', 'mail', `autocomplete="username" inputmode="email" autocapitalize="off" spellcheck="false" value="${esc(ENTRAR.email)}" placeholder="seu@email.com"`);
+  let card;
+  if (m === 'primeiro') card = `<div class="lg-hd">${voltar}<h2>Primeiro acesso</h2><p>Use o código de 6 números que a proprietária enviou e crie a sua senha. Depois é só entrar com e-mail e senha em qualquer aparelho.</p></div>${aviso}
+    ${ENTRAR.codigo ? `<div class="lg-msg ok" role="status">Seu código: <b>${ENTRAR.codigo.slice(0, 3)} ${ENTRAR.codigo.slice(3)}</b> (vale 24 horas)</div>` : ''}
+    <form class="lg-form" id="en-f" novalidate>${emailCampo()}
+      ${campoLg('en-c', 'Código de acesso', 'text', 'key', `inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000 000" value="${ENTRAR.codigo ? ENTRAR.codigo.slice(0, 3) + ' ' + ENTRAR.codigo.slice(3) : ''}"`)}
+      ${campoLg('en-s', 'Nova senha', 'password', 'lock', 'autocomplete="new-password" placeholder="mínimo 8, com letras e números"')}
+      ${campoLg('en-s2', 'Repita a nova senha', 'password', 'lock', 'autocomplete="new-password"')}
+      <button class="lg-btn" type="submit"><span>Criar senha e entrar</span>${lgi('seta')}</button></form>`;
+  else if (m === 'esqueci') card = `<div class="lg-hd">${voltar}<h2>Esqueceu a senha?</h2><p>Por segurança, a senha não é enviada por e-mail. É assim que se cria uma nova:</p></div>
+    <ol class="lg-passos"><li><b>Equipe do salão:</b> peça à proprietária um código de acesso. Ela gera em <i>Equipe e permissões</i>, na sua ficha.</li><li>Com o código, toque em <b>Já tenho um código</b> e crie a nova senha.</li><li><b>Proprietária:</b> use o e-mail e a senha da conta do estúdio para gerar o seu código.</li></ol>
+    <button class="lg-sec" type="button" data-en="dono">${lgi('escudo')}<span>Sou a proprietária: gerar meu código</span></button>
+    <button class="lg-btn" type="button" data-en="primeiro"><span>Já tenho um código</span>${lgi('seta')}</button>`;
+  else if (m === 'dono') card = `<div class="lg-hd">${voltar}<h2>Código da proprietária</h2><p>Confirme a <b>conta do estúdio</b>. O sistema gera um código para você criar a senha nova.</p></div>${aviso}
+    <form class="lg-form" id="en-f" novalidate>${emailCampo('Seu e-mail (proprietária)')}
+      ${campoLg('en-de', 'E-mail da conta do estúdio', 'text', 'mail', 'autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="email"')}
+      ${campoLg('en-ds', 'Senha da conta do estúdio', 'text', 'lock', 'class="lg-mask" autocomplete="off" autocapitalize="off" spellcheck="false"')}
+      <button class="lg-btn" type="submit"><span>Gerar meu código</span>${lgi('seta')}</button></form>`;
+  else card = `<div class="lg-hd"><span class="lg-kick">Acesso da equipe</span><h2>Bem-vinda de volta</h2><p>Entre com seu e-mail e senha. Funciona em qualquer celular ou computador.</p></div>${aviso}
+    <form class="lg-form" id="en-f" novalidate>${emailCampo()}
+      ${campoLg('en-s', 'Senha', 'password', 'lock', 'autocomplete="current-password" placeholder="Sua senha"')}
+      <div class="lg-row"><label class="lg-chk"><input type="checkbox" id="en-m" checked><span></span>Manter conectado</label><button type="button" class="lg-link" data-en="esqueci">Esqueci a senha</button></div>
+      <button class="lg-btn" type="submit"><span>Entrar</span>${lgi('seta')}</button></form>
+    <div class="lg-ou"><span>ou</span></div>
+    <button class="lg-sec" type="button" data-en="primeiro">${lgi('key')}<span>Primeiro acesso ou código</span></button>`;
+  telaProd(card + `<div class="lg-pe"><span class="lg-seg">${lgi('escudo')}Acesso protegido</span></div>`, linkCliente());
+  const root = document.querySelector('.lg'), q = x => root.querySelector(x), f = q('#en-f');
+  root.onclick = e => {
+    const t = e.target.closest('[data-en],[data-olho]'); if (!t) return;
+    if (t.dataset.olho) { const i = q('#' + t.dataset.olho), mostra = i.type === 'password'; i.type = mostra ? 'text' : 'password'; t.innerHTML = lgi(mostra ? 'olhoX' : 'olho'); return; }
+    ENTRAR.email = (q('#en-e') || {}).value || ENTRAR.email; ENTRAR.modo = t.dataset.en; ENTRAR.aviso = ''; if (ENTRAR.modo !== 'primeiro') ENTRAR.codigo = ''; telaEntrar();
+  };
+  const c = q('#en-c'); if (c) c.addEventListener('input', () => { const d = c.value.replace(/\D/g, '').slice(0, 6); c.value = d.length > 3 ? d.slice(0, 3) + ' ' + d.slice(3) : d; });
+  if (!f) return;
+  semAutoPreencher(f);
+  const b = f.querySelector('.lg-btn'), v = id => ((q('#' + id) || {}).value || '');
   f.onsubmit = async e => {
     e.preventDefault(); if (b.disabled) return;
-    const email = document.getElementById('at-e').value.trim(), senha = document.getElementById('at-s').value;
-    if (!email || !senha) return erroNaTela('Preencha o e-mail e a senha da conta do estúdio.');
+    const email = v('en-e').trim().toLowerCase(); ENTRAR.email = email;
+    const parar = m => { b.disabled = false; b.classList.remove('carregando'); erroNaTela(m); };
     b.disabled = true; b.classList.add('carregando');
     try {
-      const { error } = await PROD.sb.auth.signInWithPassword({ email, password: senha });
-      if (error) throw new Error(/invalid/i.test(error.message) ? 'E-mail ou senha da conta do estúdio incorretos.' : /fetch|network/i.test(error.message) ? 'Sem conexão com a internet. Tente de novo.' : error.message);
-      location.reload();
-    } catch (er) { b.disabled = false; b.classList.remove('carregando'); erroNaTela(er.message); }
+      if (ENTRAR.modo === 'entrar') {
+        const senha = v('en-s');
+        if (!email || !senha) return parar('Preencha o e-mail e a senha.');
+        const er = await entrarNoBanco(email, senha);
+        if (er) return parar(semRede(er) ? 'Sem conexão com a internet. Tente de novo.' : 'E-mail ou senha incorretos. Se é o seu primeiro acesso, toque em "Primeiro acesso ou código" e use o código que a proprietária enviou.');
+        PROD.pendente = { email, senha, manter: !!(q('#en-m') || {}).checked, modo: 'entrar' };
+        return bootEquipe();
+      }
+      if (ENTRAR.modo === 'primeiro') {
+        const cod = v('en-c').replace(/\D/g, ''), senha = v('en-s');
+        if (!email || cod.length !== 6) return parar('Preencha o e-mail e o código de 6 números.');
+        try { validarNovaSenha(senha, v('en-s2')); } catch (er) { return parar(er.message); }
+        const r = await rpcProd('usar_convite', { p_email: email, p_codigo: cod, p_senha: senha });
+        if (r.erro) return parar(semRede(r.erro) ? 'Sem conexão com a internet. Tente de novo.' : 'Não foi possível usar o código agora. Tente de novo em instantes.');
+        if (r.data !== 'ok') return parar(MSG_CONVITE[r.data] || 'E-mail ou código incorretos.');
+        const er = await entrarNoBanco(email, senha); if (er) return parar('Senha criada, mas não foi possível entrar agora. Tente entrar de novo.');
+        ENTRAR.codigo = '';
+        PROD.pendente = { email, senha, manter: true, modo: 'primeiro' };
+        return bootEquipe();
+      }
+      if (ENTRAR.modo === 'dono') {
+        const ce = v('en-de').trim().toLowerCase(), cs = v('en-ds');
+        if (!email || !ce || !cs) return parar('Preencha o seu e-mail e o e-mail e a senha da conta do estúdio.');
+        const er = await entrarNoBanco(ce, cs); if (er) return parar(semRede(er) ? 'Sem conexão com a internet. Tente de novo.' : 'E-mail ou senha da conta do estúdio incorretos.');
+        const ok = await rpcProd('eh_conta_estudio'); if (ok.erro || !ok.data) { try { await PROD.sb.auth.signOut(); } catch (x) { } return parar('Esta não é a conta do estúdio.'); }
+        const cod = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, '0');
+        const r = await rpcProd('registrar_convite', { p_email: email, p_codigo: cod, p_horas: 24 });
+        try { await PROD.sb.auth.signOut(); } catch (x) { }
+        if (r.erro) return parar('Não foi possível gerar o código agora. Tente de novo.');
+        ENTRAR.modo = 'primeiro'; ENTRAR.codigo = cod; ENTRAR.aviso = ''; return telaEntrar();
+      }
+    } catch (er) { parar(er.message || 'Algo deu errado. Tente de novo.'); }
   };
+  setTimeout(() => { const a = q('#en-e') && !q('#en-e').value ? q('#en-e') : (q('#en-c') && !q('#en-c').value ? q('#en-c') : q('#en-s') || q('#en-de')); if (a && !matchMedia('(max-width:700px)').matches) a.focus({ preventScroll: true }); }, 60);
 }
-async function desativarAparelho() {
-  if (!confirm('Desativar este aparelho? Para usar o sistema aqui de novo será preciso a senha da conta do estúdio.')) return;
-  try { await PROD.sb.auth.signOut(); } catch (e) { }
-  try { localStorage.removeItem(KEY); apagarSessao(); } catch (e) { }
-  location.reload();
+
+/* entrou num aparelho sem dados: quando os dados chegam, conclui a entrada da pessoa */
+async function finalizarPendente() {
+  const p = PROD.pendente; PROD.pendente = null; if (!p || !DB) return;
+  const u = usuarioPorEmail(DB, p.email);
+  if (!u) { LOGIN = { modo: 'entrar', msg: 'Conta do estúdio conectada. Agora entre com o seu e-mail e senha da equipe.', tipo: 'info', email: '', ocupado: false }; UI.forcarLogin = true; render(); return; }
+  if (!podeEntrar(DB, u)) { LOGIN = { modo: 'entrar', msg: 'Seu acesso está bloqueado. Fale com a proprietária do salão.', tipo: 'bad', email: u.email, ocupado: false }; UI.forcarLogin = true; render(); return; }
+  await senhaNoSistema(u, p.senha, p.modo === 'primeiro');
+  concluirLogin(u, p.manter);
+}
+/* a senha do banco é a que vale: o sistema guarda a mesma (protegida) para entrar sem internet */
+async function senhaNoSistema(u, senha, primeiro) {
+  if (primeiro || !u.senha || !(await confere(senha, u.senha))) { u.senha = await criarHash(senha); u.senhaEm = stamp(); }
+  if (primeiro) {
+    delete u.convite;
+    const f = DB.funcionarios.find(x => x.id === u.funcId); if (f && f.acesso === 'convite') f.acesso = 'ativo';
+    audit(DB, u, 'Primeiro acesso', 'Senha criada com o código de acesso');
+  }
+  PROD.email = (u.email || '').toLowerCase();
+}
+
+/* aparelho já conectado: a tela de entrada do sistema também usa as contas do banco */
+function ligarContasEquipe() {
+  if (PROD.contas) return; PROD.contas = true;
+  const _entrar = acaoEntrar, _prim = acaoPrimeiro;
+  acaoEntrar = async function (email, senha, manter) {
+    const u = usuarioPorEmail(DB, email);
+    if (!u || !u.senha || !senha || esperaLogin() || !navigator.onLine) return _entrar(email, senha, manter);   // primeiro acesso, espera ou sem internet: como antes
+    const er = await entrarNoBanco(u.email, senha);
+    if (!er) {
+      if (!podeEntrar(DB, u)) throw new Error('Seu acesso está bloqueado. Fale com a proprietária do salão.');
+      await senhaNoSistema(u, senha, false); return concluirLogin(u, manter);
+    }
+    if (semRede(er)) return _entrar(email, senha, manter);
+    // a conta da pessoa ainda não existe no banco: confere a senha de sempre e cria a conta
+    if (!(await confere(senha, u.senha))) { marcarFalha(); throw new Error('E-mail ou senha incorretos.'); }
+    const g = await rpcProd('garantir_conta', { p_email: u.email, p_senha: senha });
+    if (g.erro) return _entrar(email, senha, manter);   // banco ainda sem esta atualização: entra como antes
+    if (g.data === 'ok') { const e2 = await entrarNoBanco(u.email, senha); if (!e2) PROD.email = u.email.toLowerCase(); return _entrar(email, senha, manter); }
+    marcarFalha(); throw new Error('E-mail ou senha incorretos.');
+  };
+  acaoPrimeiro = async function (email, codigo, senha, conf) {
+    const w = esperaLogin(); if (w) return _prim(email, codigo, senha, conf);
+    validarNovaSenha(senha, conf);
+    const u = usuarioPorEmail(DB, email), cod = String(codigo || '').replace(/\D/g, ''), e = String(email || '').trim().toLowerCase();
+    if (!u || cod.length !== 6) return _prim(email, codigo, senha, conf);
+    let r = await rpcProd('usar_convite', { p_email: e, p_codigo: cod, p_senha: senha });
+    if (!r.erro && r.data === 'sem_convite' && u.convite && u.convite.ate > Date.now() && await confere(cod, u.convite)) {
+      // código gerado antes desta atualização: passa a valer no banco também
+      const g = await rpcProd('registrar_convite', { p_email: e, p_codigo: cod, p_horas: 168 });
+      if (!g.erro) r = await rpcProd('usar_convite', { p_email: e, p_codigo: cod, p_senha: senha });
+    }
+    if (r.erro) return _prim(email, codigo, senha, conf);   // sem internet ou banco sem a atualização: como antes
+    if (r.data !== 'ok') { marcarFalha(); throw new Error(MSG_CONVITE[r.data] || 'E-mail ou código incorretos. Confira com a proprietária.'); }
+    if (!podeEntrar(DB, u)) throw new Error('Seu acesso está bloqueado. Fale com a proprietária do salão.');
+    await entrarNoBanco(e, senha);
+    await senhaNoSistema(u, senha, true);
+    concluirLogin(u, true);
+  };
+  const _criar = acaoCriarDono;
+  acaoCriarDono = async function (email, senha, conf) {
+    validarNovaSenha(senha, conf);
+    const u = usuarioPorEmail(DB, email);
+    if (u && navigator.onLine) {   // a primeira senha da proprietária já vira a conta dela no banco
+      const g = await rpcProd('garantir_conta', { p_email: u.email.toLowerCase(), p_senha: senha });
+      if (!g.erro && g.data === 'ok' && !(await entrarNoBanco(u.email, senha))) PROD.email = u.email.toLowerCase();
+    }
+    return _criar(email, senha, conf);
+  };
+  window.PROD_CONVITE = (email, cod, horas) => { rpcProd('registrar_convite', { p_email: String(email || '').trim().toLowerCase(), p_codigo: cod, p_horas: horas || 168 }); };
+  window.PROD_TROCAR_SENHA = async (email, atual, nova) => {
+    if (!navigator.onLine) throw new Error('Para trocar a senha é preciso estar com internet.');
+    let er = await entrarNoBanco(email, atual);
+    if (er && semRede(er)) throw new Error('Sem conexão com a internet. Tente de novo.');
+    if (er) {
+      const g = await rpcProd('garantir_conta', { p_email: email, p_senha: atual });
+      if (g.erro) return;                               // banco ainda sem esta atualização: troca só no sistema
+      if (g.data !== 'ok') throw new Error('A senha atual não confere.');
+      er = await entrarNoBanco(email, atual); if (er) throw new Error('Não foi possível trocar a senha agora. Tente de novo.');
+    }
+    const { error } = await PROD.sb.auth.updateUser({ password: nova });
+    if (error) throw new Error('Não foi possível trocar a senha agora. Tente de novo.');
+    PROD.email = String(email).toLowerCase();
+  };
+  // pessoa excluída da equipe: o login dela deixa de valer
+  const removerLogin = emails => emails.filter(Boolean).forEach(e => rpcProd('remover_conta', { p_email: e }));
+  if (typeof DEL_INFO === 'object' && DEL_INFO.func) {
+    const f0 = DEL_INFO.func.f;
+    DEL_INFO.func.f = (S, a, id) => { const em = S.users.filter(u => u.funcId === id).map(u => u.email); const r = f0(S, a, id); removerLogin(em); return r; };
+  }
+  const _exDono = excluirProprietario;
+  excluirProprietario = function (S, a, id) { const em = (S.users.find(u => u.id === id) || {}).email; const r = _exDono(S, a, id); removerLogin([em]); return r; };
 }
 
 /* ---------------- primeira configuração (só uma vez, pela proprietária) ---------------- */
@@ -9797,7 +10021,7 @@ async function iniciarPublico() {
 /* ---------------- proprietária esqueceu a senha: código com a conta do estúdio ---------------- */
 window.PROD_RECUPERAR_DONO = () => {
   const donas = (DB.users || []).filter(u => u.papel === 'proprietaria' && !u.excluido);
-  const ov = openModal('Código da proprietária', `<p class="muted small" style="margin:0 0 10px">Confirme a <b>conta do estúdio</b> (a mesma usada para ativar os aparelhos). O sistema gera um código para você criar uma senha nova em <b>Primeiro acesso ou código</b>.</p>
+  const ov = openModal('Código da proprietária', `<p class="muted small" style="margin:0 0 10px">Confirme a <b>conta do estúdio</b>. O sistema gera um código para você criar uma senha nova em <b>Primeiro acesso ou código</b>.</p>
     <div class="form">${donas.length > 1 ? `<label class="f full">Proprietária<select id="rd-u">${donas.map(u => `<option value="${u.id}">${esc(u.nome)} · ${esc(u.email)}</option>`).join('')}</select></label>` : ''}
       <label class="f full">E-mail da conta do estúdio<input id="rd-e" type="text" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
       <label class="f full">Senha da conta do estúdio<input id="rd-s" type="text" class="lg-mask" autocomplete="off" autocapitalize="off" spellcheck="false"></label></div><div id="rd-x"></div>`,
@@ -9808,13 +10032,16 @@ window.PROD_RECUPERAR_DONO = () => {
     const email = ov.querySelector('#rd-e').value.trim().toLowerCase(), senha = ov.querySelector('#rd-s').value;
     if (!SYNC.pronto || SYNC.estado !== 'aovivo') return err('Aguarde o sistema conectar à internet.');
     if (!email || !senha) return err('Preencha o e-mail e a senha da conta do estúdio.');
-    if (email !== PROD.email) return err('Esta não é a conta do estúdio usada neste aparelho.');
     const { error } = await PROD.sb.auth.signInWithPassword({ email, password: senha });
-    if (error) return err('Senha da conta do estúdio incorreta.');
+    if (error) return err('E-mail ou senha da conta do estúdio incorretos.');
+    const ok = await rpcProd('eh_conta_estudio');
+    if (ok.erro ? email !== PROD.email : !ok.data) return err('Esta não é a conta do estúdio.');
+    PROD.email = email;
     const u = donas.find(d => d.id === (ov.querySelector('#rd-u') || {}).value) || donas[0]; if (!u) return err('Não há proprietária cadastrada.');
     const n = crypto.getRandomValues(new Uint32Array(1))[0] % 1000000, cod = String(n).padStart(6, '0');
     u.convite = { ...(await criarHash(cod)), ate: Date.now() + 864e5, por: 'Conta do estúdio', em: stamp() };
     audit(DB, { nome: 'Conta do estúdio' }, 'Código de acesso gerado', `${u.nome} · pela conta do estúdio · vale 24 h`); save();
+    rpcProd('registrar_convite', { p_email: u.email.toLowerCase(), p_codigo: cod, p_horas: 24 });
     openModal('Código da proprietária', `<div class="cod-box"><span class="muted small">Código de ${esc(u.nome)}</span><b class="cod">${cod.slice(0, 3)} ${cod.slice(3)}</b><span class="muted small">Vale 24 horas · uso único</span></div>
       <div class="note small">Toque em <b>Primeiro acesso ou código</b>, use o e-mail <b>${esc(u.email)}</b>, este código e crie a nova senha.</div>`,
       `<button class="btn pri" data-close>Pronto</button>`);
@@ -9841,14 +10068,14 @@ function avisoInstalar() {
 }
 
 /* ---------------- tela de "carregando" num aparelho novo ---------------- */
-function aguardarDados() {
+function aguardarDados(depois) {
   const ov = document.createElement('div'); ov.className = 'prod-load prod-cobre';
   ov.innerHTML = '<div class="mark mono"></div><p>Carregando os dados do estúdio…</p><small></small>';
   document.body.appendChild(ov);
   const t0 = Date.now();
   const ver = () => {
-    if (SYNC.pronto && SYNC.estado === 'aovivo') { ov.remove(); return; }
-    if (SYNC.estado === 'local' && !SYNC.db) { ov.remove(); telaAtivar('Este aparelho perdeu o acesso. Ative de novo com a conta do estúdio.'); return; }
+    if (SYNC.pronto && SYNC.estado === 'aovivo' && DB && !(DB.config && DB.config.__ph)) { ov.remove(); if (depois) depois(); return; }
+    if (SYNC.estado === 'local' && !SYNC.db) { ov.remove(); PROD.pendente = null; ENTRAR.modo = 'entrar'; telaEntrar('Não foi possível abrir o sistema com este e-mail. Entre de novo.'); return; }
     if (Date.now() - t0 > 15000) ov.querySelector('small').textContent = 'Está demorando: confira a internet. O sistema continua tentando sozinho.';
     setTimeout(ver, 300);
   };
@@ -9859,12 +10086,7 @@ function aguardarDados() {
 function iniciarApp(hot) {
   if (PROD.modo === 'equipe') {
     const _save = save; save = function () { _save(); agendarPublico(); };
-    const _rl = renderLogin; renderLogin = function (f) {
-      _rl(f);
-      const base = document.querySelector('.lg-base');
-      if (base && !base.querySelector('.prod-desat')) base.insertAdjacentHTML('afterbegin', '<button class="lg-link prod-desat" type="button">Desativar este aparelho</button>');
-      const b = base && base.querySelector('.prod-desat'); if (b) b.onclick = desativarAparelho;
-    };
+    ligarContasEquipe();
     const _sal = salvarNoAparelho; salvarNoAparelho = function () { if (DB && DB.config && DB.config.__ph) return; _sal(); };
     ligarEquipe();
   }
@@ -9883,16 +10105,22 @@ async function bootProd() {
   if (codigoDoLink() || pedeAvaliacao() || tokenConfirmacao()) return iniciarPublico();
   PROD.modo = 'equipe';
   const { data: { session } } = await PROD.sb.auth.getSession();
-  if (!session) return telaAtivar();
+  if (!session) return telaEntrar();
+  return bootEquipe();
+}
+async function bootEquipe() {
+  const { data: { session } } = await PROD.sb.auth.getSession();
+  if (!session) return telaEntrar();
   PROD.email = (session.user.email || '').toLowerCase();
-  const banco = criarBanco(PROD.sb);
+  if (!PROD.banco) PROD.banco = criarBanco(PROD.sb);
+  const banco = PROD.banco;
   window.claude = { use: async c => c === 'db' ? banco : c === 'user' ? { isOwner: async () => PROD.dono } : c === 'downloads' ? { save: async a => baixarArquivo(a) } : null };
   DL = { save: async a => baixarArquivo(a) };
   // o banco já foi iniciado?
   let existe = null;
   try { existe = (await banco.doc('meta/estado').get()).exists; }
   catch (e) {
-    if (e.code === 'not_granted') return telaAtivar('Esta conta não tem acesso ao sistema. Use a conta do estúdio.');
+    if (e.code === 'not_granted') { try { await PROD.sb.auth.signOut(); } catch (x) { } PROD.pendente = null; ENTRAR.modo = 'entrar'; return telaEntrar('Este e-mail não tem acesso ao sistema do salão. Confira com a proprietária.'); }
     existe = null;   // sem internet: abre com os dados deste aparelho
   }
   const local = load();
@@ -9901,8 +10129,8 @@ async function bootProd() {
   if (!local || !local.config || !local.config.producao) {
     if (existe === null) return telaProd(`<div class="lg-hd"><h2>Sem conexão</h2><p>Para abrir o sistema pela primeira vez neste aparelho é preciso internet.</p></div><button class="lg-btn" onclick="location.reload()"><span>Tentar de novo</span>${lgi('seta')}</button>`);
     const ph = prepararProducao(seedBase(), 'cadastros', { endereco: location.origin + '/' }); ph.config.__ph = true; ph.users.forEach(u => { u.excluido = true; });
-    iniciarApp({ DB: ph }); aguardarDados();
-  } else iniciarApp({});
+    iniciarApp({ DB: ph }); aguardarDados(PROD.pendente ? finalizarPendente : null);
+  } else { iniciarApp({}); if (PROD.pendente) aguardarDados(finalizarPendente); }
 }
 /* espaço usado no banco: medido a cada 6 horas (e ao conectar); acima de 70% o Painel avisa */
 try { const u = JSON.parse(localStorage.getItem('lagriff.uso') || 'null'); if (u) window.USO_ESPACO = u; } catch (e) { }
