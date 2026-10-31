@@ -1553,11 +1553,15 @@ html,*{scrollbar-width:auto}
 .on-ap{color:var(--ink);opacity:.85}
 .on-pill{flex:none;align-self:center}
 @media (max-width:700px){.top .online-b span{display:none}.top .online-b{padding:9px}}
-/* sem bordas: a página ocupa a tela inteira; o menu lateral rola sem mostrar a barra */
+/* sem bordas: a página ocupa a tela inteira; a barra do menu lateral é fina, dourada e sem trilho */
 html,body{margin:0!important;padding:0}
 html{background:var(--bg)}
-.side{scrollbar-width:none}
-.side::-webkit-scrollbar{display:none;width:0;height:0}
+.side{scrollbar-width:thin;scrollbar-color:rgba(255,220,143,.45) transparent}
+.side::-webkit-scrollbar{width:8px;background:transparent}
+@media (min-width:1025px){.side{padding-right:4px}.app{grid-template-columns:264px minmax(0,1fr)}}
+.side::-webkit-scrollbar-track{background:transparent}
+.side::-webkit-scrollbar-thumb{background:rgba(255,220,143,.4);border-radius:8px}
+.side::-webkit-scrollbar-thumb:hover{background:rgba(255,220,143,.65)}
 </style>
 
 </head>
