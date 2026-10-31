@@ -7096,12 +7096,14 @@ function navBadges(nav) {
   if (tem('financeiro') || tem('convenios') || tem('registro')) Object.assign(b, memoCalc(DB, 'nb|' + ACTOR.id + '|' + nav.map(n => n.id).join(), () => { const b = {};
     // pendência de pagamento = Pix/cartão ainda não pago, ou convênio que ainda não pagou tudo (mesma regra do amarelo nas listas)
     const ok = new Set(); for (const a of ver(DB, ACTOR, 'atendimentos')) if (a.status === 'concluido') ok.add(a.id);
+    // convênio só notifica a uma semana do vencimento (ou já vencido); o amarelo nas listas continua igual
+    const semana = addDays(TODAY, 7), cvPerto = new Set(pendCache().lista.filter(x => x.vencimento <= semana).map(x => x.parcela.id));
     let fin = 0, cv = 0; const reg = new Set();
     for (const p of DB.parcelas) { if (!ok.has(p.atendimentoId)) continue;
-      if (parcelaPendente(p)) { reg.add(p.atendimentoId); if (p.forma === 'convenio') cv++; else fin++; } }
+      if (parcelaPendente(p)) { if (p.forma === 'convenio') { if (cvPerto.has(p.id)) { cv++; reg.add(p.atendimentoId); } } else { fin++; reg.add(p.atendimentoId); } } }
     if (tem('financeiro')) b.financeiro = fin;
     // convênio: número de serviços no convênio com valor ainda em aberto
-    if (tem('convenios')) b.convenios = new Set(pendCache().lista.map(x => x.parcela.id)).size;
+    if (tem('convenios')) b.convenios = cvPerto.size;
     if (tem('registro')) b.registro = reg.size;
     return b; }));
   Object.keys(b).forEach(k => { if (!b[k]) delete b[k]; });
