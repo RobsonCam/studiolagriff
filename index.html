@@ -1562,6 +1562,7 @@ html{background:var(--bg)}
 .side::-webkit-scrollbar-track{background:transparent}
 .side::-webkit-scrollbar-thumb{background:rgba(255,220,143,.4);border-radius:8px}
 .side::-webkit-scrollbar-thumb:hover{background:rgba(255,220,143,.65)}
+.dup-l{margin-top:10px;padding-top:10px;border-top:1px solid color-mix(in srgb,var(--line) 60%,transparent)}
 </style>
 
 </head>
@@ -1596,6 +1597,9 @@ const fromIso = s => { const [y, m, d] = s.split('-').map(Number); return new Da
 const dBR = s => s ? s.split('-').reverse().join('/') : '';
 const addDays = (s, n) => { const d = fromIso(s); d.setDate(d.getDate() + n); return iso(d); };
 const weekStart = s => { const d = fromIso(s); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return iso(d); };
+/* semana de trabalho das comissões: de sábado a sexta (o pagamento é feito no sábado seguinte) */
+const semanaTrabalho = s => { const d = fromIso(s); d.setDate(d.getDate() - ((d.getDay() + 1) % 7)); return iso(d); };
+const semanaAPagar = (hoje = TODAY) => { const ini = addDays(semanaTrabalho(hoje), -7); return [ini, addDays(ini, 6)]; };
 const toMin = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
 const fromMin = m => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
 let TODAY = iso(new Date());   // atualizado na virada do dia pela interface
@@ -2667,6 +2671,28 @@ function confirmarFechamento(S, a, funcId, ini, fim, opts = {}) {
 }
 
 const aPagarFech = f => f.total - f.pago - (f.abatido || 0);
+/* competência: o pagamento da comissão conta no faturamento do último dia da semana trabalhada (não do dia em que foi pago) */
+function competenciaPagamento(S, pg) { if (pg && pg.fechamentoId) { const f = (S.fechamentos || []).find(x => x.id === pg.fechamentoId); if (f && f.fim) return f.fim; } return pg ? pg.data : ''; }
+/* o mesmo fechamento pago mais de uma vez (ex.: dois aparelhos registrando ao mesmo tempo) */
+function pagamentosDuplicados(S) {
+  const por = new Map();
+  for (const pg of S.pagamentos || []) if (pg.tipo === 'fechamento' && pg.fechamentoId) { if (!por.has(pg.fechamentoId)) por.set(pg.fechamentoId, []); por.get(pg.fechamentoId).push(pg); }
+  const out = [];
+  for (const [fid, pgs] of por) { const f = S.fechamentos.find(x => x.id === fid); if (!f) continue;
+    const devido = f.total - (f.abatido || 0), soma = pgs.reduce((t, x) => t + x.valor, 0);
+    if (pgs.length > 1 && soma > devido) out.push({ f, pgs: pgs.slice().sort((a, b) => (a.criadoEm || '').localeCompare(b.criadoEm || '')), excesso: soma - devido }); }
+  return out;
+}
+function excluirPagamentoDuplicado(S, a, pgId) {
+  exigirDono(a);
+  const pg = (S.pagamentos || []).find(x => x.id === pgId); if (!pg || !pg.fechamentoId) throw new Error('Pagamento não encontrado.');
+  const d = pagamentosDuplicados(S).find(x => x.f.id === pg.fechamentoId);
+  if (!d || pg.valor > d.excesso) throw new Error('Este pagamento não está em duplicidade: o fechamento ficaria sem pagar.');
+  S.pagamentos = S.pagamentos.filter(x => x.id !== pgId);
+  const f = d.f, soma = S.pagamentos.filter(x => x.fechamentoId === f.id).reduce((t, x) => t + x.valor, 0);
+  f.pago = Math.min(soma, f.total - (f.abatido || 0)); f.status = aPagarFech(f) <= 0 ? 'pago' : f.pago > 0 ? 'parcial' : 'aberto';
+  audit(S, a, 'Pagamento duplicado excluído', `${f.codigo} · ${brl(pg.valor)} de ${dataHora(pg.data, pg.hora)} (registrado em ${pg.criadoEm || '—'})`);
+}
 function registrarPagamento(S, a, fechamentoId, d) {
   exigirDono(a);
   const f = S.fechamentos.find(x => x.id === fechamentoId);
@@ -2856,9 +2882,12 @@ function movimentosCaixaBase(S, ini, fim, centro = '', enxuto = false) {
     if (!dentro(ac.data)) continue; const p = S.parcelas.find(x => x.id === ac.parcelaId), at = p && ats.get(p.atendimentoId), cv = p && S.convenios.find(c => c.id === p.convenioId);
     L.push({ id: ac.id, auto: true, tipo: 'entrada', categoria: 'convenios', centro: at && ehPodo(at.servicoId) ? 'podologia' : 'salao', data: ac.data, hora: ac.hora || '', descricao: `${cv?.nome || 'Convênio'}${at ? ' · ' + at.codigo + ' · ' + cli(at.clienteId) : ''}`, forma: ac.metodo || 'Convênio', valor: ac.valor });
   }
+  const fechM = new Map((S.fechamentos || []).map(f => [f.id, f]));
   for (const pg of S.pagamentos || []) {
-    if (!dentro(pg.data)) continue;
-    L.push({ id: pg.id, auto: true, centro: 'salao', tipo: 'saida', categoria: pg.tipo === 'adiantamento' ? 'adiantamentos' : 'comissoes', data: pg.data, hora: pg.hora || '', descricao: `${fun(pg.funcId)}${pg.tipo === 'adiantamento' ? ' · adiantamento' : ' · ' + pg.codigo}`, forma: pg.metodo || '', valor: pg.valor });
+    const f = pg.fechamentoId ? fechM.get(pg.fechamentoId) : null, dc = f && f.fim ? f.fim : pg.data;
+    if (!dentro(dc)) continue;
+    L.push({ id: pg.id, auto: true, centro: 'salao', tipo: 'saida', categoria: pg.tipo === 'adiantamento' ? 'adiantamentos' : 'comissoes', data: dc, hora: dc === pg.data ? pg.hora || '' : '', pagoEm: pg.data, pagoHora: pg.hora || '',
+      descricao: `${fun(pg.funcId)}${pg.tipo === 'adiantamento' ? ' · adiantamento' : ' · ' + pg.codigo}${f ? ` · semana ${dBR(f.inicio).slice(0, 5)} a ${dBR(f.fim).slice(0, 5)}${dc !== pg.data ? ` · pago em ${dBR(pg.data).slice(0, 5)}${pg.hora ? ' às ' + pg.hora : ''}` : ''}` : ''}`, forma: pg.metodo || '', valor: pg.valor });
   }
   for (const r of S.repasses || []) {
     if (!dentro(r.data)) continue;
@@ -4491,6 +4520,20 @@ function runTests() {
     const ok2 = S9.agendamentos.find(x => x.id === 'agAtrasado').funcId === f.id && (f.idsReunidos || []).includes('fnNovo');
     return (ok && ok2) || JSON.stringify([n, f.excluido, f.email, f.pct, f.telefone, sv.funcs, ok2]);
 
+  });
+  T('Comissão: semana de sábado a sexta; pagamento entra no faturamento da semana trabalhada; duplicado é detectado e excluído', () => {
+    const sem = semanaTrabalho('2026-10-31') === '2026-10-31' && semanaTrabalho('2026-10-30') === '2026-10-24' && semanaTrabalho('2026-11-01') === '2026-10-31'
+      && semanaAPagar('2026-10-31').join() === '2026-10-24,2026-10-30' && semanaAPagar('2026-11-01').join() === '2026-10-24,2026-10-30' && semanaAPagar('2026-11-06').join() === '2026-10-24,2026-10-30' && semanaAPagar('2026-11-07').join() === '2026-10-31,2026-11-06';
+    const S0 = seedBase(), d0 = S0.users.find(u => u.id === 'u0');
+    const f = { id: 'feX', codigo: 'FS-T', funcId: 'f1', inicio: '2026-10-24', fim: '2026-10-30', itens: [], total: 14250, pago: 14250, abatido: 0, status: 'pago' };
+    S0.fechamentos.push(f);
+    S0.pagamentos.push({ id: 'pgA', tipo: 'fechamento', fechamentoId: 'feX', codigo: 'FS-T', funcId: 'f1', valor: 14250, data: '2026-11-01', hora: '19:14', metodo: 'Pix', criadoEm: '01/11/2026, 19:14' },
+      { id: 'pgB', tipo: 'fechamento', fechamentoId: 'feX', codigo: 'FS-T', funcId: 'f1', valor: 14250, data: '2026-10-31', hora: '19:15', metodo: 'Pix', criadoEm: '01/11/2026, 19:15' });
+    const out = movimentosCaixaBase(S0, '2026-10-01', '2026-10-31').filter(x => x.categoria === 'comissoes' && /FS-T/.test(x.descricao));
+    const nov = movimentosCaixaBase(S0, '2026-11-01', '2026-11-30').filter(x => x.categoria === 'comissoes' && /FS-T/.test(x.descricao));
+    const dup = pagamentosDuplicados(S0), naoDeixa = deveFalhar(() => { excluirPagamentoDuplicado(S0, d0, 'pgB'); excluirPagamentoDuplicado(S0, d0, 'pgA'); });
+    const ok = sem && out.length === 2 && nov.length === 0 && out[0].data === '2026-10-30' && dup.length === 1 && dup[0].excesso === 14250 && /não está em duplicidade/.test(naoDeixa) && S0.pagamentos.filter(x => x.fechamentoId === 'feX').length === 1 && aPagarFech(f) === 0 && pagamentosDuplicados(S0).length === 0;
+    return ok || JSON.stringify([sem, out.length, nov.length, out[0] && out[0].data, dup.length, naoDeixa]);
   });
   T('Proprietários: dá para cadastrar mais donos com acesso total; não exclui a si mesmo nem o último', () => {
     const S5 = seedBase(), d5 = S5.users.find(u => u.id === 'u0');
@@ -6859,7 +6902,7 @@ function countUp(root) {
 }
 const saudacao = () => { const h = new Date().getHours(); return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'; };
 const UI = { publico: null, pedStatus: 'pendente', pubItens: [], pubOk: null, pubDados: {}, route: 'painel', per: 'semana', perIni: TODAY, perFim: TODAY, agView: 'dia', agDate: TODAY, agFunc: '', agStatus: '', agServ: '', agBusca: '',
-  regFunc: '', regForma: '', finForma: '', finFunc: '', finSit: '', cvSit: '', cvFunc: '', relTipo: 'servicos', relFunc: '', relConv: '', cliBusca: '', fechFunc: '', fechIni: weekStart(TODAY), fechFim: addDays(weekStart(TODAY), 6), fechConv: false, fechRev: false, menu: false };
+  regFunc: '', regForma: '', finForma: '', finFunc: '', finSit: '', cvSit: '', cvFunc: '', relTipo: 'servicos', relFunc: '', relConv: '', cliBusca: '', fechFunc: '', fechIni: semanaAPagar()[0], fechFim: semanaAPagar()[1], fechConv: false, fechRev: false, menu: false };
 
 function load() { try { for (const k of [KEY, ...KEYS_ANTIGAS]) { const r = localStorage.getItem(k); if (r) return JSON.parse(r); } } catch (e) { } return null; }
 /* gravar: o envio ao banco compartilhado sai na hora (só o que mudou); a cópia no
@@ -8181,10 +8224,13 @@ function pgFechamento() {
   return `
   <div class="ph"><div><h1>Fechamento Semanal</h1><p>Um único fechamento por profissional e por semana, somando tudo o que já foi liberado: Pix, cartão e convênio acertado. O que for liberado depois entra no mesmo fechamento, e o pagamento é feito de uma vez.</p></div></div>
   <div class="stack">
+    ${avisoDuplicadosHTML()}
     <div class="panel"><div class="bar">
       <label class="f">Funcionário<select id="fe-f">${opt(equipeComissao(DB).map(f => [f.id, f.nome]), fid)}</select></label>
       <label class="f">Data inicial<input type="date" id="fe-i" value="${UI.fechIni}"></label><label class="f">Data final<input type="date" id="fe-e" value="${UI.fechFim}"></label>
-      <div class="bar" style="align-self:flex-end"><button class="btn sm" data-fesem="-7">Semana anterior</button><button class="btn sm" data-fesem="0">Esta semana</button></div>
+      <div class="bar" style="align-self:flex-end">${(() => { const [a0] = semanaAPagar(), op = [[-7, 'Semana anterior'], [0, 'Semana a pagar'], [7, 'Semana atual']];
+        return op.map(([o, t]) => { const i = addDays(a0, o); return `<button class="btn sm ${UI.fechIni === i && UI.fechFim === addDays(i, 6) ? 'pri' : ''}" data-fesem="${o}" title="sábado ${dBR(i)} a sexta ${dBR(addDays(i, 6))}">${t} · ${dBR(i).slice(0, 5)} a ${dBR(addDays(i, 6)).slice(0, 5)}</button>`; }).join(''); })()}</div>
+      <div class="muted small" style="flex-basis:100%">A semana de trabalho vai de <b>sábado a sexta</b>; o pagamento é feito no sábado seguinte e entra no faturamento do mês da semana trabalhada.</div>
     </div></div>
     <div class="sec">Pix e cartão</div>
     <div class="grid g4">${kpi('1 · Pix', brl(t.pix))}${kpi('2 · Cartão de débito', brl(t.debito))}${kpi('3 · Cartão de crédito', brl(t.credito))}
@@ -8348,6 +8394,14 @@ function pdfConta(funcId) {
     resumo: [['Total adiantado', brl(sum(m.filter(x => x.valor > 0).map(x => x.valor)))], ['Descontado das comissões', brl(-sum(m.filter(x => x.valor < 0).map(x => x.valor)))], ['Saldo devedor atual', brl(saldoDevedor(DB, funcId))]],
     secoes: [{ cols: ['Data e hora', 'Movimento', 'Valor', 'Saldo devedor'], rows: m.map(x => [dataHora(x.data, x.hora), x.desc, (x.valor > 0 ? '+' : '-') + brl(Math.abs(x.valor)), brl(x.saldo)]) }], assinatura: fn(funcId), declaracao: 'Declaro ter recebido os adiantamentos acima e estar ciente do desconto nas próximas comissões.' }), 'PDF');
 }
+/* aviso: o mesmo fechamento pago mais de uma vez (só a proprietária vê e resolve) */
+function avisoDuplicadosHTML() {
+  if (!isOwner(ACTOR)) return '';
+  const L = pagamentosDuplicados(DB); if (!L.length) return '';
+  return `<div class="note bad"><b>Pagamento em duplicidade.</b> ${L.length === 1 ? 'Um fechamento foi pago' : `${L.length} fechamentos foram pagos`} mais de uma vez (provavelmente registrado em dois aparelhos ao mesmo tempo). Exclua o pagamento que sobrou:
+    ${L.map(({ f, pgs }) => `<div class="dup-l"><b>${esc(f.codigo)} · ${esc(F(f.funcId)?.nome || '')}</b> · semana ${dBR(f.inicio).slice(0, 5)} a ${dBR(f.fim).slice(0, 5)} · devido ${brl(f.total - (f.abatido || 0))}
+      <div class="bar" style="margin-top:6px">${pgs.map(pg => `<button class="btn sm bad-b" data-pg-dup="${pg.id}" title="Registrado em ${esc(pg.criadoEm || '')} por ${esc(pg.responsavel || '')}">Excluir ${brl(pg.valor)} pago em ${dBR(pg.data).slice(0, 5)}${pg.hora ? ' às ' + pg.hora : ''}</button>`).join('')}</div></div>`).join('')}</div>`;
+}
 function pgPagamentos() {
   const own = !isOwner(ACTOR);
   const pgs = ver(DB, ACTOR, 'pagamentos').slice().reverse();
@@ -8360,6 +8414,7 @@ function pgPagamentos() {
   <div class="ph"><div><h1>${own ? 'Meus pagamentos' : 'Pagamentos de comissões'}</h1><p>${own ? 'Pagamentos recebidos, adiantamentos e o que ainda será descontado das suas comissões.' : 'Pagamento de fechamento não passa do saldo. Adiantamento é pago antes do fechamento e vira saldo negativo, descontado automaticamente das próximas comissões.'}</p></div>
     ${own ? '' : '<div class="act"><button class="btn" data-adiant="">Adiantamento</button><button class="btn pri" data-pagar="">Registrar pagamento</button></div>'}</div>
   <div class="stack">
+    ${avisoDuplicadosHTML()}
     <div class="grid g4">${kpi(own ? 'Recebido de comissões' : 'Pago de comissões', brl(sum(fechPg.map(p => p.valor))), `${fechPg.length} pagamento(s)`, 'ok')}${kpi('Adiantamentos pagos', brl(sum(adPg.map(p => p.valor))), `${adPg.length} adiantamento(s)`, 'info')}
       ${kpi('A receber em fechamentos', brl(sum(conta.map(c => c.rec))), '', 'warn')}${kpi('Saldo devedor', totDev ? '−' + brl(totDev) : brl(0), totDev ? 'adiantamento ainda não descontado' : 'nenhum adiantamento em aberto', totDev ? 'bad' : 'ok')}</div>
     <div class="sec">${own ? 'Minha conta' : 'Conta de cada profissional'}</div>
@@ -8368,8 +8423,8 @@ function pgPagamentos() {
         <td class="r b" style="color:${c.saldo < 0 ? 'var(--bad)' : c.saldo > 0 ? 'var(--ok)' : 'inherit'}">${c.saldo < 0 ? '−' + brl(-c.saldo) : brl(c.saldo)}${c.saldo < 0 ? '<div class="muted small" style="font-weight:400">saldo negativo</div>' : ''}</td>
         <td><div class="bar" style="flex-wrap:nowrap;justify-content:flex-end"><button class="btn sm" data-extrato="${c.f.id}">Extrato</button>${own ? '' : `<button class="btn sm" data-adiant="${c.f.id}">Adiantamento</button>`}</div></td></tr>`).join('')}</tbody></table></div>
     <div class="sec">Histórico</div>
-    ${pgs.length ? `<div class="tw"><table><thead><tr><th>Data e hora</th><th>Tipo</th><th>Funcionário</th><th>Fechamento</th><th>Método</th><th class="r">Valor</th><th>Referência</th><th>Registrado por</th></tr></thead><tbody>
-    ${pgs.map(p => `<tr><td>${dataHora(p.data, p.hora)}</td><td>${p.tipo === 'adiantamento' ? pill('Adiantamento', 'info') : pill('Fechamento', 'ok')}</td><td>${esc(fn(p.funcId))}</td><td>${p.fechamentoId ? `<span class="code" data-fe-ver="${p.fechamentoId}" style="cursor:pointer">${p.codigo}</span>` : '<span class="muted">—</span>'}</td><td>${esc(p.metodo)}</td><td class="r b">${brl(p.valor)}</td><td class="small">${esc(p.referencia) || '—'}${p.obs ? `<div class="muted">${esc(p.obs)}</div>` : ''}</td><td class="small">${esc(p.responsavel)}<div class="muted">${esc(p.criadoEm)}</div></td></tr>`).join('')}</tbody></table></div>`
+    ${pgs.length ? `<div class="tw"><table><thead><tr><th>Data e hora</th><th>Tipo</th><th>Funcionário</th><th>Fechamento</th><th>Período</th><th>Método</th><th class="r">Valor</th><th>Referência</th><th>Registrado por</th></tr></thead><tbody>
+    ${pgs.map(p => { const fe = p.fechamentoId ? DB.fechamentos.find(x => x.id === p.fechamentoId) : null; return `<tr><td>${dataHora(p.data, p.hora)}</td><td>${p.tipo === 'adiantamento' ? pill('Adiantamento', 'info') : pill('Fechamento', 'ok')}</td><td>${esc(fn(p.funcId))}</td><td>${p.fechamentoId ? `<span class="code" data-fe-ver="${p.fechamentoId}" style="cursor:pointer">${p.codigo}</span>` : '<span class="muted">—</span>'}</td><td class="small" style="white-space:nowrap">${fe ? `<b>${dBR(fe.inicio)} a ${dBR(fe.fim)}</b><div class="muted">semana trabalhada</div>` : p.tipo === 'adiantamento' ? '<span class="muted">Antecipação · desconta<br>no próximo fechamento</span>' : '<span class="muted">—</span>'}</td><td>${esc(p.metodo)}</td><td class="r b">${brl(p.valor)}</td><td class="small">${esc(p.referencia) || '—'}${p.obs ? `<div class="muted">${esc(p.obs)}</div>` : ''}</td><td class="small">${esc(p.responsavel)}<div class="muted">${esc(p.criadoEm)}</div></td></tr>`; }).join('')}</tbody></table></div>`
       : `<div class="panel">${empty('Nenhum pagamento registrado', own ? 'Seus pagamentos aparecem aqui depois do fechamento semanal.' : 'Confirme um fechamento e registre o pagamento, ou lance um adiantamento.')}</div>`}
   </div>`;
 }
@@ -9576,7 +9631,7 @@ const AFTER = {
 
 /* ---------- eventos globais (delegação) ---------- */
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-al-todos],[data-online],[data-wa-pk],[data-pk-limpa],[data-sv-limpa],[data-del-cat],[data-po-limpa],[data-ct-todos],[data-del],[data-dono-novo],[data-dono-edit],[data-podo-aba],[data-podo-nova],[data-podo-ficha],[data-cxcentro],[data-comanda],[data-av-teste],[data-av-qr],[data-av-copiar],[data-av-dl],[data-av-nota],[data-pk-novo],[data-pk-edit],[data-pk-vender],[data-pk-filtro],[data-pk-sessao],[data-cli-nivel],[data-dona-serv],[data-mov],[data-mov-ed],[data-mov-ex],[data-cxper],[data-cxnav],[data-cxtipo],[data-cli-acao],[data-conv-membros],[data-receb-com],[data-conf-com],[data-acerto-com],[data-pagar-cli],[data-cvst],[data-liberar],[data-conta],[data-sair],[data-codigo],[data-repasse],[data-adiant],[data-extrato],[data-abater],[data-conv-novo],[data-conv-edit],[data-conv-filtro],[data-alertas],[data-fechar],[data-faltou],[data-chegou],[data-tema],[data-pdf],[data-wa-ag],[data-wa-cli],[data-wa-cob],[data-wa-at],[data-fab],[data-go],[data-menu],[data-per],[data-agv],[data-agnav],[data-ag],[data-bl],[data-slot],[data-goday],[data-new-ag],[data-new-bl],[data-new-reg],[data-at-open],[data-receb],[data-conf],[data-acerto],[data-fesem],[data-fe-ver],[data-pagar],[data-new-cli],[data-cli],[data-new-func],[data-func],[data-new-serv],[data-serv],[data-new-cat],[data-mais],[data-pub-abrir],[data-pub-cliente],[data-origem-nova],[data-origem],[data-ped-agendar],[data-ped-recusar],[data-qr-copiar],[data-qr-dl],[data-qr-ver],[data-ped-dia]');
+  const t = e.target.closest('[data-al-todos],[data-online],[data-pg-dup],[data-wa-pk],[data-pk-limpa],[data-sv-limpa],[data-del-cat],[data-po-limpa],[data-ct-todos],[data-del],[data-dono-novo],[data-dono-edit],[data-podo-aba],[data-podo-nova],[data-podo-ficha],[data-cxcentro],[data-comanda],[data-av-teste],[data-av-qr],[data-av-copiar],[data-av-dl],[data-av-nota],[data-pk-novo],[data-pk-edit],[data-pk-vender],[data-pk-filtro],[data-pk-sessao],[data-cli-nivel],[data-dona-serv],[data-mov],[data-mov-ed],[data-mov-ex],[data-cxper],[data-cxnav],[data-cxtipo],[data-cli-acao],[data-conv-membros],[data-receb-com],[data-conf-com],[data-acerto-com],[data-pagar-cli],[data-cvst],[data-liberar],[data-conta],[data-sair],[data-codigo],[data-repasse],[data-adiant],[data-extrato],[data-abater],[data-conv-novo],[data-conv-edit],[data-conv-filtro],[data-alertas],[data-fechar],[data-faltou],[data-chegou],[data-tema],[data-pdf],[data-wa-ag],[data-wa-cli],[data-wa-cob],[data-wa-at],[data-fab],[data-go],[data-menu],[data-per],[data-agv],[data-agnav],[data-ag],[data-bl],[data-slot],[data-goday],[data-new-ag],[data-new-bl],[data-new-reg],[data-at-open],[data-receb],[data-conf],[data-acerto],[data-fesem],[data-fe-ver],[data-pagar],[data-new-cli],[data-cli],[data-new-func],[data-func],[data-new-serv],[data-serv],[data-new-cat],[data-mais],[data-pub-abrir],[data-pub-cliente],[data-origem-nova],[data-origem],[data-ped-agendar],[data-ped-recusar],[data-qr-copiar],[data-qr-dl],[data-qr-ver],[data-ped-dia]');
   if (!t) return;
   const ds = t.dataset;
   if ('waAg' in ds) { e.stopPropagation(); const x = DB.agendamentos.find(a => a.id === ds.waAg); return modalWhatsApp({ agendamentoId: ds.waAg }, ds.waM || waModeloPadrao(x)); }
@@ -9666,7 +9721,7 @@ document.addEventListener('click', e => {
     ov.querySelector('#rc-ok').onclick = () => run(() => confirmarRecebimento(DB, ACTOR, ds.receb, { data: val('rc-d'), hora: val('rc-h') }), isOwner(ACTOR) ? 'Recebimento registrado · comissão liberada' : 'Recebimento registrado').ok && closeModal(); return; }
   if ('conf' in ds) return run(() => marcarConferido(DB, ACTOR, ds.conf), 'Parcela marcada como conferida');
   if ('acerto' in ds) return modalAcerto(ds.acerto);
-  if ('fesem' in ds) { const w = addDays(weekStart(TODAY), +ds.fesem); UI.fechIni = w; UI.fechFim = addDays(w, 6); UI.fechRev = false; render(); return; }
+  if ('fesem' in ds) { const w = addDays(semanaAPagar()[0], +ds.fesem); UI.fechIni = w; UI.fechFim = addDays(w, 6); UI.fechRev = false; render(); return; }
   if ('feVer' in ds) return modalFechamento(ds.feVer);
   if ('pagar' in ds) return modalPagamento(ds.pagar);
   if ('newCli' in ds) return modalCliente();
@@ -9686,6 +9741,10 @@ document.addEventListener('click', e => {
   if ('pagarCli' in ds) { const ids = [...new Set(pendCache().lista.filter(x => x.at.clienteId === ds.pagarCli).map(x => x.parcela.id))]; return modalPagarConvenio(ids, `Pagamento do convênio · ${CL(ds.pagarCli)?.nome || ''}`); }
   if ('cvst' in ds) { const [c, v] = ds.cvst.split('|'); return modalStatusConvenio(c, v); }
   if ('liberar' in ds) { const box = t.closest('.lib-cv'); const r = run(() => liberarConvenio(DB, ACTOR, ds.liberar, { autorizadoPor: box?.querySelector('[data-lib-quem]')?.value, motivo: box?.querySelector('[data-lib-mot]')?.value }), 'Liberação registrada: o próximo lançamento no convênio está liberado'); if (r.ok) atualizarPendencias(); return; }
+  if ('pgDup' in ds) { const pg = DB.pagamentos.find(x => x.id === ds.pgDup); if (!pg) return;
+    const ov = openModal('Excluir pagamento duplicado', `<div class="del-box">${icon('lixo')}<div><p style="margin:0 0 6px">Excluir o pagamento de <b>${brl(pg.valor)}</b> de ${dataHora(pg.data, pg.hora)} (${esc(pg.codigo)} · ${esc(F(pg.funcId)?.nome || '')})?</p><p class="muted small" style="margin:0">Registrado em ${esc(pg.criadoEm || '—')} por ${esc(pg.responsavel || '—')}. O outro pagamento continua valendo e o fechamento segue pago. Fica registrado na auditoria.</p></div></div>`,
+      `<button class="btn" data-close>Cancelar</button><button class="btn bad-b" id="dup-ok">${icon('lixo')}<span>Excluir duplicado</span></button>`);
+    ov.querySelector('#dup-ok').onclick = () => run(() => excluirPagamentoDuplicado(DB, ACTOR, pg.id), 'Pagamento duplicado excluído').ok && closeModal(); return; }
   if ('online' in ds) return modalOnline();
   if ('conta' in ds) return modalConta();
   if ('sair' in ds) return sair();
