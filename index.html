@@ -6839,7 +6839,7 @@ function evolucaoRelatorio(ini, fim, fid) {
   if (sum(S.com)) cards.push(cg(isOwner(ACTOR) ? 'Comissões' : 'Minhas comissões', tot(S.com), ({ labels: lab, series: [{ nome: 'Comissão', valores: S.com, cor: 2 }], modo: 'barras' })));
   if (veFaturamento() && Object.keys(S.formas).length) {
     const fs = Object.entries(S.formas).sort((a, b) => sum(b[1]) - sum(a[1]));
-    cards.push(cg('Formas de pagamento', 'quanto entrou por cada forma', ({ labels: lab, series: fs.map(([f, v], k) => ({ nome: (n => n.charAt(0).toUpperCase() + n.slice(1))(FORMAS[f].replace('Cartão de ', '')), valores: v, cor: k + 1 })), modo: 'empilhado' })));
+    cards.push(cg('Formas de pagamento', 'quanto entrou por cada forma', ({ labels: lab, series: fs.map(([f, v], k) => ({ nome: (n => n.charAt(0).toUpperCase() + n.slice(1))(FORMAS[f].replace('Cartão de ', '')), valores: v, cor: k + 1 })), modo: 'linhas' })));
   }
   if (isOwner(ACTOR) && !fid && Object.keys(S.prof).length > 1) {
     const ps = Object.entries(S.prof).sort((a, b) => sum(b[1]) - sum(a[1])).slice(0, 5);
