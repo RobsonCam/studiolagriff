@@ -1567,6 +1567,15 @@ html{background:var(--bg)}
 :is(.app,.md,body) .btn.bad-b{background:#B5343E!important;background-image:none!important;color:#fff!important;border-color:#B5343E!important;opacity:1}
 :is(.app,.md,body) .btn.bad-b:hover{filter:brightness(1.08)}
 :is(.app,.md,body) .btn.bad-b svg{color:#fff}
+/* pesquisa de serviço */
+.svb{position:relative}
+.svb-c{margin:0}
+.svb-l{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:30;max-height:300px;overflow:auto;background:var(--surface);border-radius:14px;box-shadow:0 18px 40px -12px rgba(0,0,0,.45);padding:6px;border:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
+.svb-o{display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:100%;text-align:left;border:0;background:transparent;color:var(--ink);font:inherit;padding:9px 12px;border-radius:10px;cursor:pointer}
+.svb-o:hover,.svb-o.on{background:color-mix(in srgb,var(--gold) 18%,transparent)}
+.svb-o.sel b{color:var(--accent)}
+/* lista aberta dos selects no tema escuro: fundo e letras legíveis */
+select option,select optgroup{background:var(--surface);color:var(--ink)}
 </style>
 
 </head>
@@ -7703,6 +7712,41 @@ function lerCliente(ov, p) {
 }
 const servOpts = (sel, filtro) => { const cats = DB.categorias.map(c => [c, DB.servicos.filter(s => s.ativo && s.catId === c.id && (!filtro || filtro(s)))]).filter(([, l]) => l.length);
   return `<option value="">Escolha o serviço…</option>` + cats.map(([c, l]) => `<optgroup label="${esc(c.nome)}">${l.map(s => `<option value="${s.id}" ${s.id === sel ? 'selected' : ''}>${esc(s.nome)} · ${s.duracao} min · ${brl(s.preco)}</option>`).join('')}</optgroup>`).join(''); };
+/* lista de serviços com pesquisa: digita parte do nome (sem acento) e escolhe na lista; o select original continua guardando o valor */
+function buscaServico(root, selId) {
+  const sel = root.querySelector('#' + selId); if (!sel || sel.dataset.busca) return; sel.dataset.busca = '1';
+  const opts = [...sel.querySelectorAll('option')].filter(o => o.value).map(o => { const sv = SV(o.value); return { id: o.value, nome: sv ? sv.nome : o.textContent, txt: o.textContent, cat: o.parentElement && o.parentElement.tagName === 'OPTGROUP' ? o.parentElement.label : '' }; });
+  const box = document.createElement('div'); box.className = 'svb';
+  box.innerHTML = `<div class="po-busca-c svb-c">${icon('lupa')}<input type="text" class="svb-in" autocomplete="off" enterkeyhint="search" placeholder="Pesquisar serviço pelo nome…" aria-label="Pesquisar serviço" role="combobox" aria-expanded="false"></div><div class="svb-l" role="listbox" hidden></div>`;
+  sel.style.display = 'none'; sel.after(box);
+  const inp = box.querySelector('.svb-in'), lst = box.querySelector('.svb-l');
+  let res = [], ativo = 0;
+  const atual = () => opts.find(o => o.id === sel.value);
+  const mostrarAtual = () => { const a = atual(); inp.value = a ? a.nome : ''; };
+  const desenhar = () => {
+    const q = nomeChave(inp.value), a = atual(), filtrando = q && !(a && inp.value === a.nome);
+    res = filtrando ? opts.filter(o => nomeChave(o.nome + ' ' + o.cat).includes(q)) : opts;
+    ativo = Math.max(0, Math.min(ativo, res.length - 1));
+    lst.innerHTML = res.length ? res.map((o, i) => `<button type="button" class="svb-o ${i === ativo ? 'on' : ''} ${a && o.id === a.id ? 'sel' : ''}" data-svb="${o.id}" role="option"><b>${esc(o.nome)}</b><span class="muted small">${esc(o.txt.slice(o.nome.length).replace(/^ · /, ''))}${o.cat ? ' · ' + esc(o.cat) : ''}</span></button>`).join('')
+      : '<div class="muted small" style="padding:10px 12px">Nenhum serviço com esse nome.</div>';
+    lst.hidden = false; inp.setAttribute('aria-expanded', 'true');
+    const on = lst.querySelector('.svb-o.on'); if (on) on.scrollIntoView({ block: 'nearest' });
+  };
+  const fechar = () => { lst.hidden = true; inp.setAttribute('aria-expanded', 'false'); };
+  const escolher = id => { sel.value = id; sel.dispatchEvent(new Event('change', { bubbles: true })); sel.dispatchEvent(new Event('input', { bubbles: true })); mostrarAtual(); fechar(); };
+  inp.addEventListener('focus', () => { inp.select(); ativo = Math.max(0, res.findIndex(o => o.id === sel.value)); desenhar(); });
+  inp.addEventListener('input', () => { ativo = 0; desenhar(); });
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); e.stopPropagation(); if (lst.hidden) desenhar(); else { ativo = Math.min(res.length - 1, ativo + 1); desenhar(); } }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); e.stopPropagation(); ativo = Math.max(0, ativo - 1); desenhar(); }
+    else if (e.key === 'Enter') { e.preventDefault(); if (res[ativo]) escolher(res[ativo].id); }
+    else if (e.key === 'Escape' && !lst.hidden) { e.preventDefault(); e.stopPropagation(); mostrarAtual(); fechar(); }
+  });
+  lst.addEventListener('mousedown', e => e.preventDefault());
+  lst.addEventListener('click', e => { const b = e.target.closest('[data-svb]'); if (b) escolher(b.dataset.svb); });
+  inp.addEventListener('blur', () => setTimeout(() => { mostrarAtual(); fechar(); }, 120));
+  mostrarAtual();
+}
 const durTxt = m => m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? String(m % 60).padStart(2, '0') : ''}` : `${m} min`;
 
 /* =================== AGENDAMENTO (um ou vários serviços) =================== */
@@ -8793,6 +8837,7 @@ function modalPacote(id) {
   const info = () => { const sv = SV(val('pk-s')), q = parseInt(val('pk-q'), 10) || 0, v = toCents(val('pk-v')) || 0, av = (sv?.preco || 0) * q;
     ov.querySelector('#pk-info').innerHTML = sv && q ? `<div class="note small">Avulso: ${q}x ${brl(sv.preco)} = <b>${brl(av)}</b>${v ? ` · no pacote: <b>${brl(v)}</b> (${brl(Math.round(v / q))} por sessão${av > v ? `, desconto de ${brl(av - v)}` : ''})` : ''}</div>` : ''; };
   ['pk-s', 'pk-q', 'pk-v'].forEach(k => ov.querySelector('#' + k).addEventListener('input', info)); ov.querySelector('#pk-s').onchange = info; info();
+  buscaServico(ov, 'pk-s');
   ov.querySelector('#pk-ok').onclick = () => run(() => salvarPacote(DB, ACTOR, { id, nome: val('pk-n'), servicoId: val('pk-s'), sessoes: val('pk-q'), preco: toCents(val('pk-v')), validadeDias: val('pk-d'), descricao: val('pk-o'), ativo: id ? ov.querySelector('#pk-a').checked : true }), 'Pacote salvo').ok && closeModal();
 }
 /* sugestão de datas: uma por semana, no mesmo dia da semana (pula domingo) */
