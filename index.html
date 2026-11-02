@@ -1563,6 +1563,10 @@ html{background:var(--bg)}
 .side::-webkit-scrollbar-thumb{background:rgba(255,220,143,.4);border-radius:8px}
 .side::-webkit-scrollbar-thumb:hover{background:rgba(255,220,143,.65)}
 .dup-l{margin-top:10px;padding-top:10px;border-top:1px solid color-mix(in srgb,var(--line) 60%,transparent)}
+/* botões vermelhos (excluir, não enviar): sempre vermelhos, em qualquer tema */
+:is(.app,.md,body) .btn.bad-b{background:#B5343E!important;background-image:none!important;color:#fff!important;border-color:#B5343E!important;opacity:1}
+:is(.app,.md,body) .btn.bad-b:hover{filter:brightness(1.08)}
+:is(.app,.md,body) .btn.bad-b svg{color:#fff}
 </style>
 
 </head>
@@ -2011,22 +2015,22 @@ function salvarConfigWhatsApp(S, a, d) {
   S.config.whatsapp = { ...S.config.whatsapp, ...d };
   audit(S, a, 'Configuração do WhatsApp', `${d.modelos.length} mensagens · equipe ${d.funcionarios ? 'pode' : 'não pode'} usar`);
 }
-function registrarContatoWhatsApp(S, a, { clienteId, modeloId, agendamentoId, pacoteVendaId, atendimentoId }) {
+function registrarContatoWhatsApp(S, a, { clienteId, modeloId, agendamentoId, pacoteVendaId, atendimentoId, dispensar }) {
   exigirAcesso(S, a);
   if (!podeWhatsApp(S, a, modeloId)) throw new Error('Seu usuário não tem permissão para usar esta mensagem.');
   const cl = S.clientes.find(c => c.id === clienteId);
   const m = S.config.whatsapp.modelos.find(x => x.id === modeloId);
   const ag = agendamentoId && S.agendamentos.find(x => x.id === agendamentoId);
-  if (ag) ag.historico.push({ quando: stamp(), usuario: a.nome, texto: `WhatsApp aberto · ${m ? m.nome : 'mensagem'}` });
+  if (ag) ag.historico.push({ quando: stamp(), usuario: a.nome, texto: `${dispensar ? 'Mensagem não enviada (aviso dispensado)' : 'WhatsApp aberto'} · ${m ? m.nome : 'mensagem'}` });
   S.contatos = S.contatos || [];
-  S.contatos.unshift({ id: uid('wa'), quando: stamp(), usuario: a.nome, funcId: a.funcId, clienteId, modelo: m ? m.nome : 'Mensagem', modeloId: modeloId || '', agendamentoId: agendamentoId || null, atendimentoId: atendimentoId || null });
+  S.contatos.unshift({ id: uid('wa'), quando: stamp(), usuario: a.nome, funcId: a.funcId, clienteId, modelo: m ? m.nome : 'Mensagem', modeloId: modeloId || '', agendamentoId: agendamentoId || null, atendimentoId: atendimentoId || null, ...(dispensar ? { dispensado: true } : {}) });
   if (modeloId === 'nivel' && typeof marcarNivelAvisado === 'function') marcarNivelAvisado(S, clienteId);
-  const pv = pacoteVendaId && (S.pacoteVendas || []).find(x => x.id === pacoteVendaId);
+  const pv = !dispensar && pacoteVendaId && (S.pacoteVendas || []).find(x => x.id === pacoteVendaId);
   let det = '';
   if (pv) { const st = situacaoVenda(S, pv), r = Math.max(0, pv.sessoes - st.usadas);
     pv.avisos = pv.avisos || []; pv.avisos.push({ quando: stamp(), usuario: a.nome, usadas: st.usadas, restantes: r, modelo: m ? m.nome : 'Mensagem' });
     det = ` · ${pv.codigo}: ${st.usadas} usada(s), ${r} restante(s)`; S.contatos[0].pacoteVendaId = pv.id; S.contatos[0].detalhe = det.slice(3); }
-  audit(S, a, 'WhatsApp aberto', `${cl ? cl.nome : 'cliente'} · ${m ? m.nome : 'mensagem'}${det}`);
+  audit(S, a, dispensar ? 'Mensagem não enviada' : 'WhatsApp aberto', `${cl ? cl.nome : 'cliente'} · ${m ? m.nome : 'mensagem'}${det}${dispensar ? ' · aviso dispensado' : ''}`);
 }
 
 /* =========================================================================
@@ -6270,7 +6274,8 @@ function contatosGestao(ags, item) {
   const svs = x => grupoDe(DB, x).filter(y => !INATIVOS.includes(y.status)).map(y => SV(y.servicoId)?.nome).filter(Boolean).join(' + ');
   P.remarcar.filter(x => vis.has(x.id)).forEach(x => out.push(item(cliNome(x.clienteId, 'nome'), `<b class="bad-t">Pediu para remarcar</b> · ${quando(x)} ${x.inicio} · ${esc(svs(x))}`,
     `<div class="ct-bts"><button class="btn sm pri" data-ag-edit="${x.id}">Reagendar</button><button class="btn sm ghost" data-remarc-ok="${x.id}">Resolvido</button></div>`)));
-  P.confirmar.filter(x => vis.has(x.id)).forEach(x => { const sn = exigeSinal(DB, x.clienteId), pago = sinalDoAtendimento(DB, x);
+  const dispensou = (x, mids) => { const ids = grupoDe(DB, x).map(y => y.id); return (DB.contatos || []).some(c => c.dispensado && c.agendamentoId && ids.includes(c.agendamentoId) && mids.includes(c.modeloId)); };
+  P.confirmar.filter(x => vis.has(x.id) && !dispensou(x, ['confirmacao', 'sinal'])).forEach(x => { const sn = exigeSinal(DB, x.clienteId), pago = sinalDoAtendimento(DB, x);
     out.push(item(cliNome(x.clienteId, 'nome'), `Confirmar · ${quando(x)} ${x.inicio} · ${esc(svs(x))}${sn && !pago ? ' · <b class="warn-t">pedir sinal</b>' : pago ? ' · sinal pago' : ''}`,
       `<div class="ct-bts">${sn && !pago ? `${waBtn(`data-wa-ag="${x.id}" data-wa-m="sinal"`, 'Pedir sinal', 'sinal')}<button class="btn sm" data-sinal-reg="${x.id}">Sinal pago</button>` : waBtn(`data-wa-ag="${x.id}" data-wa-m="confirmacao"`, 'Confirmar', 'confirmacao')}<button class="btn sm" data-conf-ok="${x.id}" title="A cliente respondeu que vem">Confirmou</button></div>`)); });
   // faltou hoje ou ontem: mensagem para remarcar (uma vez)
@@ -7367,13 +7372,14 @@ function modalWhatsApp(ref = {}, modeloId) {
   if (!modelos.length) return toast('Seu usuário não tem mensagens liberadas. Fale com a proprietária.', 'bad');
   let W = waContexto(ref);
   let mid = modelos.some(m => m.id === modeloId) ? modeloId : modelos[0].id;
+  const midAviso = modeloId && modelos.some(m => m.id === modeloId) && modeloId !== 'pacote' && modeloId !== 'livre' && (ref.agendamentoId || ref.atendimentoId || ref.clienteId) ? modeloId : '';
   const ov = openModal('Mensagem no WhatsApp', `
     ${W.clienteId ? '' : `<label class="f">Cliente<select id="wa-cl">${opt([['', 'Selecione…'], ...DB.clientes.slice().sort((a, b) => a.nome.localeCompare(b.nome)).map(x => [x.id, x.nome])], '')}</select></label>`}
     <div class="wa-head"><div class="wa-av">${esc((W.ctx.cliente || '?').slice(0, 1))}</div><div style="min-width:0;flex:1"><div class="b" id="wa-nome">${esc(W.ctx.cliente || 'Escolha o cliente')}</div><input id="wa-tel" inputmode="tel" value="${esc(W.telefone)}" aria-label="Telefone do cliente" class="wa-tel"></div></div>
     <div><div class="sec" style="margin:0 0 8px">Mensagem pronta</div><div class="chips" id="wa-chips">${modelos.map(m => `<button class="chip ${m.id === mid ? 'on' : ''}" data-m="${m.id}">${esc(m.nome)}</button>`).join('')}</div></div>
     <div class="wa-bubble"><textarea id="wa-txt" aria-label="Texto da mensagem" rows="6"></textarea></div>
     <div class="muted small" id="wa-msg">O WhatsApp abre com o texto pronto. Você revisa e envia pelo aplicativo.</div>`,
-    `<button class="btn" id="wa-copy">Copiar texto</button><a class="btn wa" id="wa-go" target="_blank" rel="noopener">${icon('wa')}<span>Abrir no WhatsApp</span></a>`);
+    `${midAviso ? '<button class="btn bad-b" id="wa-nao" title="Tira este aviso da lista sem mandar mensagem">Não enviar mensagem</button><div class="grow"></div>' : ''}<button class="btn" id="wa-copy">Copiar texto</button><a class="btn wa" id="wa-go" target="_blank" rel="noopener">${icon('wa')}<span>Abrir no WhatsApp</span></a>`);
   const q = s => ov.querySelector(s);
   const fill = () => { q('#wa-txt').value = waMensagem(c.modelos.find(m => m.id === mid).texto, W.ctx); upd(); };
   const upd = () => { const tel = waTelefone(q('#wa-tel').value), a = q('#wa-go');
@@ -7387,6 +7393,11 @@ function modalWhatsApp(ref = {}, modeloId) {
   // copiar o texto também conta como feito (a pessoa vai colar no WhatsApp): o botão sai da lista
   let registrado = false;
   const registrar = () => { if (registrado) return true; try { registrarContatoWhatsApp(DB, ACTOR, { clienteId: W.clienteId, modeloId: mid, agendamentoId: W.agendamentoId, pacoteVendaId: W.pacoteVendaId, atendimentoId: W.atendimentoId }); registrado = true; save(); try { gravarPendentes(); } catch (x) { } return true; } catch (err) { toast(err.message, 'bad'); return false; } };
+  if (q('#wa-nao')) q('#wa-nao').onclick = () => {
+    try { registrarContatoWhatsApp(DB, ACTOR, { clienteId: W.clienteId, modeloId: midAviso, agendamentoId: W.agendamentoId, atendimentoId: W.atendimentoId, dispensar: true }); save(); try { gravarPendentes(); } catch (x) { } }
+    catch (err) { toast(err.message, 'bad'); return; }
+    closeModal(); render(); toast('Aviso dispensado: a mensagem não será enviada');
+  };
   q('#wa-copy').onclick = () => { const t = q('#wa-txt'); const ok = () => { if (W.clienteId) registrar(); toast('Texto copiado'); }; const fb = () => { t.select(); toast('Texto selecionado. Use Copiar do aparelho.'); };
     try { navigator.clipboard.writeText(t.value).then(ok, fb); } catch (err) { fb(); } };
   fill();
@@ -7413,8 +7424,9 @@ function painelContatos(ags) {
   // contatos com clientes: só proprietários e recepção (profissionais não veem)
   if (!DB.config.whatsapp.ativo || !(isOwner(ACTOR) || cargoDe(F(ACTOR.funcId)) === 'recepcao')) return '';
   const am = addDays(TODAY, 1), hojeDM = dBR(TODAY).slice(0, 5);
-  const lembrar = ags.filter(x => x.data === am && x.status === 'confirmado').sort((a, b) => a.inicio.localeCompare(b.inicio));
-  const aniv = DB.clientes.filter(c => (c.aniversario || '').slice(0, 5) === hojeDM);
+  const contou = (ids, mid) => (DB.contatos || []).some(c => c.agendamentoId && ids.includes(c.agendamentoId) && (c.modeloId === mid || c.modelo === (DB.config.whatsapp.modelos.find(m => m.id === mid) || {}).nome));
+  const lembrar = ags.filter(x => x.data === am && x.status === 'confirmado' && !contou(grupoDe(DB, x).map(y => y.id), 'lembrete')).sort((a, b) => a.inicio.localeCompare(b.inicio));
+  const hojeBR = dBR(TODAY), aniv = DB.clientes.filter(c => (c.aniversario || '').slice(0, 5) === hojeDM && !(DB.contatos || []).some(k => k.clienteId === c.id && k.modeloId === 'aniversario' && String(k.quando || '').startsWith(hojeBR)));
   // depois do atendimento (hoje e ontem): pedir a avaliação (a mensagem já agradece), uma vez por comanda
   const ontem = addDays(TODAY, -1), feitos = (DB.contatos || []);
   const jaFez = (cid, nomeModelo, desde, idModelo) => feitos.some(c => c.clienteId === cid && (c.modelo === nomeModelo || (idModelo && c.modeloId === idModelo)) && (() => { const m = String(c.quando || '').match(/(\d{2})\/(\d{2})\/(\d{2,4})/); if (!m) return false; const y = m[3].length === 2 ? '20' + m[3] : m[3]; return `${y}-${m[2]}-${m[1]}` >= desde; })());
