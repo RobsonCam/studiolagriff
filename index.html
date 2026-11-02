@@ -2795,13 +2795,16 @@ function salvarConvenio(S, a, d) {
   if (d.id) { const cv = S.convenios.find(c => c.id === d.id); const msg = Number(cv.taxa || 0) !== taxa ? ` · acréscimo ${cv.taxa || 0}% → ${taxa}% (vale para novos serviços)` : ''; Object.assign(cv, dados); audit(S, a, 'Convênio editado', nome + msg); return d.id; }
   const cv = { id: uid('cv'), ...dados, criadoEm: TODAY }; S.convenios.push(cv); audit(S, a, 'Convênio cadastrado', `${nome} · acréscimo ${taxa}%`); return cv.id;
 }
+/* serviço no convênio ainda com valor em aberto (vem de um mês anterior e continua aparecendo até ser pago) */
+const convEmAberto = p => p.forma === 'convenio' && p.situacao !== 'cancelado' && totalConv(p) - (p.acertado || 0) > 0;
 function resumoConvenios(S, ini, fim) {
-  const ps = S.parcelas.filter(p => p.forma === 'convenio' && p.situacao !== 'cancelado' && (!ini || p.data >= ini) && (!fim || p.data <= fim));
-  return S.convenios.filter(cv => !cv.excluido || ps.some(p => p.convenioId === cv.id)).map(cv => { const l = ps.filter(p => p.convenioId === cv.id);
+  const ps = S.parcelas.filter(p => p.forma === 'convenio' && p.situacao !== 'cancelado' && ((!ini || p.data >= ini) && (!fim || p.data <= fim) || (ini && p.data < ini && convEmAberto(p))));
+  return S.convenios.filter(cv => !cv.excluido || ps.some(p => p.convenioId === cv.id)).map(cv => { const l = ps.filter(p => p.convenioId === cv.id), ant = ini ? l.filter(p => p.data < ini) : [];
     const repassado = sum((S.repasses || []).filter(r => r.convenioId === cv.id).map(r => r.valor));
     const devidoTotal = sum(S.parcelas.filter(p => p.convenioId === cv.id && p.situacao !== 'cancelado').map(repasseDevido));
     return { cv, servicos: l.length, servico: sum(l.map(p => p.valor)), acrescimo: sum(l.map(p => p.acrescimo || 0)), gerado: sum(l.map(totalConv)), pago: sum(l.map(p => p.acertado)), pendente: sum(l.map(p => totalConv(p) - p.acertado)),
-      comissao: sum(l.map(p => p.comissao)), repDevido: sum(l.map(repasseDevido)), repassadoTotal: repassado, aRepassar: devidoTotal - repassado, parcelas: l }; });
+      comissao: sum(l.map(p => p.comissao)), repDevido: sum(l.map(repasseDevido)), repassadoTotal: repassado, aRepassar: devidoTotal - repassado, parcelas: l,
+      anteriores: { n: ant.length, valor: sum(ant.map(p => totalConv(p) - p.acertado)) } }; });
 }
 /* repasse ao conveniado: só do acréscimo já recebido e ainda não repassado */
 function aRepassar(S, convenioId) {
@@ -4554,6 +4557,16 @@ function runTests() {
     const dup = pagamentosDuplicados(S0), naoDeixa = deveFalhar(() => { excluirPagamentoDuplicado(S0, d0, 'pgB'); excluirPagamentoDuplicado(S0, d0, 'pgA'); });
     const ok = sem && out.length === 2 && nov.length === 0 && out[0].data === '2026-10-30' && dup.length === 1 && dup[0].excesso === 14250 && /não está em duplicidade/.test(naoDeixa) && S0.pagamentos.filter(x => x.fechamentoId === 'feX').length === 1 && aPagarFech(f) === 0 && pagamentosDuplicados(S0).length === 0;
     return ok || JSON.stringify([sem, out.length, nov.length, out[0] && out[0].data, dup.length, naoDeixa]);
+  });
+  T('Convênio: serviço de mês anterior ainda em aberto continua contando no mês seguinte até ser pago', () => {
+    const S1 = seedBase(), d1 = S1.users.find(u => u.id === 'u0'), cv = S1.convenios[0]; cv.taxa = 0;
+    const k = S1.clientes.find(c => (c.convenios || []).includes(cv.id)) || S1.clientes[0]; k.convenios = [cv.id];
+    const [at] = registrarAtendimentoGrupo(S1, d1, { clienteId: k.id, data: TODAY, itens: [{ funcId: 'f1', servicoId: 's1', valorCobrado: 8000 }], parcelas: [{ forma: 'convenio', valor: 8000, convenioId: cv.id }] });
+    const p = S1.parcelas.find(x => x.atendimentoId === at.id); p.data = '2026-10-20';
+    const nov = resumoConvenios(S1, '2026-11-01', '2026-11-30').find(r => r.cv.id === cv.id);
+    p.acertado = totalConv(p);
+    const pago = resumoConvenios(S1, '2026-11-01', '2026-11-30').find(r => r.cv.id === cv.id);
+    return (nov.servicos === 1 && nov.pendente === 8000 && nov.anteriores.n === 1 && nov.anteriores.valor === 8000 && pago.servicos === 0 && pago.pendente === 0) || JSON.stringify([nov.servicos, nov.pendente, nov.anteriores, pago.servicos]);
   });
   T('Proprietários: dá para cadastrar mais donos com acesso total; não exclui a si mesmo nem o último', () => {
     const S5 = seedBase(), d5 = S5.users.find(u => u.id === 'u0');
@@ -8220,7 +8233,7 @@ function pgConvenios() {
   const dono = isOwner(ACTOR);
   // a recepção vê todos os convênios para registrar pagamentos, mas sem comissões nem parte do salão
   const busca = (UI.cvBusca || '').trim().toLowerCase(), bd = digits(busca);
-  const L = linhasObrig(DB, dono ? ACTOR : { papel: 'proprietaria', id: '_cv' }, { ini, fim, tipo: 'convenio' }).filter(r => (!UI.cvFunc || r.o.funcId === UI.cvFunc) && (!UI.cvSit || r.p.situacao === UI.cvSit) && (!UI.cvConv || r.p.convenioId === UI.cvConv)
+  const L = linhasObrig(DB, dono ? ACTOR : { papel: 'proprietaria', id: '_cv' }, { tipo: 'convenio' }).filter(r => ((r.p.data >= ini && r.p.data <= fim) || (r.p.data < ini && convEmAberto(r.p))) && (!UI.cvFunc || r.o.funcId === UI.cvFunc) && (!UI.cvSit || r.p.situacao === UI.cvSit) && (!UI.cvConv || r.p.convenioId === UI.cvConv)
     && (!busca || (CL(r.at.clienteId)?.nome || '').toLowerCase().includes(busca) || (bd.length >= 3 && digits(CL(r.at.clienteId)?.telefone || '').includes(bd))));
   const canc = DB.parcelas.filter(p => p.forma === 'convenio' && p.situacao === 'cancelado' && p.data >= ini && p.data <= fim && (!UI.cvSit || UI.cvSit === 'cancelado'));
   return `
@@ -8231,7 +8244,7 @@ function pgConvenios() {
     <div class="cv-grid">${resumoConvenios(DB, ini, fim).map(r => { const pct = r.gerado ? Math.round(r.pago / r.gerado * 100) : 0;
       return `<div class="cv-card ${r.cv.ativo === false ? 'off' : ''} ${UI.cvConv === r.cv.id ? 'sel' : ''}">
         <div class="bar" style="justify-content:space-between;align-items:flex-start"><div style="min-width:0"><b>${esc(r.cv.nome)}</b><div class="muted small ell">${esc(r.cv.responsavel || 'Responsável não informado')}${r.cv.telefone ? ' · ' + esc(r.cv.telefone) : ''}</div></div><div class="bar" style="flex-wrap:nowrap">${r.cv.taxa ? `<span class="taxa">+${String(r.cv.taxa).replace('.', ',')}%</span>` : ''}${r.cv.ativo === false ? pill('Inativo') : ''}</div></div>
-        <div class="cv-nums"><div><span>Serviços</span><b>${r.servicos}</b></div><div><span>Total cobrado</span><b>${brl(r.gerado)}</b>${r.acrescimo ? `<small>${brl(r.servico)} + ${brl(r.acrescimo)} acréscimo</small>` : ''}</div><div><span>Pago</span><b class="ok">${brl(r.pago)}</b></div><div><span>A receber</span><b class="${r.pendente ? 'bad' : ''}">${brl(r.pendente)}</b></div></div>
+        <div class="cv-nums"><div><span>Serviços</span><b>${r.servicos}</b>${r.anteriores.n ? `<small>${r.anteriores.n} de meses anteriores em aberto</small>` : ''}</div><div><span>Total cobrado</span><b>${brl(r.gerado)}</b>${r.acrescimo ? `<small>${brl(r.servico)} + ${brl(r.acrescimo)} acréscimo</small>` : ''}</div><div><span>Pago</span><b class="ok">${brl(r.pago)}</b></div><div><span>A receber</span><b class="${r.pendente ? 'bad' : ''}">${brl(r.pendente)}</b>${r.anteriores.valor ? `<small>inclui ${brl(r.anteriores.valor)} de antes</small>` : ''}</div></div>
         <div class="meter" title="${pct}% pago"><i style="width:${pct}%"></i></div><div class="muted small">${pct}% pago pelo convênio</div>
         ${r.cv.taxa || r.repassadoTotal || r.aRepassar ? `<div class="rep"><div><span>Repasse ao conveniado</span><b class="${r.aRepassar ? 'bad' : ''}">${r.aRepassar ? 'A repassar ' + brl(r.aRepassar) : 'Nada a repassar'}</b><small>Acréscimo recebido no período ${brl(r.repDevido)} · já repassado (total) ${brl(r.repassadoTotal)}</small></div>${r.aRepassar && dono ? `<button class="btn sm pri" data-repasse="${r.cv.id}">Registrar repasse</button>` : ''}</div>` : ''}
         <div class="bar"><button class="btn sm pri" data-conv-membros="${r.cv.id}">Conveniados (${conveniadosDe(DB, r.cv.id).length})</button>${lixo('conv', r.cv.id, r.cv.nome)}<button class="btn sm" data-conv-filtro="${r.cv.id}">${UI.cvConv === r.cv.id ? 'Mostrar todos' : 'Ver serviços'}</button>${dono ? `<button class="btn sm" data-pdf="conv:${r.cv.id}">Extrato PDF</button><button class="btn sm ghost" data-conv-edit="${r.cv.id}">Editar</button>` : ''}</div></div>`; }).join('')}</div>
@@ -8361,7 +8374,7 @@ function pdfConvenio(cvId) {
   const pct = x => String(x || 0).replace('.', ',') + '%';
   return baixar(`extrato-${nomeArq(r.cv.nome)}-${ini}-a-${fim}.pdf`, gerarPDF({ titulo: 'Extrato do convênio', salao: DB.config.nome, tagline: 'Salão de beleza e podologia', geradoPor: geradoPor(),
     meta: [['Convênio', r.cv.nome], ['Responsável', r.cv.responsavel || '-'], ['Acréscimo atual', pct(r.cv.taxa)], ['Período', `${dBR(ini)} a ${dBR(fim)}`]],
-    resumo: [['Serviços realizados', String(r.servicos)], ['Total cobrado', brl(r.gerado)], ['Já pago', brl(r.pago)], ['Ainda a pagar', brl(r.pendente)],
+    resumo: [['Serviços realizados', String(r.servicos)], ...(r.anteriores.n ? [['Em aberto de meses anteriores', `${r.anteriores.n} serviço(s) · ${brl(r.anteriores.valor)}`]] : []), ['Total cobrado', brl(r.gerado)], ['Já pago', brl(r.pago)], ['Ainda a pagar', brl(r.pendente)],
       ...(r.acrescimo || r.repassadoTotal ? [['Acréscimo do conveniado', brl(r.acrescimo)], ['Repasse devido (já recebido)', brl(r.repDevido)], ['Repassado no período', brl(sum(reps.map(x => x.valor)))], ['A repassar ao conveniado', brl(r.aRepassar)]] : [])],
     secoes: [{ titulo: 'Serviços', cols: ['Data', 'Atend.', 'Cliente', 'Serviço', 'Autorização', 'Valor', 'Acréscimo', 'Total', 'Pago', 'A pagar'],
       rows: r.parcelas.sort((a, b) => a.data.localeCompare(b.data)).map(p => { const at = ats[p.atendimentoId]; return [dBR(p.data), at?.codigo || '', CL(at?.clienteId)?.nome || '', SV(at?.servicoId)?.nome || '', p.autorizacao || '-', brl(p.valor), p.acrescimo ? `${brl(p.acrescimo)} (${pct(p.taxaPct)})` : '-', brl(totalConv(p)), brl(p.acertado), brl(totalConv(p) - p.acertado)]; }),
@@ -8373,7 +8386,7 @@ function pdfConvResumo() {
   const [ini, fim] = periodo(); const rs = resumoConvenios(DB, ini, fim);
   return baixar(`resumo-convenios-${ini}-a-${fim}.pdf`, gerarPDF({ titulo: 'Resumo por convênio', salao: DB.config.nome, tagline: 'Salão de beleza e podologia', geradoPor: geradoPor(),
     meta: [['Período', `${dBR(ini)} a ${dBR(fim)}`], ['Convênios', String(rs.length)]],
-    resumo: [['Serviços', String(sum(rs.map(r => r.servicos)))], ['Total cobrado', brl(sum(rs.map(r => r.gerado)))], ['Já pago', brl(sum(rs.map(r => r.pago)))], ['A receber', brl(sum(rs.map(r => r.pendente)))], ['A repassar aos conveniados', brl(sum(rs.map(r => r.aRepassar)))]],
+    resumo: [['Serviços', String(sum(rs.map(r => r.servicos)))], ...(sum(rs.map(r => r.anteriores.n)) ? [['Em aberto de meses anteriores', `${sum(rs.map(r => r.anteriores.n))} serviço(s) · ${brl(sum(rs.map(r => r.anteriores.valor)))}`]] : []), ['Total cobrado', brl(sum(rs.map(r => r.gerado)))], ['Já pago', brl(sum(rs.map(r => r.pago)))], ['A receber', brl(sum(rs.map(r => r.pendente)))], ['A repassar aos conveniados', brl(sum(rs.map(r => r.aRepassar)))]],
     secoes: [{ cols: ['Convênio', 'Acréscimo', 'Serviços', 'Total cobrado', 'Pago', 'A receber', 'A repassar'], rows: rs.map(r => [r.cv.nome, String(r.cv.taxa || 0).replace('.', ',') + '%', String(r.servicos), brl(r.gerado), brl(r.pago), brl(r.pendente), brl(r.aRepassar)]),
       foot: ['Total', '', String(sum(rs.map(r => r.servicos))), brl(sum(rs.map(r => r.gerado))), brl(sum(rs.map(r => r.pago))), brl(sum(rs.map(r => r.pendente))), brl(sum(rs.map(r => r.aRepassar)))] }] }), 'PDF');
 }
