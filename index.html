@@ -7130,6 +7130,9 @@ function renderTela() {
   REAL = usuarioSessao();
   if (!REAL) {
     if (!UI.forcarLogin && !lerSessao() && formularioPrimeiro()) { pararFundo(); abrirFormularioCliente(''); return; }
+    // só encerra o acesso com os dados já carregados: enquanto o banco ainda está chegando, a pessoa pode não estar na lista por um instante
+    const dadosProntos = typeof SYNC === 'undefined' || !SYNC.db || SYNC.pronto;
+    if (lerSessao() && !dadosProntos) { ACTOR = null; closeModal(); return renderLogin(); }
     if (lerSessao()) { apagarSessao(); LOGIN = { modo: 'entrar', msg: 'Sua sessão terminou. Entre de novo.', tipo: 'info', email: '', ocupado: false }; }
     ACTOR = null; closeModal(); return renderLogin();
   }
