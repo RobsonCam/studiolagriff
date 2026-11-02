@@ -10466,6 +10466,33 @@ html.girado #app{height:100%;overflow-y:auto;overflow-x:hidden;-webkit-overflow-
   const st0 = window.scrollTo.bind(window), sb0 = window.scrollBy.bind(window);
   window.scrollTo = function () { return GIRO.on && app() ? app().scrollTo.apply(app(), arguments) : st0.apply(null, arguments); };
   window.scrollBy = function () { return GIRO.on && app() ? app().scrollBy.apply(app(), arguments) : sb0.apply(null, arguments); };
+  // rolagem pelo toque com a tela girada: o dedo anda na tela do aparelho e o sistema converte para a direção da tela em pé
+  const pode = (el, eixo, d) => { const cs = getComputedStyle(el), ov = eixo === 'y' ? cs.overflowY : cs.overflowX;
+    if (!/(auto|scroll)/.test(ov) && !(el.id === 'app')) return false;
+    return eixo === 'y' ? (d > 0 ? el.scrollTop + el.clientHeight < el.scrollHeight - 1 : el.scrollTop > 0) : (d > 0 ? el.scrollLeft + el.clientWidth < el.scrollWidth - 1 : el.scrollLeft > 0); };
+  const alvoRolar = (de, eixo, d) => { for (let n = de; n && n.nodeType === 1; n = n.parentElement) { if (pode(n, eixo, d)) return n; if (n.id === 'app') break; } return eixo === 'y' ? app() : null; };
+  const T = { x: 0, y: 0, t: 0, alvo: null, eixo: '', vx: 0, vy: 0, moveu: false, raf: 0 };
+  const paraApp = (dx, dy) => GIRO.lado === 'g-dir' ? { ax: dy, ay: -dx } : { ax: -dy, ay: dx };   // deslocamento do dedo na tela em pé
+  document.addEventListener('touchstart', e => {
+    if (!GIRO.on || e.touches.length !== 1) return; cancelAnimationFrame(T.raf);
+    const t = e.touches[0]; Object.assign(T, { x: t.clientX, y: t.clientY, t: performance.now(), alvo: e.target, eixo: '', vx: 0, vy: 0, moveu: false });
+  }, { passive: true, capture: true });
+  document.addEventListener('touchmove', e => {
+    if (!GIRO.on || e.touches.length !== 1 || !T.alvo) return;
+    const t = e.touches[0], dx = t.clientX - T.x, dy = t.clientY - T.y, { ax, ay } = paraApp(dx, dy);
+    if (!T.eixo) { if (Math.abs(ax) + Math.abs(ay) < 6) return; T.eixo = Math.abs(ay) >= Math.abs(ax) ? 'y' : 'x'; T.el = alvoRolar(T.alvo, T.eixo, T.eixo === 'y' ? -ay : -ax); }
+    e.preventDefault(); T.moveu = true;
+    const agora = performance.now(), dt = Math.max(1, agora - T.t), d = T.eixo === 'y' ? -ay : -ax;
+    if (T.el) { if (T.eixo === 'y') T.el.scrollTop += d; else T.el.scrollLeft += d; }
+    T.v = d / dt; T.x = t.clientX; T.y = t.clientY; T.t = agora;
+  }, { passive: false, capture: true });
+  document.addEventListener('touchend', () => {
+    if (!GIRO.on || !T.moveu || !T.el) { T.alvo = null; return; }
+    let v = T.v || 0; const el = T.el, eixo = T.eixo; let ult = performance.now(); T.alvo = null;
+    const passo = () => { const agora = performance.now(), dt = agora - ult; ult = agora; v *= Math.pow(0.95, dt / 16); if (Math.abs(v) < 0.02) return;
+      if (eixo === 'y') el.scrollTop += v * dt; else el.scrollLeft += v * dt; T.raf = requestAnimationFrame(passo); };
+    if (Math.abs(v) > 0.1) T.raf = requestAnimationFrame(passo);
+  }, { passive: true, capture: true });
   const agendar = () => { clearTimeout(GIRO.t); GIRO.t = setTimeout(conferirGiro, 120); };
   window.addEventListener('resize', agendar); window.addEventListener('orientationchange', agendar);
   if (screen.orientation && screen.orientation.addEventListener) screen.orientation.addEventListener('change', agendar);
