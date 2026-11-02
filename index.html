@@ -105,19 +105,6 @@
 @media (min-width:900px){.inst-bar{bottom:20px;left:auto;right:20px;width:440px}}
 .lg-mask,input.lg-mask{-webkit-text-security:disc;text-security:disc;font-family:var(--f-body);letter-spacing:.08em}
 
-/* celular deitado: aviso para virar (o app instalado no Android já fica travado na vertical) */
-#gire-aviso{display:none}
-@media (orientation:landscape) and (max-height:500px) and (pointer:coarse){
-  #gire-aviso{display:flex;position:fixed;inset:0;z-index:99999;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px;text-align:center;background:#1B1410;color:#F1ECE4;font-family:var(--f-body,sans-serif)}
-  #gire-aviso b{font-size:20px;color:#FFDC8F;font-weight:700}
-  #gire-aviso span{max-width:420px;opacity:.85;line-height:1.45}
-  .gire-ic{width:46px;height:74px;border:3px solid #FFDC8F;border-radius:10px;position:relative;animation:gireIc 2.4s ease-in-out infinite}
-  .gire-ic i{position:absolute;bottom:6px;left:50%;width:10px;height:3px;margin-left:-5px;border-radius:2px;background:#FFDC8F}
-  html,body{overflow:hidden!important}
-}
-@keyframes gireIc{0%,20%{transform:rotate(-90deg)}55%,100%{transform:rotate(0)}}
-@media (prefers-reduced-motion:reduce){.gire-ic{animation:none}}
-
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Italiana&family=Lato:wght@300;400;700;900&display=swap">
@@ -10408,15 +10395,81 @@ window.PROD_RECUPERAR_DONO = () => {
 };
 
 /* ---------------- sempre na vertical no celular ----------------
-   O app instalado já abre travado na vertical (manifest). Aqui: tenta travar também no navegador,
-   e no celular deitado (o iPhone não deixa travar) mostra um aviso para virar o aparelho. */
+   O app instalado no Android abre travado na vertical (manifest) e aqui ainda tenta travar pelo navegador.
+   Onde não dá para travar (iPhone, navegador), com o celular deitado o sistema gira o próprio conteúdo
+   ao contrário: a tela continua "em pé" em relação ao aparelho, com o layout de celular. */
+const GIRO = { on: false, lado: '', regras: [], estilos: [], ef: { w: 0, h: 0 }, t: 0 };
+const MM0 = window.matchMedia ? window.matchMedia.bind(window) : null;
+const temDim = t => /(width|height|orientation)/i.test(t || '');
+function avaliarMidia(txt, W, H) {
+  return String(txt).split(',').some(q => {
+    q = q.trim(); let neg = false; if (/^not\s+/i.test(q)) { neg = true; q = q.replace(/^not\s+/i, ''); }
+    const ok = q.split(/\s+and\s+/i).every(p => {
+      p = p.trim(); if (!p || /^(only\s+)?(all|screen)$/i.test(p)) return true; if (/^(only\s+)?print$/i.test(p)) return false;
+      const m = p.match(/^\(\s*(min-|max-)?(width|height)\s*:\s*([\d.]+)px\s*\)$/i);
+      if (m) { const v = m[2].toLowerCase() === 'width' ? W : H, n = +m[3]; return !m[1] ? v === n : m[1].toLowerCase() === 'min-' ? v >= n : v <= n; }
+      const o = p.match(/^\(\s*orientation\s*:\s*(portrait|landscape)\s*\)$/i); if (o) return (H >= W) === (o[1].toLowerCase() === 'portrait');
+      try { return MM0 ? MM0(p).matches : true; } catch (e) { return true; }
+    });
+    return neg ? !ok : ok;
+  });
+}
+const trocaVhVw = v => v.replace(/(\d)([dsl]?)vh\b/g, '$1$2§').replace(/(\d)([dsl]?)vw\b/g, '$1$2vh').replace(/§/g, 'vw');
+function coletarRegras() {
+  if (GIRO.coletado) return; GIRO.coletado = true;
+  const andar = lista => { for (const r of lista) {
+    if (r.media && r.cssRules) { if (temDim(r.media.mediaText)) GIRO.regras.push({ r, orig: r.media.mediaText }); andar(r.cssRules); }
+    else if (r.style) { for (let i = 0; i < r.style.length; i++) { const pr = r.style[i], v = r.style.getPropertyValue(pr); if (/\d[dsl]?v[hw]\b/.test(v)) GIRO.estilos.push({ r, pr, v, pri: r.style.getPropertyPriority(pr) }); } }
+  } };
+  for (const sh of document.styleSheets) { if (sh.ownerNode && sh.ownerNode.id === 'giro-css') continue; try { andar(sh.cssRules); } catch (e) { } }
+}
+function aplicarGiro(on) {
+  coletarRegras();
+  const { w, h } = GIRO.ef;
+  GIRO.regras.forEach(x => { try { x.r.media.mediaText = on ? (avaliarMidia(x.orig, w, h) ? 'all' : 'not all') : x.orig; } catch (e) { } });
+  GIRO.estilos.forEach(x => { try { x.r.style.setProperty(x.pr, on ? trocaVhVw(x.v) : x.v, x.pri); } catch (e) { } });
+}
+function ladoGiro() {
+  let a = screen.orientation && typeof screen.orientation.angle === 'number' ? screen.orientation.angle : (typeof window.orientation === 'number' ? (window.orientation + 360) % 360 : 90);
+  return a === 270 ? 'g-dir' : 'g-esq';
+}
+function conferirGiro() {
+  const de = document.documentElement, W = de.clientWidth, H = de.clientHeight;
+  const toque = MM0 ? MM0('(pointer:coarse)').matches : false, deitado = toque && W > H && Math.min(W, H) <= 500;
+  const lado = deitado ? ladoGiro() : '';
+  if (deitado === GIRO.on && lado === GIRO.lado) return;
+  GIRO.on = deitado; GIRO.lado = lado; GIRO.ef = { w: Math.min(W, H), h: Math.max(W, H) };
+  de.classList.toggle('girado', deitado); de.classList.toggle('g-esq', lado === 'g-esq'); de.classList.toggle('g-dir', lado === 'g-dir');
+  aplicarGiro(deitado);
+  try { if (typeof render === 'function' && typeof DB !== 'undefined' && DB && document.querySelector('.app')) { const a = document.activeElement; if (!(a && a.matches && a.matches('input,textarea,select'))) render(); } } catch (e) { }
+}
 function travarVertical() {
   const tentar = () => { try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(() => { }); } catch (e) { } };
   tentar(); document.addEventListener('visibilitychange', () => { if (!document.hidden) tentar(); });
-  if (document.getElementById('gire-aviso')) return;
-  const d = document.createElement('div'); d.id = 'gire-aviso'; d.setAttribute('aria-live', 'polite');
-  d.innerHTML = '<div class="gire-ic" aria-hidden="true"><i></i></div><b>Use o celular na vertical</b><span>O sistema do Studio La Griff foi feito para a tela em pé. Vire o aparelho para continuar.</span>';
-  document.body.appendChild(d);
+  if (!document.getElementById('giro-css')) {
+    const st = document.createElement('style'); st.id = 'giro-css';
+    st.textContent = `html.girado,html.girado body{overflow:hidden!important;height:100%}
+html.girado body{position:fixed!important;top:0;left:0;width:100vh;height:100vw;margin:0;transform-origin:0 0}
+html.girado.g-esq body{transform:translateY(100vh) rotate(-90deg)}
+html.girado.g-dir body{transform:translateX(100vw) rotate(90deg)}
+html.girado #app{height:100%;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}`;
+    document.head.appendChild(st);
+  }
+  // com a tela girada, as medidas e a rolagem do sistema passam a ser as do celular em pé
+  const app = () => document.getElementById('app');
+  try {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, get: () => GIRO.on ? GIRO.ef.w : document.documentElement.clientWidth });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, get: () => GIRO.on ? GIRO.ef.h : document.documentElement.clientHeight });
+    Object.defineProperty(window, 'scrollY', { configurable: true, get: () => GIRO.on ? (app() || {}).scrollTop || 0 : (document.scrollingElement || document.documentElement).scrollTop });
+  } catch (e) { }
+  if (MM0) window.matchMedia = q => GIRO.on && temDim(q) ? { matches: avaliarMidia(q, GIRO.ef.w, GIRO.ef.h), media: q, onchange: null, addEventListener() { }, removeEventListener() { }, addListener() { }, removeListener() { } } : MM0(q);
+  const st0 = window.scrollTo.bind(window), sb0 = window.scrollBy.bind(window);
+  window.scrollTo = function () { return GIRO.on && app() ? app().scrollTo.apply(app(), arguments) : st0.apply(null, arguments); };
+  window.scrollBy = function () { return GIRO.on && app() ? app().scrollBy.apply(app(), arguments) : sb0.apply(null, arguments); };
+  const agendar = () => { clearTimeout(GIRO.t); GIRO.t = setTimeout(conferirGiro, 120); };
+  window.addEventListener('resize', agendar); window.addEventListener('orientationchange', agendar);
+  if (screen.orientation && screen.orientation.addEventListener) screen.orientation.addEventListener('change', agendar);
+  setTimeout(conferirGiro, 0);
 }
 /* ---------------- aplicativo (PWA) ---------------- */
 function avisoInstalar() {
