@@ -1576,6 +1576,13 @@ html{background:var(--bg)}
 .svb-o.sel b{color:var(--accent)}
 /* lista aberta dos selects no tema escuro: fundo e letras legíveis */
 select option,select optgroup{background:var(--surface);color:var(--ink)}
+.pk-tit{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.pk-tit .sec{flex:none}
+.pk-tit .pk-tb{flex:1 1 260px;max-width:440px;margin:0;min-height:42px;min-width:0;box-sizing:border-box}
+.pk-tit .pk-tb input{min-width:0;flex:1 1 auto;width:100%}
+.pk-tit .pk-tb .btn{flex:none}
+.pk-tit .seg{margin-left:auto}
+@media (max-width:700px){.pk-tit .pk-tb{flex-basis:100%;max-width:none;order:3}.pk-tit .seg{margin-left:0}}
 </style>
 
 </head>
@@ -8796,15 +8803,18 @@ function pgPacotes() {
     <div class="act">${dono ? '<button class="btn" data-pk-novo>Novo pacote</button>' : ''}${pode(DB, ACTOR, 'registrar') ? '<button class="btn pri" data-pk-vender="">Vender pacote</button>' : ''}</div></div>
   <div class="stack">
     <div class="grid g4">${kpi('Pacotes ativos', ativos.length)}${kpi('Sessões a marcar', sum(ativos.map(v => situacaoVenda(DB, v).livres)), 'ainda sem data', 'warn')}${kpi('Sessões marcadas', sum(ativos.map(v => situacaoVenda(DB, v).marcadas)), '', 'info')}${kpi('Vendido no total', brl(sum(vendas.map(v => v.valor))), `${vendas.length} pacote(s)`, 'ok')}</div>
-    <div class="sec">Pacotes à venda</div>
-    ${(DB.pacotes || []).length ? `<div class="pk-cat">${DB.pacotes.map(pc => { const sv = SV(pc.servicoId), avulso = (sv?.preco || 0) * pc.sessoes;
+    ${(() => { const q = (UI.pkvBusca || '').trim(); return `<div class="pk-tit"><div class="sec" style="margin:0">Pacotes à venda</div>${(DB.pacotes || []).length ? `<div class="po-busca-c pk-tb">${icon('lupa')}<input id="pkv-b" type="text" enterkeyhint="search" autocomplete="off" placeholder="Pesquisar pacote ou serviço" aria-label="Pesquisar pacotes à venda" value="${esc(q)}">${q ? '<button type="button" class="btn sm ghost" data-pkv-limpa aria-label="Limpar pesquisa">Limpar</button>' : ''}</div>` : ''}</div>`; })()}
+    ${(() => { const qn = nomeChave(UI.pkvBusca || ''), lv = (DB.pacotes || []).filter(pc => !qn || nomeChave(`${pc.nome} ${SV(pc.servicoId)?.nome || ''} ${pc.descricao || ''}`).includes(qn));
+      return (DB.pacotes || []).length && !lv.length ? `<div class="panel">${empty('Nenhum pacote com essa pesquisa', 'Confira o nome do pacote ou do serviço.')}</div>` : ''; })()}
+    ${(DB.pacotes || []).length ? `<div class="pk-cat">${DB.pacotes.filter(pc => { const qn = nomeChave(UI.pkvBusca || ''); return !qn || nomeChave(`${pc.nome} ${SV(pc.servicoId)?.nome || ''} ${pc.descricao || ''}`).includes(qn); }).map(pc => { const sv = SV(pc.servicoId), avulso = (sv?.preco || 0) * pc.sessoes;
       return `<div class="pk-item ${pc.ativo === false ? 'off' : ''}"><div><b>${esc(pc.nome)}</b><span class="muted small">${pc.sessoes}x ${esc(sv?.nome || '')}${pc.validadeDias ? ` · vale ${pc.validadeDias} dias` : ''}${pc.ativo === false ? ' · inativo' : ''}</span></div>
         <div class="pk-preco"><b>${brl(pc.preco)}</b>${avulso > pc.preco ? `<span class="muted small">avulso ${brl(avulso)}</span>` : ''}</div>
         <div class="bar" style="flex-wrap:nowrap">${dono ? `<button class="btn sm" data-pk-edit="${pc.id}">Editar</button>` : ''}${pc.ativo !== false && pode(DB, ACTOR, 'registrar') ? `<button class="btn sm pri" data-pk-vender="${pc.id}">Vender</button>` : ''}</div></div>`; }).join('')}</div>`
       : `<div class="panel">${empty('Nenhum pacote cadastrado', dono ? 'Toque em "Novo pacote" para montar o primeiro.' : 'A proprietária cadastra os pacotes.')}</div>`}
-    <div class="bar" style="justify-content:space-between"><div class="sec" style="margin:0">Pacotes das clientes</div><div class="seg">${[['ativos', 'Em uso'], ['encerrados', 'Encerrados'], ['todos', 'Todos']].map(([k, t]) => `<button data-pk-filtro="${k}" class="${filtro === k ? 'on' : ''}">${t}</button>`).join('')}</div></div>
-    ${vendas.length ? `<div class="po-busca"><label for="pk-b" class="po-busca-l">Pesquisar cliente</label><div class="po-busca-c">${icon('lupa')}<input id="pk-b" type="text" enterkeyhint="search" autocomplete="off" placeholder="Nome, telefone, CPF ou pacote" value="${esc(pb)}">${pb ? '<button type="button" class="btn sm ghost" data-pk-limpa aria-label="Limpar pesquisa">Limpar</button>' : ''}</div>
-      <span class="muted small">${pb ? `${linhas.length} de ${doFiltro.length} pacote(s)` : `${doFiltro.length} pacote(s) ${filtro === 'ativos' ? 'em uso' : filtro === 'encerrados' ? 'encerrado(s)' : 'no total'}`}</span></div>` : ''}
+    <div class="pk-tit"><div class="sec" style="margin:0">Pacotes das clientes</div>
+      ${vendas.length ? `<div class="po-busca-c pk-tb">${icon('lupa')}<input id="pk-b" type="text" enterkeyhint="search" autocomplete="off" placeholder="Cliente, telefone, CPF ou pacote" aria-label="Pesquisar pacotes das clientes" value="${esc(pb)}">${pb ? '<button type="button" class="btn sm ghost" data-pk-limpa aria-label="Limpar pesquisa">Limpar</button>' : ''}</div>` : ''}
+      <div class="seg">${[['ativos', 'Em uso'], ['encerrados', 'Encerrados'], ['todos', 'Todos']].map(([k, t]) => `<button data-pk-filtro="${k}" class="${filtro === k ? 'on' : ''}">${t}</button>`).join('')}</div></div>
+    ${vendas.length ? `<span class="muted small">${pb ? `${linhas.length} de ${doFiltro.length} pacote(s)` : `${doFiltro.length} pacote(s) ${filtro === 'ativos' ? 'em uso' : filtro === 'encerrados' ? 'encerrado(s)' : 'no total'}`}</span>` : ''}
     ${linhas.length ? `<div class="pk-lista">${linhas.map(({ v, st }) => `<article class="pk-venda">
       <div class="pk-vh"><div style="min-width:0"><b>${cliNome(v.clienteId)}</b><div class="muted small">${esc(v.nome)} · ${esc(v.codigo)} · ${brl(v.valor)} · com ${esc(first(v.funcId))}${v.validoAte ? ` · vale até ${dBR(v.validoAte)}` : ''}</div></div>
         <div class="pk-cont"><b>${st.usadas}</b>/${v.sessoes}<span>usadas</span></div></div>
@@ -9662,6 +9672,7 @@ const AFTER = {
     const sb = document.getElementById('sv-b'); if (sb) sb.oninput = () => { clearTimeout(sb._t); sb._t = setTimeout(() => { UI.svBusca = sb.value; render(); const nb = document.getElementById('sv-b'); nb.focus(); nb.setSelectionRange(nb.value.length, nb.value.length); }, 200); };
   },
   pacotes() {
+    const bv = document.getElementById('pkv-b'); if (bv) bv.oninput = () => { clearTimeout(bv._t); bv._t = setTimeout(() => { UI.pkvBusca = bv.value; render(); const nb = document.getElementById('pkv-b'); nb.focus(); nb.setSelectionRange(nb.value.length, nb.value.length); }, 200); };
     const b = document.getElementById('pk-b'); if (b) b.oninput = () => { clearTimeout(b._t); b._t = setTimeout(() => { UI.pkBusca = b.value; render(); const nb = document.getElementById('pk-b'); nb.focus(); nb.setSelectionRange(nb.value.length, nb.value.length); }, 200); };
   },
   podologia() {
@@ -9688,7 +9699,7 @@ const AFTER = {
 
 /* ---------- eventos globais (delegação) ---------- */
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-al-todos],[data-online],[data-pg-dup],[data-wa-pk],[data-pk-limpa],[data-sv-limpa],[data-del-cat],[data-po-limpa],[data-ct-todos],[data-del],[data-dono-novo],[data-dono-edit],[data-podo-aba],[data-podo-nova],[data-podo-ficha],[data-cxcentro],[data-comanda],[data-av-teste],[data-av-qr],[data-av-copiar],[data-av-dl],[data-av-nota],[data-pk-novo],[data-pk-edit],[data-pk-vender],[data-pk-filtro],[data-pk-sessao],[data-cli-nivel],[data-dona-serv],[data-mov],[data-mov-ed],[data-mov-ex],[data-cxper],[data-cxnav],[data-cxtipo],[data-cli-acao],[data-conv-membros],[data-receb-com],[data-conf-com],[data-acerto-com],[data-pagar-cli],[data-cvst],[data-liberar],[data-conta],[data-sair],[data-codigo],[data-repasse],[data-adiant],[data-extrato],[data-abater],[data-conv-novo],[data-conv-edit],[data-conv-filtro],[data-alertas],[data-fechar],[data-faltou],[data-chegou],[data-tema],[data-pdf],[data-wa-ag],[data-wa-cli],[data-wa-cob],[data-wa-at],[data-fab],[data-go],[data-menu],[data-per],[data-agv],[data-agnav],[data-ag],[data-bl],[data-slot],[data-goday],[data-new-ag],[data-new-bl],[data-new-reg],[data-at-open],[data-receb],[data-conf],[data-acerto],[data-fesem],[data-fe-ver],[data-pagar],[data-new-cli],[data-cli],[data-new-func],[data-func],[data-new-serv],[data-serv],[data-new-cat],[data-mais],[data-pub-abrir],[data-pub-cliente],[data-origem-nova],[data-origem],[data-ped-agendar],[data-ped-recusar],[data-qr-copiar],[data-qr-dl],[data-qr-ver],[data-ped-dia]');
+  const t = e.target.closest('[data-al-todos],[data-pkv-limpa],[data-online],[data-pg-dup],[data-wa-pk],[data-pk-limpa],[data-sv-limpa],[data-del-cat],[data-po-limpa],[data-ct-todos],[data-del],[data-dono-novo],[data-dono-edit],[data-podo-aba],[data-podo-nova],[data-podo-ficha],[data-cxcentro],[data-comanda],[data-av-teste],[data-av-qr],[data-av-copiar],[data-av-dl],[data-av-nota],[data-pk-novo],[data-pk-edit],[data-pk-vender],[data-pk-filtro],[data-pk-sessao],[data-cli-nivel],[data-dona-serv],[data-mov],[data-mov-ed],[data-mov-ex],[data-cxper],[data-cxnav],[data-cxtipo],[data-cli-acao],[data-conv-membros],[data-receb-com],[data-conf-com],[data-acerto-com],[data-pagar-cli],[data-cvst],[data-liberar],[data-conta],[data-sair],[data-codigo],[data-repasse],[data-adiant],[data-extrato],[data-abater],[data-conv-novo],[data-conv-edit],[data-conv-filtro],[data-alertas],[data-fechar],[data-faltou],[data-chegou],[data-tema],[data-pdf],[data-wa-ag],[data-wa-cli],[data-wa-cob],[data-wa-at],[data-fab],[data-go],[data-menu],[data-per],[data-agv],[data-agnav],[data-ag],[data-bl],[data-slot],[data-goday],[data-new-ag],[data-new-bl],[data-new-reg],[data-at-open],[data-receb],[data-conf],[data-acerto],[data-fesem],[data-fe-ver],[data-pagar],[data-new-cli],[data-cli],[data-new-func],[data-func],[data-new-serv],[data-serv],[data-new-cat],[data-mais],[data-pub-abrir],[data-pub-cliente],[data-origem-nova],[data-origem],[data-ped-agendar],[data-ped-recusar],[data-qr-copiar],[data-qr-dl],[data-qr-ver],[data-ped-dia]');
   if (!t) return;
   const ds = t.dataset;
   if ('waAg' in ds) { e.stopPropagation(); const x = DB.agendamentos.find(a => a.id === ds.waAg); return modalWhatsApp({ agendamentoId: ds.waAg }, ds.waM || waModeloPadrao(x)); }
@@ -9720,6 +9731,7 @@ document.addEventListener('click', e => {
   if ('cxnav' in ds) { UI.cxRef = ds.cxnav === '0' ? TODAY : passoCaixa(UI.cxPer || 'mes', UI.cxRef || TODAY, +ds.cxnav); UI.cxMax = 0; render(); return; }
   if ('svLimpa' in ds) { UI.svBusca = ''; render(); document.getElementById('sv-b')?.focus(); return; }
   if ('delCat' in ds) { e.stopPropagation(); return modalExcluirCategoria(ds.delCat); }
+  if ('pkvLimpa' in ds) { UI.pkvBusca = ''; render(); document.getElementById('pkv-b')?.focus(); return; }
   if ('pkLimpa' in ds) { UI.pkBusca = ''; render(); document.getElementById('pk-b')?.focus(); return; }
   if ('poLimpa' in ds) { UI.podoBusca = ''; render(); document.getElementById('po-b')?.focus(); return; }
   if ('ctTodos' in ds) { UI.ctTodos = !UI.ctTodos; render(); return; }
