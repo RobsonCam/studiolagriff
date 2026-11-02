@@ -1583,6 +1583,8 @@ select option,select optgroup{background:var(--surface);color:var(--ink)}
 .pk-tit .pk-tb .btn{flex:none}
 .pk-tit .seg{margin-left:auto}
 @media (max-width:700px){.pk-tit .pk-tb{flex-basis:100%;max-width:none;order:3}.pk-tit .seg{margin-left:0}}
+.svb .svb-in{border:0!important;background:transparent!important;box-shadow:none!important;outline:none!important;min-height:0!important;padding:10px 4px!important;margin:0!important;width:100%;font:inherit;color:inherit}
+.svb .svb-c{display:flex;align-items:center;gap:8px;padding:0 12px;min-height:46px;box-sizing:border-box}
 </style>
 
 </head>
@@ -5915,6 +5917,7 @@ function ligarPublico(cat) {
   document.querySelectorAll('[data-pub-rm]').forEach(b => b.onclick = () => { lerPublico(); UI.pubItens.splice(+b.dataset.pubRm, 1); renderPublico(); });
   const add = q('#pub-add'); if (add) add.onclick = () => { lerPublico(); UI.pubItens.push({ servicoId: '', funcId: '' }); renderPublico(); };
   ligarFaData(document.getElementById('app'));
+  document.querySelectorAll('#pub-f select[data-pk="servicoId"]').forEach(el => { try { buscaServico(document, el); } catch (e) { } });   // procurar o serviço pelo nome
   q('#pb-t').oninput = e => { const d = digits(e.target.value).slice(0, 11); if (d.length >= 10) e.target.value = formatarTel(d); };
   q('#pub-f').onsubmit = e => {
     e.preventDefault(); lerPublico();
@@ -7734,7 +7737,7 @@ const servOpts = (sel, filtro) => { const cats = DB.categorias.map(c => [c, DB.s
   return `<option value="">Escolha o serviço…</option>` + cats.map(([c, l]) => `<optgroup label="${esc(c.nome)}">${l.map(s => `<option value="${s.id}" ${s.id === sel ? 'selected' : ''}>${esc(s.nome)} · ${s.duracao} min · ${brl(s.preco)}</option>`).join('')}</optgroup>`).join(''); };
 /* lista de serviços com pesquisa: digita parte do nome (sem acento) e escolhe na lista; o select original continua guardando o valor */
 function buscaServico(root, selId) {
-  const sel = root.querySelector('#' + selId); if (!sel || sel.dataset.busca) return; sel.dataset.busca = '1';
+  const sel = typeof selId === 'string' ? root.querySelector('#' + selId) : selId; if (!sel || sel.dataset.busca) return; sel.dataset.busca = '1';
   const opts = [...sel.querySelectorAll('option')].filter(o => o.value).map(o => { const sv = SV(o.value); return { id: o.value, nome: sv ? sv.nome : o.textContent, txt: o.textContent, cat: o.parentElement && o.parentElement.tagName === 'OPTGROUP' ? o.parentElement.label : '' }; });
   const box = document.createElement('div'); box.className = 'svb';
   box.innerHTML = `<div class="po-busca-c svb-c">${icon('lupa')}<input type="text" class="svb-in" autocomplete="off" enterkeyhint="search" placeholder="Pesquisar serviço pelo nome…" aria-label="Pesquisar serviço" role="combobox" aria-expanded="false"></div><div class="svb-l" role="listbox" hidden></div>`;
@@ -7747,7 +7750,7 @@ function buscaServico(root, selId) {
     const q = nomeChave(inp.value), a = atual(), filtrando = q && !(a && inp.value === a.nome);
     res = filtrando ? opts.filter(o => nomeChave(o.nome + ' ' + o.cat).includes(q)) : opts;
     ativo = Math.max(0, Math.min(ativo, res.length - 1));
-    lst.innerHTML = res.length ? res.map((o, i) => `<button type="button" class="svb-o ${i === ativo ? 'on' : ''} ${a && o.id === a.id ? 'sel' : ''}" data-svb="${o.id}" role="option"><b>${esc(o.nome)}</b><span class="muted small">${esc(o.txt.slice(o.nome.length).replace(/^ · /, ''))}${o.cat ? ' · ' + esc(o.cat) : ''}</span></button>`).join('')
+    lst.innerHTML = res.length ? res.map((o, i) => `<button type="button" class="svb-o ${i === ativo ? 'on' : ''} ${a && o.id === a.id ? 'sel' : ''}" data-svb="${o.id}" role="option"><b>${esc(o.nome)}</b><span class="muted small">${esc([o.txt.slice(o.nome.length).replace(/^ · /, '').trim(), o.cat].filter(Boolean).join(' · '))}</span></button>`).join('')
       : '<div class="muted small" style="padding:10px 12px">Nenhum serviço com esse nome.</div>';
     lst.hidden = false; inp.setAttribute('aria-expanded', 'true');
     const on = lst.querySelector('.svb-o.on'); if (on) on.scrollIntoView({ block: 'nearest' });
