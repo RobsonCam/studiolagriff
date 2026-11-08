@@ -1174,6 +1174,15 @@ td.acts{width:1%;white-space:nowrap}
 .pv-ses{display:flex;flex-direction:column;gap:8px;margin-top:8px}
 .pv-s{display:grid;grid-template-columns:28px minmax(0,1fr) minmax(0,140px) auto;gap:8px;align-items:center}
 .pv-n{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--hero);color:var(--gold);font-weight:900;font-size:13px}
+.pv-s.pv-s5{grid-template-columns:28px minmax(0,1.2fr) minmax(0,1fr) minmax(0,110px) auto}
+@media (max-width:560px){.pv-s.pv-s5{grid-template-columns:28px minmax(0,1fr) minmax(0,1fr) auto}.pv-s.pv-s5 select[data-sv]{grid-column:2/5;grid-row:1}.pv-s.pv-s5 .pv-n{grid-row:1/3;align-self:start;margin-top:8px}.pv-s.pv-s5 [data-sd]{grid-column:2;grid-row:2}.pv-s.pv-s5 [data-sh]{grid-column:3;grid-row:2}.pv-s.pv-s5 [data-sx]{grid-column:4;grid-row:2}}
+.pk-comp{border:1px dashed var(--line);border-radius:12px;padding:10px 12px}
+.pk-cr{display:grid;grid-template-columns:minmax(0,1fr) 72px auto;gap:8px;align-items:start} .pk-cr .svb{min-width:0}
+.pk-its{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px} .pk-its span{font-size:12px;background:var(--sunk);border-radius:999px;padding:3px 9px}
+.pk-venda.pk-canc{opacity:.75} .pk-venda.pk-canc .pk-cont b{text-decoration:line-through}
+.pk-esc{display:flex;flex-direction:column;gap:6px}
+.pk-cs{display:flex;gap:10px;align-items:center;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.ag-pk,.cv-pagar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border:1px dashed var(--accent);border-radius:12px;padding:10px 12px;margin:6px 0}
 /* ===== Cards de valores: todos iguais, sólidos como os botões principais, nas cores da marca =====
    Tema claro: marrom com letras amarelas. Tema escuro: amarelo com letras marrons.
    Preto e branco: preto com letras brancas. Sem transparência. */
@@ -1641,7 +1650,7 @@ const parseStamp = t => { const m = String(t || '').match(/(\d{2})\/(\d{2})\/(\d
 const digits = s => String(s || '').replace(/\D/g, '');
 
 /* ---------- dicionários ---------- */
-const FORMAS = { pix: 'Pix', debito: 'Cartão de débito', credito: 'Cartão de crédito', convenio: 'Convênio' };
+const FORMAS = { pix: 'Pix', debito: 'Cartão de débito', credito: 'Cartão de crédito', dinheiro: 'Dinheiro', convenio: 'Convênio' };
 const CANAIS = { whatsapp: 'WhatsApp', formulario: 'Formulário / QR Code', instagram: 'Instagram', facebook: 'Facebook', telefone: 'Telefone', presencial: 'Presencial', outros: 'Outros' };
 const AG_STATUS = { aguardando: 'Aguardando confirmação', confirmado: 'Confirmado', chegou: 'Cliente chegou', atendimento: 'Em atendimento', concluido: 'Concluído', cancelado: 'Cancelado', faltou: 'Não compareceu' };
 const CONV_STATUS = { registrado: 'Registrado', conferencia: 'Aguardando conferência', pendente: 'Pendente de acerto', parcial: 'Parcialmente acertado', acertado: 'Acertado', cancelado: 'Cancelado ou estornado' };
@@ -1669,12 +1678,21 @@ function somaMeses(dataIso, k) {
   t.setDate(Math.min(dia, new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate()));
   return iso(t);
 }
+/* ---------- mês do convênio e vencimento ----------
+   O convênio "vira" no dia 28: serviço feito do dia 28 em diante conta para o mês seguinte.
+   Todo convênio vence no dia 10 do mês seguinte ao mês dele.
+   Ex.: serviço em 20/11 → mês de novembro → vence 10/12. Serviço em 28/11 → mês de dezembro → vence 10/01. */
+const CONV_VIRA = 28, CONV_VENCE = 10;
+const competenciaConv = data => { const d = fromIso(data); return d.getDate() >= CONV_VIRA ? iso(new Date(d.getFullYear(), d.getMonth() + 1, 1)).slice(0, 7) : data.slice(0, 7); };
+/* data usada para colocar o serviço no período: do dia 28 em diante, vai para o dia 1º do mês seguinte */
+const dataCompetenciaConv = data => { const c = competenciaConv(data); return c === data.slice(0, 7) ? data : c + '-01'; };
+const vencimentoConv = (data, i = 0) => { const [y, m] = competenciaConv(data).split('-').map(Number); return iso(new Date(y, m + i, CONV_VENCE)); };
 function parcelasConvenio(p, hoje = TODAY) {
   const n = p.nParcelas || 1, tot = totalConv(p), base = Math.floor(tot / n), resto = tot - base * n;
   let pagoRest = p.acertado || 0;
   return Array.from({ length: n }, (_, i) => {
     const valor = base + (i === 0 ? resto : 0), pago = Math.min(valor, Math.max(0, pagoRest)); pagoRest -= pago;
-    const vencimento = somaMeses(p.data, i + 1);
+    const vencimento = vencimentoConv(p.data, i);
     return { n: i + 1, de: n, vencimento, valor, pago, aberto: valor - pago, situacao: pago >= valor ? 'paga' : vencimento < hoje ? 'vencida' : 'aberta' };
   });
 }
@@ -1930,9 +1948,18 @@ function situacaoComissao(r) {
   if (r.pago < r.fechado) return ['Em fechamento · a pagar', 'accent'];
   return ['Paga', 'ok'];
 }
+/* convênio no fechamento: aparece na semana em que foi feito e, enquanto não for pago, em todas as semanas
+   seguintes (bloqueado). Quando o convênio paga, a comissão é liberada na semana do pagamento. */
+function convNaSemana(S, r, ini, fim) {
+  if (r.p.data >= ini && r.p.data <= fim) return true;
+  if (r.p.data > fim) return false;
+  if (r.bloqueado > 0 || r.aFechar > 0) return true;   // ainda em aberto (ou liberado e não fechado): continua aparecendo
+  return (S.acertos || []).some(x => x.parcelaId === r.p.id && x.data >= ini && x.data <= fim);
+}
 function resumoFechamento(S, a, funcId, ini, fim, inclConv) {
-  const all = linhasObrig(S, a, { funcId, ini, fim });
-  const pc = all.filter(r => r.o.tipo === 'pix_cartao'), cv = all.filter(r => r.o.tipo === 'convenio');
+  const pc = linhasObrig(S, a, { funcId, ini, fim }).filter(r => r.o.tipo === 'pix_cartao');
+  const cv = linhasObrig(S, a, { funcId, tipo: 'convenio' }).filter(r => r.p.situacao !== 'cancelado' && convNaSemana(S, r, ini, fim));
+  const all = [...pc, ...cv];
   // o fechamento da semana soma tudo o que já foi liberado: Pix, cartão e convênio já acertado
   const elegiveis = all.filter(r => r.aFechar > 0);
   const val = (rows, k) => sum(rows.map(r => r[k]));
@@ -1940,7 +1967,7 @@ function resumoFechamento(S, a, funcId, ini, fim, inclConv) {
   return {
     pc, cv, elegiveis, forma,
     t: {
-      pix: sum(forma('pix').map(r => r.p.valor)), debito: sum(forma('debito').map(r => r.p.valor)), credito: sum(forma('credito').map(r => r.p.valor)),
+      pix: sum(forma('pix').map(r => r.p.valor)), debito: sum(forma('debito').map(r => r.p.valor)), credito: sum(forma('credito').map(r => r.p.valor)), dinheiro: sum(forma('dinheiro').map(r => r.p.valor)),
       comPC: val(pc, 'comissao'), liberadaPC: val(pc, 'liberado'), aguardandoRec: val(pc, 'bloqueado'), pagaPC: val(pc, 'pago'), pendentePC: val(pc, 'aPagar'),
       conv: sum(cv.map(r => r.p.valor)), comConv: val(cv, 'comissao'), convBloq: val(cv, 'bloqueado'), convLib: val(cv, 'liberado'), convAFechar: val(cv, 'aFechar'),
       totalFechar: val(elegiveis, 'aFechar')
@@ -2598,7 +2625,11 @@ function estornarAtendimento(S, a, id, motivo) {
   ps.forEach(p => { if (p.forma === 'convenio') p.situacao = 'cancelado'; });
   if (at.agendamentoId) { const ag = S.agendamentos.find(x => x.id === at.agendamentoId); if (ag) { ag.status = 'atendimento'; ag.historico.push({ quando: stamp(), usuario: a.nome, texto: `Registro ${at.codigo} estornado` }); const sn = sinalDoAtendimento(S, ag); if (sn && sn.usadoEm === at.codigo) sn.usadoEm = ''; } }
   if (S.estoqueMov) devolverConsumo(S, a, at.id, at.codigo);
-  audit(S, a, 'Estorno de serviço', `${at.codigo} · ${motivo}`);
+  // estorno da venda de um pacote: o pacote é cancelado e as sessões ainda marcadas saem da agenda
+  const pv = at.pacoteVendaId && (S.pacoteVendas || []).find(v => v.id === at.pacoteVendaId && v.atendimentoId === at.id);
+  if (pv) { pv.cancelado = { por: a.nome, em: stamp(), motivo };
+    sessoesDaVenda(S, pv.id).filter(x => ABERTOS.includes(x.status)).forEach(x => { x.status = 'cancelado'; x.historico.push({ quando: stamp(), usuario: a.nome, texto: `Pacote ${pv.codigo} estornado · sessão cancelada` }); }); }
+  audit(S, a, 'Estorno de serviço', `${at.codigo}${pv ? ` · pacote ${pv.codigo} cancelado` : ''} · ${motivo}`);
 }
 
 function confirmarRecebimento(S, a, parcelaId, d = {}) {
@@ -2799,9 +2830,27 @@ function salvarConvenio(S, a, d) {
 }
 /* serviço no convênio ainda com valor em aberto (vem de um mês anterior e continua aparecendo até ser pago) */
 const convEmAberto = p => p.forma === 'convenio' && p.situacao !== 'cancelado' && totalConv(p) - (p.acertado || 0) > 0;
+/* o convênio entra no período pelo mês dele (vira no dia 28) e o que ficou em aberto de antes continua aparecendo */
+const convNoPeriodo = (p, ini, fim) => { const d = dataCompetenciaConv(p.data); return (!ini || d >= ini) && (!fim || d <= fim) || (!!ini && d < ini && convEmAberto(p)); };
+/* "Pagar convênio": o responsável pagou tudo o que estava em aberto do convênio até o mês escolhido */
+function abertosDoConvenio(S, convenioId, fim = '') {
+  const ats = new Set(S.atendimentos.filter(x => x.status === 'concluido').map(x => x.id));
+  return S.parcelas.filter(p => p.convenioId === convenioId && p.forma === 'convenio' && ats.has(p.atendimentoId) && convEmAberto(p) && (!fim || dataCompetenciaConv(p.data) <= fim))
+    .sort((a, b) => a.data.localeCompare(b.data) || a.id.localeCompare(b.id));
+}
+function pagarConvenioTodo(S, a, convenioId, parcelaIds, d) {
+  exigirConvenios(S, a);
+  const cv = S.convenios.find(x => x.id === convenioId); if (!cv) throw new Error('Convênio não encontrado.');
+  const ids = new Set(parcelaIds || []), ps = abertosDoConvenio(S, convenioId).filter(p => ids.has(p.id));
+  if (!ps.length) throw new Error('Marque ao menos um serviço em aberto.');
+  const total = sum(ps.map(p => totalConv(p) - (p.acertado || 0)));
+  return transacao(S, () => { const lib = ps.map(p => registrarAcerto(S, a, p.id, { ...d, valor: totalConv(p) - (p.acertado || 0) }));
+    audit(S, a, 'Convênio pago (tudo)', `${cv.nome} · ${ps.length} serviço(s) · ${brl(total)} · ${dataHora(d.data, d.hora)}`);
+    return { n: ps.length, total, liberado: sum(lib) }; });
+}
 function resumoConvenios(S, ini, fim) {
-  const ps = S.parcelas.filter(p => p.forma === 'convenio' && p.situacao !== 'cancelado' && ((!ini || p.data >= ini) && (!fim || p.data <= fim) || (ini && p.data < ini && convEmAberto(p))));
-  return S.convenios.filter(cv => !cv.excluido || ps.some(p => p.convenioId === cv.id)).map(cv => { const l = ps.filter(p => p.convenioId === cv.id), ant = ini ? l.filter(p => p.data < ini) : [];
+  const ps = S.parcelas.filter(p => p.forma === 'convenio' && p.situacao !== 'cancelado' && convNoPeriodo(p, ini, fim));
+  return S.convenios.filter(cv => !cv.excluido || ps.some(p => p.convenioId === cv.id)).map(cv => { const l = ps.filter(p => p.convenioId === cv.id), ant = ini ? l.filter(p => dataCompetenciaConv(p.data) < ini) : [];
     const repassado = sum((S.repasses || []).filter(r => r.convenioId === cv.id).map(r => r.valor));
     const devidoTotal = sum(S.parcelas.filter(p => p.convenioId === cv.id && p.situacao !== 'cancelado').map(repasseDevido));
     return { cv, servicos: l.length, servico: sum(l.map(p => p.valor)), acrescimo: sum(l.map(p => p.acrescimo || 0)), gerado: sum(l.map(totalConv)), pago: sum(l.map(p => p.acertado)), pendente: sum(l.map(p => totalConv(p) - p.acertado)),
@@ -3203,41 +3252,80 @@ function salvarPacote(S, a, d) {
   if (nome.length < 3) throw new Error('Dê um nome ao pacote. Ex.: Pacote 4 escovas.');
   const sv = S.servicos.find(x => x.id === d.servicoId && x.ativo);
   if (!sv) throw new Error('Escolha o serviço do pacote.');
-  const sessoes = parseInt(d.sessoes, 10);
-  if (!(sessoes >= 2 && sessoes <= 20)) throw new Error('O pacote precisa ter de 2 a 20 sessões.');
+  // composição: o que a cliente pode usar (ex.: 4 manicures + 1 pedicure). Sem composição = N sessões do serviço do pacote.
+  const itens = normalizarItensPacote(S, d.itens);
+  const sessoes = itens.length ? sum(itens.map(x => x.qtd)) : parseInt(d.sessoes, 10);
+  if (!(sessoes >= 1 && sessoes <= 30)) throw new Error('O pacote precisa ter de 1 a 30 sessões.');
+  if (!itens.length && sessoes < 2) throw new Error('O pacote precisa ter pelo menos 2 sessões.');
   if (!(d.preco > 0)) throw new Error('Informe o valor do pacote.');
   const validade = parseInt(d.validadeDias, 10) || 0;
-  const dados = { nome, servicoId: sv.id, sessoes, preco: d.preco, validadeDias: validade, descricao: String(d.descricao || '').trim(), ativo: d.ativo !== false };
-  if (d.id) { const pc = S.pacotes.find(x => x.id === d.id); Object.assign(pc, dados); audit(S, a, 'Pacote editado', `${nome} · ${sessoes} sessões · ${brl(d.preco)}`); return pc; }
+  const dados = { nome, servicoId: sv.id, sessoes, itens, preco: d.preco, validadeDias: validade, descricao: String(d.descricao || '').trim(), ativo: d.ativo !== false };
+  const txt = itens.length ? itens.map(x => `${x.qtd}x ${S.servicos.find(k => k.id === x.servicoId)?.nome || ''}`).join(' + ') : `${sessoes}x ${sv.nome}`;
+  if (d.id) { const pc = S.pacotes.find(x => x.id === d.id); Object.assign(pc, dados); audit(S, a, 'Pacote editado', `${nome} · ${txt} · ${brl(d.preco)}`); return pc; }
   const pc = { id: uid('pk'), ...dados, criadoEm: TODAY }; S.pacotes.push(pc);
-  audit(S, a, 'Pacote cadastrado', `${nome} · ${sessoes}x ${sv.nome} · ${brl(d.preco)}`); return pc;
+  audit(S, a, 'Pacote cadastrado', `${nome} · ${txt} · ${brl(d.preco)}`); return pc;
 }
+function normalizarItensPacote(S, itens) {
+  const m = new Map();
+  for (const it of itens || []) { const q = parseInt(it.qtd, 10) || 0; if (!it.servicoId || q <= 0) continue;
+    if (!S.servicos.some(x => x.id === it.servicoId)) throw new Error('Serviço da composição não encontrado.');
+    m.set(it.servicoId, (m.get(it.servicoId) || 0) + q); }
+  return [...m.entries()].map(([servicoId, qtd]) => ({ servicoId, qtd }));
+}
+/* o que a venda dá direito: a composição do pacote, ou N sessões do serviço do pacote */
+const itensVenda = v => v.itens && v.itens.length ? v.itens : [{ servicoId: v.servicoId, qtd: v.sessoes }];
 const sessoesDaVenda = (S, vendaId) => S.agendamentos.filter(x => x.pacoteVendaId === vendaId).sort((p, q) => (p.data + p.inicio).localeCompare(q.data + q.inicio));
+const USADA = x => ['concluido', 'faltou'].includes(x.status);
 function situacaoVenda(S, v) {
-  const ags = sessoesDaVenda(S, v.id), usadas = ags.filter(x => ['concluido', 'faltou'].includes(x.status)).length, marcadas = ags.filter(x => ABERTOS.includes(x.status)).length;
-  const livres = Math.max(0, v.sessoes - usadas - marcadas), vencido = v.validoAte && v.validoAte < TODAY && (livres + marcadas) > 0;
-  return { ags, usadas, marcadas, livres, concluidas: ags.filter(x => x.status === 'concluido').length, vencido, encerrado: usadas >= v.sessoes, proxima: ags.find(x => ABERTOS.includes(x.status) && x.data >= TODAY) || null };
+  const ags = sessoesDaVenda(S, v.id), usadas = ags.filter(USADA).length, marcadas = ags.filter(x => ABERTOS.includes(x.status)).length;
+  const cancelado = !!v.cancelado;
+  const livres = cancelado ? 0 : Math.max(0, v.sessoes - usadas - marcadas), vencido = !cancelado && v.validoAte && v.validoAte < TODAY && (livres + marcadas) > 0;
+  const itens = itensVenda(v).map(it => { const l = ags.filter(x => x.servicoId === it.servicoId), u = l.filter(USADA).length, m = l.filter(x => ABERTOS.includes(x.status)).length;
+    return { ...it, usadas: u, marcadas: m, livres: cancelado ? 0 : Math.max(0, Math.min(it.qtd - u - m, livres)) }; });
+  return { ags, usadas, marcadas, livres, itens, cancelado, concluidas: ags.filter(x => x.status === 'concluido').length, vencido, encerrado: cancelado || usadas >= v.sessoes, proxima: cancelado ? null : ags.find(x => ABERTOS.includes(x.status) && x.data >= TODAY) || null };
+}
+/* serviço que a sessão pode usar: o pedido (se ainda tem saldo dele) ou o primeiro com saldo */
+function servicoDaSessao(S, v, st, servicoId, ignorarAg = null) {
+  const its = itensVenda(v);
+  const saldo = id => { const it = its.find(x => x.servicoId === id); if (!it) return -1;
+    const l = st.ags.filter(x => x.id !== (ignorarAg && ignorarAg.id) && x.servicoId === id && (USADA(x) || ABERTOS.includes(x.status))).length; return it.qtd - l; };
+  if (servicoId) { const sv = S.servicos.find(x => x.id === servicoId), r = saldo(servicoId);
+    if (r < 0) throw new Error(`${sv ? sv.nome : 'Este serviço'} não faz parte do pacote ${v.nome}.`);
+    if (r === 0) throw new Error(`Todas as sessões de ${sv ? sv.nome : 'este serviço'} do pacote já foram marcadas ou usadas.`);
+    return servicoId; }
+  const it = its.find(x => saldo(x.servicoId) > 0); if (!it) throw new Error(`Todas as ${v.sessoes} sessões deste pacote já estão marcadas ou usadas.`);
+  return it.servicoId;
 }
 /* texto do saldo do pacote para o WhatsApp: quantas usou, quantas restam e cada sessão com data */
 function waPacoteCtx(S, v) {
   const st = situacaoVenda(S, v), ags = st.ags.filter(x => x.status !== 'cancelado'), dia = d => `${['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][fromIso(d).getDay()]}, ${dBR(d).slice(0, 5)}`;
+  const misto = itensVenda(v).length > 1, nomeSv = id => S.servicos.find(x => x.id === id)?.nome || '';
   const linhas = Array.from({ length: v.sessoes }, (_, i) => { const x = ags[i];
     if (!x) return `${i + 1}ª sessão: a agendar`;
-    const quando = `${dia(x.data)} às ${x.inicio}`;
+    const quando = `${dia(x.data)} às ${x.inicio}${misto ? ` (${nomeSv(x.servicoId)})` : ''}`;
     return `${i + 1}ª sessão: ${quando} · ${x.status === 'concluido' ? 'feita ✓' : x.status === 'faltou' ? 'falta (contou como usada)' : 'marcada'}`; });
   return { pacote: `${v.nome} (${v.codigo})`, pacote_usadas: st.usadas, pacote_restantes: Math.max(0, v.sessoes - st.usadas), pacote_total: v.sessoes, pacote_sessoes: linhas.join('\n'),
-    pacote_validade: v.validoAte ? `Seu pacote vale até ${dBR(v.validoAte)}.` : '', servico: (S.servicos.find(x => x.id === v.servicoId) || {}).nome || '', profissional: (S.funcionarios.find(f => f.id === v.funcId)?.nome || '').split(' ')[0] };
+    pacote_validade: v.validoAte ? `Seu pacote vale até ${dBR(v.validoAte)}.` : '', servico: misto ? itensVenda(v).map(x => `${x.qtd}x ${nomeSv(x.servicoId)}`).join(' + ') : nomeSv(v.servicoId), profissional: (S.funcionarios.find(f => f.id === v.funcId)?.nome || '').split(' ')[0] };
 }
+const obsSessao = (S, v, n, servicoId) => `${v.codigo} · sessão ${n} de ${v.sessoes}${itensVenda(v).length > 1 ? ' · ' + (S.servicos.find(x => x.id === servicoId)?.nome || '') : ''}`;
 function agendarSessaoPacote(S, a, vendaId, d) {
   const v = (S.pacoteVendas || []).find(x => x.id === vendaId); if (!v) throw new Error('Pacote não encontrado.');
+  if (v.cancelado) throw new Error('Este pacote foi estornado.');
   const st = situacaoVenda(S, v);
   if (st.livres <= 0) throw new Error(`Todas as ${v.sessoes} sessões deste pacote já estão marcadas ou usadas.`);
   if (v.validoAte && d.data > v.validoAte) throw new Error(`O pacote vale até ${dBR(v.validoAte)}. Escolha uma data até lá.`);
   if (!d.data || !d.inicio) throw new Error('Escolha o dia e o horário da sessão.');
-  const sv = S.servicos.find(x => x.id === v.servicoId), funcId = d.funcId || v.funcId;
+  const servicoId = servicoDaSessao(S, v, st, d.servicoId), sv = S.servicos.find(x => x.id === servicoId);
+  let funcId = d.funcId || v.funcId;
+  if (sv && !sv.funcs.includes(funcId)) { const outra = sv.funcs.find(id => S.funcionarios.find(f => f.id === id)?.ativo); if (d.funcId || !outra) throw new Error(`${S.funcionarios.find(f => f.id === funcId)?.nome || 'A profissional'} não faz ${sv.nome}.`); funcId = outra; }
   const n = st.ags.filter(x => !INATIVOS.includes(x.status)).length + 1;
-  return salvarAgendamento(S, a, { clienteId: v.clienteId, servicoId: v.servicoId, funcId, data: d.data, inicio: d.inicio, fim: fromMin(toMin(d.inicio) + (sv?.duracao || 60)),
-    status: 'confirmado', canal: 'presencial', obs: `${v.codigo} · sessão ${n} de ${v.sessoes}`, preco: 0, pacoteVendaId: v.id });
+  return salvarAgendamento(S, a, { clienteId: v.clienteId, servicoId, funcId, data: d.data, inicio: d.inicio, fim: d.fim || fromMin(toMin(d.inicio) + (sv?.duracao || 60)),
+    status: 'confirmado', canal: 'presencial', obs: obsSessao(S, v, n, servicoId), preco: 0, pacoteVendaId: v.id });
+}
+/* várias sessões no mesmo dia (ex.: a mão e o pé): uma depois da outra */
+function agendarSessoesPacote(S, a, vendaId, d) {
+  const ids = (d.servicoIds || []).filter(Boolean); if (!ids.length) return [agendarSessaoPacote(S, a, vendaId, d)];
+  return transacao(S, () => { let ini = d.inicio; return ids.map(servicoId => { const id = agendarSessaoPacote(S, a, vendaId, { ...d, servicoId, inicio: ini, fim: '' }); ini = S.agendamentos.find(x => x.id === id).fim; return id; }); });
 }
 function venderPacote(S, a, d) {
   if (!isOwner(a)) { exigirAcesso(S, a); if (!pode(S, a, 'registrar')) throw new Error('Seu usuário não registra vendas. Quem vende pacote é a recepção.'); }
@@ -3247,33 +3335,86 @@ function venderPacote(S, a, d) {
   const sv = S.servicos.find(x => x.id === pc.servicoId);
   const funcId = d.funcId || sv?.funcs[0];
   if (!sv || !sv.funcs.includes(funcId)) throw new Error(`Escolha uma profissional que faz ${sv ? sv.nome : 'o serviço'}.`);
-  const sessoes = (d.sessoes || []).filter(x => x && x.data && x.inicio);
-  if (sessoes.length > pc.sessoes) throw new Error(`Este pacote tem ${pc.sessoes} sessões.`);
+  const sessoes = (d.sessoes || []).filter(x => x && x.data && x.inicio), conv = (d.converter || []).map(id => S.agendamentos.find(x => x.id === id)).filter(Boolean);
+  if (sessoes.length + conv.length > pc.sessoes) throw new Error(`Este pacote tem ${pc.sessoes} sessões.`);
+  conv.forEach(x => { if (!ABERTOS.includes(x.status)) throw new Error('O horário que vira sessão do pacote já foi concluído ou cancelado.'); if (x.clienteId !== d.clienteId) throw new Error('O horário que vira sessão do pacote é de outra cliente.'); if (x.pacoteVendaId) throw new Error('Este horário já é sessão de um pacote.'); });
   return transacao(S, () => {
     const valor = d.valor > 0 ? d.valor : pc.preco;
     const [at] = registrarAtendimentoGrupo(S, a, { clienteId: d.clienteId, data: d.data || TODAY, hora: d.hora, desconto: 0, obs: `Pacote: ${pc.nome}`, parcelas: d.parcelas && d.parcelas.length ? d.parcelas : [{ forma: 'pix', valor }],
       itens: [{ funcId, servicoId: sv.id, valorCobrado: valor }] });
     S.seq.pk = (S.seq.pk || 0) + 1;
-    const v = { id: uid('pv'), codigo: 'PCT-' + S.seq.pk, pacoteId: pc.id, nome: pc.nome, servicoId: sv.id, funcId, clienteId: d.clienteId, sessoes: pc.sessoes, valor, atendimentoId: at.id,
+    const v = { id: uid('pv'), codigo: 'PCT-' + S.seq.pk, pacoteId: pc.id, nome: pc.nome, servicoId: sv.id, ...(pc.itens && pc.itens.length ? { itens: pc.itens.map(x => ({ ...x })) } : {}), funcId, clienteId: d.clienteId, sessoes: pc.sessoes, valor, atendimentoId: at.id,
       data: d.data || TODAY, validoAte: pc.validadeDias ? addDays(d.data || TODAY, pc.validadeDias) : '', vendidoPor: a.nome, criadoEm: stamp() };
     S.pacoteVendas = S.pacoteVendas || []; S.pacoteVendas.push(v);
     at.pacoteVendaId = v.id;
+    // horário já marcado (serviço avulso) que a cliente trocou pelo pacote: vira sessão do pacote
+    conv.forEach(x => { const st = situacaoVenda(S, v), servicoId = servicoDaSessao(S, v, st, itensVenda(v).some(i => i.servicoId === x.servicoId) ? x.servicoId : '');
+      const n = st.ags.filter(y => !INATIVOS.includes(y.status)).length + 1;
+      x.pacoteVendaId = v.id; x.preco = 0; x.servicoId = servicoId; x.obs = [obsSessao(S, v, n, servicoId), x.obs].filter(Boolean).join(' · ');
+      x.historico.push({ quando: stamp(), usuario: a.nome, texto: `Trocado pelo pacote ${v.codigo} (vira a sessão ${n})` });
+      if (d.concluirConvertidos) concluirSessaoPacote(S, a, x.id); });
     sessoes.forEach(x => agendarSessaoPacote(S, a, v.id, x));
-    audit(S, a, 'Pacote vendido', `${v.codigo} · ${pc.nome} · ${S.clientes.find(k => k.id === d.clienteId)?.nome || ''} · ${brl(valor)} · ${sessoes.length} de ${pc.sessoes} sessões marcadas`);
+    audit(S, a, 'Pacote vendido', `${v.codigo} · ${pc.nome} · ${S.clientes.find(k => k.id === d.clienteId)?.nome || ''} · ${brl(valor)} · ${sessoes.length + conv.length} de ${pc.sessoes} sessões marcadas${conv.length ? ` (${conv.length} trocada(s) do agendamento)` : ''}`);
     return v;
   });
 }
-/* sessão do pacote atendida: conclui o horário sem nova cobrança (já foi pago na venda) */
-function concluirSessaoPacote(S, a, agId) {
+/* venda lançada errado: troca o pacote, o valor ou a profissional sem estornar.
+   O registro da venda, a forma de pagamento e a comissão são ajustados juntos; as sessões continuam. */
+function editarVendaPacote(S, a, vendaId, d) {
+  exigirDono(a);
+  const v = (S.pacoteVendas || []).find(x => x.id === vendaId); if (!v) throw new Error('Pacote não encontrado.');
+  if (v.cancelado) throw new Error('Este pacote foi estornado e não pode ser editado.');
+  const motivo = String(d.motivo || '').trim(); if (motivo.length < 5) throw new Error('Descreva o motivo da correção.');
+  const pc = (S.pacotes || []).find(x => x.id === (d.pacoteId || v.pacoteId)); if (!pc) throw new Error('Escolha o pacote.');
+  const valor = d.valor > 0 ? d.valor : pc.preco, sv = S.servicos.find(x => x.id === pc.servicoId);
+  const funcId = d.funcId || v.funcId, func = S.funcionarios.find(f => f.id === funcId);
+  if (!sv || !sv.funcs.includes(funcId)) throw new Error(`Escolha uma profissional que faz ${sv ? sv.nome : 'o serviço do pacote'}.`);
+  const at = S.atendimentos.find(x => x.id === v.atendimentoId);
+  const obs = at ? S.obrigacoes.filter(o => o.atendimentoId === at.id && !o.cancelada) : [], ps = obs.map(o => S.parcelas.find(p => p.id === o.parcelaId)).filter(Boolean);
+  const mudaValor = at && (valor !== at.valorFinal || funcId !== at.funcId);
+  if (mudaValor && obs.some(o => o.fechado > 0)) throw new Error('A comissão desta venda já entrou em fechamento. Corrija com um ajuste no próximo fechamento.');
+  if (mudaValor && ps.some(p => (p.acertado || 0) > 0)) throw new Error('O convênio desta venda já tem pagamento registrado.');
+  const st0 = situacaoVenda(S, v), ativas = st0.ags.filter(x => USADA(x) || ABERTOS.includes(x.status));
+  if (ativas.length > pc.sessoes) throw new Error(`A cliente já tem ${ativas.length} sessões marcadas ou usadas e o pacote ${pc.nome} tem ${pc.sessoes}. Desmarque sessões antes.`);
+  return transacao(S, () => {
+    const antes = `${v.nome} · ${brl(v.valor)} · ${S.funcionarios.find(f => f.id === v.funcId)?.nome || ''}`;
+    Object.assign(v, { pacoteId: pc.id, nome: pc.nome, servicoId: sv.id, sessoes: pc.sessoes, valor, funcId, validoAte: pc.validadeDias ? addDays(v.data, pc.validadeDias) : '' });
+    if (pc.itens && pc.itens.length) v.itens = pc.itens.map(x => ({ ...x })); else delete v.itens;
+    if (at && (mudaValor || at.servicoId !== sv.id)) {
+      const pct = func.pct || 0, com = Engine.comissao(valor, pct);
+      const vals = ps.length === 1 ? [valor] : Engine.ratear(valor, ps.map(p => p.valor || 0)), coms = Engine.ratear(com, vals);
+      ps.forEach((p, i) => { const o = obs.find(x => x.parcelaId === p.id); Object.assign(p, { valor: vals[i], comissao: coms[i], parteSalao: vals[i] - coms[i], funcId }); if (p.forma === 'convenio') p.acrescimo = Engine.acrescimo(vals[i], Number(p.taxaPct || 0)); Object.assign(o, { comissao: coms[i], funcId, liberado: Engine.liberadoParcela(p, coms[i]) }); });
+      Object.assign(at, { servicoId: sv.id, funcId, valorCobrado: valor + (at.desconto || 0), valorFinal: valor, pct, comissaoTotal: com, parteSalao: valor - com, obs: `Pacote: ${pc.nome}`, corrigidoEm: stamp(), corrigidoPor: a.nome });
+    }
+    // sessões ainda abertas com serviço que não está no pacote novo passam para um serviço do pacote
+    const st = situacaoVenda(S, v); let n = 0;
+    st.ags.filter(x => !INATIVOS.includes(x.status)).forEach(x => { n++;
+      if (ABERTOS.includes(x.status) && !itensVenda(v).some(i => i.servicoId === x.servicoId)) { const novo = servicoDaSessao(S, v, situacaoVenda(S, v), '', x), s2 = S.servicos.find(k => k.id === novo);
+        x.servicoId = novo; x.fim = fromMin(toMin(x.inicio) + (s2?.duracao || 60)); }
+      x.obs = obsSessao(S, v, n, x.servicoId); });
+    audit(S, a, 'Venda de pacote corrigida', `${v.codigo} · ${antes} → ${v.nome} · ${brl(valor)} · ${func.nome} · ${motivo}`);
+    return v;
+  });
+}
+/* sessão do pacote atendida: conclui o horário sem nova cobrança (já foi pago na venda).
+   Pode trocar o serviço da sessão (ex.: era mão e a cliente fez o pé) dentro do que o pacote dá direito. */
+function concluirSessaoPacote(S, a, agId, servicoId = '') {
   const ag = S.agendamentos.find(x => x.id === agId);
   if (!ag || !ag.pacoteVendaId) throw new Error('Este horário não é de pacote.');
   if (!(isOwner(a) || podeRegistrarPara(S, a, ag.funcId) || podeAgendarPara(S, a, ag.funcId))) throw new Error('Sem permissão para concluir esta sessão.');
   if (!ABERTOS.includes(ag.status)) throw new Error('Esta sessão já foi concluída ou cancelada.');
   const v = S.pacoteVendas.find(x => x.id === ag.pacoteVendaId);
+  if (v?.cancelado) throw new Error('Este pacote foi estornado.');
+  const naComp = !(v.itens && v.itens.length) || itensVenda(v).some(i => i.servicoId === ag.servicoId);
+  if (servicoId && servicoId !== ag.servicoId || !naComp) {
+    const novo = servicoDaSessao(S, v, situacaoVenda(S, v), servicoId || '', ag), nm = id => S.servicos.find(x => x.id === id)?.nome || '';
+    if (novo !== ag.servicoId) { ag.historico.push({ quando: stamp(), usuario: a.nome, texto: `Serviço da sessão: ${nm(ag.servicoId)} → ${nm(novo)}` }); ag.servicoId = novo; }
+    const ativos = situacaoVenda(S, v).ags.filter(x => !INATIVOS.includes(x.status)); ag.obs = obsSessao(S, v, ativos.indexOf(ag) + 1, novo);
+  }
   ag.status = 'concluido'; ag.historico.push({ quando: stamp(), usuario: a.nome, texto: `Sessão do pacote ${v?.codigo || ''} concluída (já pago na venda)` });
   if (S.estoqueMov) baixarConsumo(S, a, ag.servicoId, ag.id, v?.codigo || '', ag.data);
   const st = situacaoVenda(S, v);
-  audit(S, a, 'Sessão de pacote concluída', `${v?.codigo} · ${st.usadas} de ${v?.sessoes} usadas`);
+  audit(S, a, 'Sessão de pacote concluída', `${v?.codigo} · ${S.servicos.find(x => x.id === ag.servicoId)?.nome || ''} · ${st.usadas} de ${v?.sessoes} usadas`);
   return st;
 }
 
@@ -3304,7 +3445,8 @@ function nivelCliente(S, clienteId, hoje = TODAY, gastos = null) {
    no registro de serviços e no formulário do cliente, mas não em fechamento e pagamentos. */
 const donaFunc = S => S.funcionarios.find(f => f.dona);
 const ehDona = f => !!(f && f.dona);
-const equipeComissao = S => S.funcionarios.filter(f => !f.dona);
+// a proprietária entra no fechamento quando tem comissão (percentual maior que zero) ou serviços já com comissão
+const equipeComissao = S => S.funcionarios.filter(f => !f.dona || f.pct > 0 || S.obrigacoes.some(o => o.funcId === f.id && !o.cancelada && o.comissao > 0));
 function garantirDona(S, id) {
   if (donaFunc(S)) return donaFunc(S);
   const u = S.users.find(x => x.papel === 'proprietaria');
@@ -3325,7 +3467,11 @@ function salvarAtendimentoDona(S, a, d) {
   const sim = parseInt(d.simultaneos, 10);
   const antes = S.servicos.filter(sv => sv.funcs.includes(f.id)).map(sv => sv.id);
   S.servicos.forEach(sv => { const tem = sv.funcs.includes(f.id), quer = d.atende !== false && marcados.has(sv.id); if (tem && !quer) sv.funcs = sv.funcs.filter(x => x !== f.id); if (!tem && quer) sv.funcs = [...sv.funcs, f.id]; });
-  Object.assign(f, { ativo: d.atende !== false, simultaneos: sim >= 1 && sim <= SIMULT_MAX ? sim : f.simultaneos || 1, especialidades: String(d.especialidades ?? f.especialidades ?? '').trim(), nome: S.users.find(x => x.papel === 'proprietaria')?.nome || f.nome });
+  const pctAntes = f.pct || 0, pct = d.pct === undefined || d.pct === '' ? pctAntes : Number(String(d.pct).replace(',', '.'));
+  if (!(pct >= 0 && pct <= 100)) throw new Error('O percentual de comissão deve estar entre 0 e 100.');
+  Object.assign(f, { ativo: d.atende !== false, pct, simultaneos: sim >= 1 && sim <= SIMULT_MAX ? sim : f.simultaneos || 1, especialidades: String(d.especialidades ?? f.especialidades ?? '').trim(), nome: S.users.find(x => x.papel === 'proprietaria')?.nome || f.nome });
+  if (pct !== pctAntes) audit(S, a, 'Comissão da proprietária', `${pctAntes}% → ${pct}%`);
+  if (d.recalcularDesde) recalcularComissoes(S, a, f.id, d.recalcularDesde);
   const depois = S.servicos.filter(sv => sv.funcs.includes(f.id)).map(sv => sv.id);
   const nome = id => S.servicos.find(x => x.id === id)?.nome;
   const add = depois.filter(x => !antes.includes(x)).map(nome), rem = antes.filter(x => !depois.includes(x)).map(nome);
@@ -3333,6 +3479,24 @@ function salvarAtendimentoDona(S, a, d) {
   return f;
 }
 
+/* aplica o percentual atual da profissional aos serviços já registrados a partir de uma data
+   (só os que ainda não entraram em fechamento) */
+function recalcularComissoes(S, a, funcId, desde) {
+  exigirDono(a);
+  const f = S.funcionarios.find(x => x.id === funcId); if (!f) throw new Error('Profissional não encontrada.');
+  if (!desde) throw new Error('Informe a data inicial.');
+  let n = 0, total = 0;
+  S.atendimentos.filter(at => at.funcId === funcId && at.status === 'concluido' && at.data >= desde && at.pct !== f.pct).forEach(at => {
+    const obs = S.obrigacoes.filter(o => o.atendimentoId === at.id && !o.cancelada);
+    if (obs.some(o => o.fechado > 0)) return;
+    const ps = obs.map(o => S.parcelas.find(p => p.id === o.parcelaId)).filter(Boolean);
+    const com = Engine.comissao(Math.max(at.valorFinal, 0), f.pct), partes = Engine.ratear(com, ps.map(p => Math.max(p.valor || 0, 0)));
+    ps.forEach((p, i) => { const o = obs.find(x => x.parcelaId === p.id); p.comissao = partes[i]; p.parteSalao = p.valor - partes[i]; o.comissao = partes[i]; o.liberado = Engine.liberadoParcela(p, partes[i]); });
+    at.pct = f.pct; at.comissaoTotal = com; at.parteSalao = at.valorFinal - com; n++; total += com;
+  });
+  audit(S, a, 'Comissões recalculadas', `${f.nome} · ${f.pct}% desde ${dBR(desde)} · ${n} serviço(s) · ${brl(total)}`);
+  return { n, total };
+}
 function salvarFuncionario(S, a, d) {
   exigirDono(a);
   if (!d.nome || !d.nome.trim()) throw new Error('Informe o nome completo.');
@@ -3587,7 +3751,7 @@ function registrarSinal(S, a, agId, d) {
   if (!ABERTOS.includes(ag.status)) throw new Error('Só dá para registrar sinal em horário ainda não atendido.');
   if (sinalDoAtendimento(S, ag)) throw new Error('Este atendimento já tem sinal registrado.');
   if (!(d.valor > 0)) throw new Error('Informe o valor do sinal.');
-  if (!['pix', 'debito', 'credito'].includes(d.forma)) throw new Error('Forma do sinal: Pix ou cartão.');
+  if (!['pix', 'debito', 'credito', 'dinheiro'].includes(d.forma)) throw new Error('Forma do sinal: Pix, cartão ou dinheiro.');
   const g = grupoDe(S, ag); S.seq.sn = (S.seq.sn || 0) + 1;
   const sn = { id: uid('sn'), codigo: 'SN-' + S.seq.sn, valor: d.valor, forma: d.forma, data: d.data || TODAY, hora: horaValida(d.hora), por: a.nome, em: stamp(), usadoEm: '' };
   g[0].sinal = sn;
@@ -3767,7 +3931,7 @@ function venderProduto(S, a, d) {
   if (!isOwner(a)) { exigirAcesso(S, a); if (!(pode(S, a, 'estoque') || pode(S, a, 'registrar'))) throw new Error('Seu usuário não registra vendas. Quem vende é a recepção.'); }
   const itens = (d.itens || []).filter(x => x.itemId);
   if (!itens.length) throw new Error('Adicione pelo menos um produto.');
-  if (!['pix', 'debito', 'credito'].includes(d.forma)) throw new Error('Escolha a forma de pagamento.');
+  if (!['pix', 'debito', 'credito', 'dinheiro'].includes(d.forma)) throw new Error('Escolha a forma de pagamento.');
   const linhas = itens.map(x => { const it = itemEst(S, x.itemId), q = Number(String(x.qtd ?? 1).replace(',', '.'));
     if (!it || it.excluido || it.ativo === false) throw new Error('Produto não encontrado.');
     if (it.uso === 'consumo') throw new Error(`${it.nome} é material de trabalho, não está à venda. Mude o cadastro para vender.`);
@@ -4394,14 +4558,14 @@ function runTests() {
     exc.exclusivo = false;
     return (/3 clientes ao mesmo tempo/.test(quarta) && depois && /sozinha/.test(sozinha)) || JSON.stringify([quarta, depois, sozinha]);
   });
-  T('Convênio em 3x: parcelas mês a mês, mínimo de R$ 50 e acerto quitando na ordem', () => {
+  T('Convênio em 3x: parcelas vencendo no dia 10 de cada mês, mínimo de R$ 50 e acerto quitando na ordem', () => {
     const S7 = seedBase(), d7 = S7.users.find(u => u.id === 'u0'), dia = '2026-10-19';
     const cvId = S7.convenios[0].id; S7.convenios[0].taxa = 0;
     const menor = deveFalhar(() => registrarAtendimentoGrupo(S7, d7, { clienteId: 'k1', data: TODAY, itens: [{ funcId: 'f1', servicoId: 's1', valorCobrado: 12000 }], parcelas: [{ forma: 'convenio', valor: 12000, convenioId: cvId, nParcelas: 3 }] }));
     const [at] = registrarAtendimentoGrupo(S7, d7, { clienteId: 'k1', data: TODAY, itens: [{ funcId: 'f1', servicoId: 's1', valorCobrado: 15000 }], parcelas: [{ forma: 'convenio', valor: 15000, convenioId: cvId, nParcelas: 3 }] });
     const p = S7.parcelas.find(x => x.atendimentoId === at.id); p.data = dia;
     const q = parcelasConvenio(p, '2026-10-20');
-    const datas = q.map(x => x.vencimento).join(',') === '2026-11-19,2026-12-19,2027-01-19' && q.every(x => x.valor === 5000);
+    const datas = q.map(x => x.vencimento).join(',') === '2026-11-10,2026-12-10,2027-01-10' && q.every(x => x.valor === 5000);
     registrarAcerto(S7, d7, p.id, { valor: 7000, data: TODAY, hora: '10:00' });
     const q2 = parcelasConvenio(p, '2026-12-25');
     return (/mínimo por parcela/.test(menor) && datas && q2[0].situacao === 'paga' && q2[1].pago === 2000 && q2[1].situacao === 'vencida' && q2[2].situacao === 'aberta') || JSON.stringify([menor, q, q2]);
@@ -4409,7 +4573,7 @@ function runTests() {
   T('Cliente com valor em aberto no convênio: novo convênio bloqueado sem liberação; Pix liberado; liberação vale uma vez', () => {
     const S8 = seedBase(), d8 = S8.users.find(u => u.id === 'u0'), cvId = S8.convenios[0].id;
     const [at] = registrarAtendimentoGrupo(S8, d8, { clienteId: 'k2', data: TODAY, itens: [{ funcId: 'f1', servicoId: 's1', valorCobrado: 6000 }], parcelas: [{ forma: 'convenio', valor: 6000, convenioId: cvId }] });
-    S8.parcelas.find(x => x.atendimentoId === at.id).data = addDays(TODAY, -40);   // vencida há ~10 dias
+    S8.parcelas.find(x => x.atendimentoId === at.id).data = addDays(TODAY, -70);   // mês de dois meses atrás: já venceu no dia 10
     const novo = () => registrarAtendimentoGrupo(S8, d8, { clienteId: 'k2', data: TODAY, itens: [{ funcId: 'f1', servicoId: 's1', valorCobrado: 6000 }], parcelas: [{ forma: 'convenio', valor: 6000, convenioId: cvId }] });
     const bloq = deveFalhar(novo);
     const pix = !deveFalhar(() => registrarAtendimentoGrupo(S8, d8, { clienteId: 'k2', data: TODAY, itens: [{ funcId: 'f1', servicoId: 's1', valorCobrado: 6000 }], parcelas: [{ forma: 'pix', valor: 6000 }] }));
@@ -4839,6 +5003,62 @@ function runTests() {
     T('Benefício do nível: Platina com 10% de desconto calculado sozinho', () => { G.atendimentos.push({ id: 'atx', status: 'concluido', clienteId: 'k9', data: TODAY, valorFinal: 250000, servicoId: 's1', funcId: 'f1' }); const b = beneficioCliente(G, 'k9'); return b && b.nivel.id === 'platina' && descontoNivel(G, 'k9', 10000) === 1000 && descontoNivel(G, 'k9', 10000, 'produto') === 0 || JSON.stringify(b); });
     T('Metas: a meta do mês vale para os meses seguintes até mudar', () => { salvarMeta(G, dg, { mes: '2026-01', salao: 500000, func: { f1: 100000 } }); const m = metaDoMes(G, '2026-05'); return m.salao === 500000 && m.herdada && m.func.f1 === 100000 && !!deveFalhar(() => salvarMeta(G, rec, { mes: '2026-02', salao: 1 })) || JSON.stringify(m); });
   }
+  T('Convênio: vence dia 10 do mês seguinte e vira no dia 28 (28/11 vence 10/01)', () => {
+    const v = [vencimentoConv('2026-11-20'), vencimentoConv('2026-11-27'), vencimentoConv('2026-11-28'), vencimentoConv('2026-12-30'), vencimentoConv('2026-11-01', 1)];
+    const c = [competenciaConv('2026-11-27'), competenciaConv('2026-11-28'), dataCompetenciaConv('2026-10-29'), dataCompetenciaConv('2026-11-05')];
+    return (v.join() === '2026-12-10,2026-12-10,2027-01-10,2027-02-10,2027-01-10' && c.join() === '2026-11,2026-12,2026-11-01,2026-11-05') || JSON.stringify([v, c]);
+  });
+  T('Fechamento: convênio em aberto aparece bloqueado em toda semana e libera a comissão na semana do pagamento; Pagar convênio quita tudo', () => {
+    const S3 = seedBase(), d3 = S3.users.find(u => u.id === 'u0'), cvId = S3.convenios[0].id; S3.convenios[0].taxa = 0;
+    const [at] = registrarAtendimentoGrupo(S3, d3, { clienteId: 'k1', data: TODAY, itens: [{ funcId: 'f1', servicoId: 's1', valorCobrado: 10000 }], parcelas: [{ forma: 'convenio', valor: 10000, convenioId: cvId }] });
+    const [at2] = registrarAtendimentoGrupo(S3, d3, { clienteId: 'k2', data: TODAY, itens: [{ funcId: 'f1', servicoId: 's1', valorCobrado: 6000 }], parcelas: [{ forma: 'convenio', valor: 6000, convenioId: cvId }] });
+    const p = S3.parcelas.find(x => x.atendimentoId === at.id), p2 = S3.parcelas.find(x => x.atendimentoId === at2.id); p.data = p2.data = addDays(TODAY, -30);
+    const ini = addDays(TODAY, -6), sem = () => resumoFechamento(S3, d3, 'f1', ini, TODAY);
+    const antes = sem(), bloq = antes.cv.filter(r => r.at.id === at.id && r.bloqueado > 0).length === 1 && antes.t.totalFechar === 0;
+    const ab = abertosDoConvenio(S3, cvId).map(x => x.id);
+    const r = pagarConvenioTodo(S3, d3, cvId, ab, { data: TODAY, hora: '10:00', metodo: 'Pix' });
+    const depois = sem(); confirmarFechamento(S3, d3, 'f1', ini, TODAY); const outra = resumoFechamento(S3, d3, 'f1', addDays(TODAY, 7), addDays(TODAY, 13));
+    return (bloq && r.n === 2 && r.total === 16000 && depois.t.totalFechar === 8000 && !outra.cv.length && p.situacao === 'acertado' && p2.situacao === 'acertado') || JSON.stringify([antes.t, r, depois.t, outra.cv.length]);
+  });
+  T('Pacote misto: 4 mãos + 1 pé, escolhe o serviço, faz mão e pé no mesmo dia e não passa do saldo de cada um', () => {
+    const S4 = seedBase(), d4 = S4.users.find(u => u.id === 'u0');
+    const pc = salvarPacote(S4, d4, { nome: 'Pacote 4 mãos e 1 pé', servicoId: 's9', itens: [{ servicoId: 's7', qtd: 4 }, { servicoId: 's8', qtd: 1 }], preco: 14500, validadeDias: 60 });
+    const v = venderPacote(S4, d4, { pacoteId: pc.id, clienteId: 'k2', funcId: 'f2', parcelas: [{ forma: 'dinheiro', valor: 14500 }] });
+    const ids = agendarSessoesPacote(S4, d4, v.id, { data: addDays(TODAY, 2), inicio: '10:00', servicoIds: ['s7', 's8'] });
+    const [a1, a2] = ids.map(id => S4.agendamentos.find(x => x.id === id));
+    const doisPes = deveFalhar(() => agendarSessaoPacote(S4, d4, v.id, { data: addDays(TODAY, 9), inicio: '10:00', servicoId: 's8' }));
+    concluirSessaoPacote(S4, d4, a1.id, 's7'); concluirSessaoPacote(S4, d4, a2.id);
+    const st = situacaoVenda(S4, v), pg = S4.parcelas.find(x => x.atendimentoId === v.atendimentoId);
+    return (pc.sessoes === 5 && a2.inicio === a1.fim && /Pedicure/.test(doisPes) && st.itens.find(i => i.servicoId === 's7').usadas === 1 && st.itens.find(i => i.servicoId === 's8').usadas === 1 && st.livres === 3 && pg.forma === 'dinheiro') || JSON.stringify([a1, a2, doisPes, st.itens]);
+  });
+  T('Pacote: corrigir venda errada troca pacote e valor sem estornar; estorno da venda cancela o pacote e as sessões marcadas', () => {
+    const S5 = seedBase(), d5 = S5.users.find(u => u.id === 'u0');
+    const caro = salvarPacote(S5, d5, { nome: 'Pacote 4 mãos e 1 pé', servicoId: 's9', itens: [{ servicoId: 's7', qtd: 4 }, { servicoId: 's8', qtd: 1 }], preco: 14500 });
+    const certo = salvarPacote(S5, d5, { nome: 'Pacote 4 mãos', servicoId: 's7', sessoes: 4, preco: 10000 });
+    const v = venderPacote(S5, d5, { pacoteId: caro.id, clienteId: 'k3', funcId: 'f2', parcelas: [{ forma: 'pix', valor: 14500 }], sessoes: [{ data: addDays(TODAY, 3), inicio: '10:00', servicoId: 's8' }] });
+    editarVendaPacote(S5, d5, v.id, { pacoteId: certo.id, valor: 10000, motivo: 'vendido o pacote errado' });
+    const at = S5.atendimentos.find(x => x.id === v.atendimentoId), pg = S5.parcelas.find(x => x.atendimentoId === at.id), ob = S5.obrigacoes.find(x => x.parcelaId === pg.id), ses = sessoesDaVenda(S5, v.id)[0];
+    const corr = v.sessoes === 4 && !v.itens && at.valorFinal === 10000 && pg.valor === 10000 && ob.comissao === 5000 && at.status === 'concluido' && ses.servicoId === 's7' && /sessão 1 de 4/.test(ses.obs);
+    estornarAtendimento(S5, d5, at.id, 'cliente desistiu do pacote');
+    const st = situacaoVenda(S5, v);
+    return (corr && v.cancelado && st.encerrado && ses.status === 'cancelado' && /estornado/.test(deveFalhar(() => agendarSessaoPacote(S5, d5, v.id, { data: addDays(TODAY, 5), inicio: '10:00' })))) || JSON.stringify([corr, at, pg, ob, ses, v]);
+  });
+  T('Pacote: horário avulso já marcado vira a 1ª sessão (e pode já concluir no fechamento do serviço)', () => {
+    const S6 = seedBase(), d6 = S6.users.find(u => u.id === 'u0');
+    const pc = salvarPacote(S6, d6, { nome: 'Pacote 4 mãos', servicoId: 's7', sessoes: 4, preco: 10000 });
+    const agId = salvarAgendamento(S6, d6, { clienteId: 'k4', servicoId: 's7', funcId: 'f2', data: TODAY, inicio: '15:00', fim: '15:40', status: 'chegou', preco: 3000 });
+    const v = venderPacote(S6, d6, { pacoteId: pc.id, clienteId: 'k4', funcId: 'f2', parcelas: [{ forma: 'pix', valor: 10000 }], converter: [agId], concluirConvertidos: true });
+    const ag = S6.agendamentos.find(x => x.id === agId), st = situacaoVenda(S6, v);
+    return (ag.pacoteVendaId === v.id && ag.preco === 0 && ag.status === 'concluido' && st.usadas === 1 && st.livres === 3 && S6.atendimentos.filter(x => x.agendamentoId === agId).length === 0) || JSON.stringify([ag, st]);
+  });
+  T('Proprietária com comissão: entra no fechamento e o recálculo vale para os serviços ainda não fechados', () => {
+    const S9 = seedBase(), d9 = S9.users.find(u => u.id === 'u0'), dona = donaFunc(S9) || garantirDona(S9);
+    const [at] = registrarAtendimentoGrupo(S9, d9, { clienteId: 'k1', data: TODAY, itens: [{ funcId: dona.id, servicoId: 's7', valorCobrado: 3000 }], parcelas: [{ forma: 'pix', valor: 3000 }] });
+    const fora = !equipeComissao(S9).some(f => f.id === dona.id) && at.comissaoTotal === 0;
+    salvarAtendimentoDona(S9, d9, { atende: true, servicos: S9.servicos.filter(s => s.funcs.includes(dona.id)).map(s => s.id), pct: '40', recalcularDesde: TODAY });
+    const ob = S9.obrigacoes.find(o => o.atendimentoId === at.id);
+    return (fora && equipeComissao(S9).some(f => f.id === dona.id) && at.comissaoTotal === 1200 && ob.comissao === 1200 && ob.liberado === 1200) || JSON.stringify([fora, at, ob]);
+  });
   return out;
 }
 
@@ -6307,7 +6527,9 @@ function contatosGestao(ags, item) {
   P.remarcar.filter(x => vis.has(x.id)).forEach(x => out.push(item(cliNome(x.clienteId, 'nome'), `<b class="bad-t">Pediu para remarcar</b> · ${quando(x)} ${x.inicio} · ${esc(svs(x))}`,
     `<div class="ct-bts"><button class="btn sm pri" data-ag-edit="${x.id}">Reagendar</button><button class="btn sm ghost" data-remarc-ok="${x.id}">Resolvido</button></div>`)));
   const dispensou = (x, mids) => { const ids = grupoDe(DB, x).map(y => y.id); return (DB.contatos || []).some(c => c.dispensado && c.agendamentoId && ids.includes(c.agendamentoId) && mids.includes(c.modeloId)); };
-  P.confirmar.filter(x => vis.has(x.id) && !dispensou(x, ['confirmacao', 'sinal'])).forEach(x => { const sn = exigeSinal(DB, x.clienteId), pago = sinalDoAtendimento(DB, x);
+  // mensagem de confirmação já enviada pelo WhatsApp: o aviso sai da lista (a cliente responde e a recepção confirma na agenda)
+  const conf = DB.config.whatsapp.modelos.find(m => m.id === 'confirmacao'), enviou = x => { const ids = grupoDe(DB, x).map(y => y.id); return (DB.contatos || []).some(c => c.agendamentoId && ids.includes(c.agendamentoId) && (c.modeloId === 'confirmacao' || (conf && c.modelo === conf.nome))); };
+  P.confirmar.filter(x => vis.has(x.id) && !dispensou(x, ['confirmacao', 'sinal']) && !(enviou(x) && !(exigeSinal(DB, x.clienteId) && !sinalDoAtendimento(DB, x)))).forEach(x => { const sn = exigeSinal(DB, x.clienteId), pago = sinalDoAtendimento(DB, x);
     out.push(item(cliNome(x.clienteId, 'nome'), `Confirmar · ${quando(x)} ${x.inicio} · ${esc(svs(x))}${sn && !pago ? ' · <b class="warn-t">pedir sinal</b>' : pago ? ' · sinal pago' : ''}`,
       `<div class="ct-bts">${sn && !pago ? `${waBtn(`data-wa-ag="${x.id}" data-wa-m="sinal"`, 'Pedir sinal', 'sinal')}<button class="btn sm" data-sinal-reg="${x.id}">Sinal pago</button>` : waBtn(`data-wa-ag="${x.id}" data-wa-m="confirmacao"`, 'Confirmar', 'confirmacao')}<button class="btn sm" data-conf-ok="${x.id}" title="A cliente respondeu que vem">Confirmou</button></div>`)); });
   // faltou hoje ou ontem: mensagem para remarcar (uma vez)
@@ -6345,7 +6567,7 @@ function modalSinal(agId) {
   const x = DB.agendamentos.find(a => a.id === agId); if (!x) return;
   const tot = sum(grupoDe(DB, x).filter(y => !INATIVOS.includes(y.status)).map(y => y.preco || 0)), sug = valorSinal(DB, tot);
   const ov = openModal('Registrar sinal pago', `<div class="note small">${cliNome(x.clienteId)} · ${dBR(x.data)} às ${x.inicio}. O sinal entra no caixa hoje e é descontado do total quando o serviço for registrado. Se a cliente faltar, fica com o salão.</div>
-    <div class="form"><label class="f">Valor (R$)<input id="sn-v" inputmode="decimal" value="${centsInput(sug)}"></label><label class="f">Forma<select id="sn-f">${opt([['pix', 'Pix'], ['debito', 'Cartão de débito'], ['credito', 'Cartão de crédito']], 'pix')}</select></label>
+    <div class="form"><label class="f">Valor (R$)<input id="sn-v" inputmode="decimal" value="${centsInput(sug)}"></label><label class="f">Forma<select id="sn-f">${opt([['pix', 'Pix'], ['debito', 'Cartão de débito'], ['credito', 'Cartão de crédito'], ['dinheiro', 'Dinheiro']], 'pix')}</select></label>
     <label class="f">Data do pagamento<input type="date" id="sn-d" value="${TODAY}"></label>${campoHora('sn-h', 'Hora')}</div>`,
     `<button class="btn" data-close>Cancelar</button><button class="btn pri" id="sn-ok">Registrar sinal</button>`);
   ov.querySelector('#sn-ok').onclick = () => run(() => registrarSinal(DB, ACTOR, agId, { valor: toCents(val('sn-v')), forma: val('sn-f'), data: val('sn-d'), hora: val('sn-h') }), s => `Sinal ${s.codigo} registrado · horário confirmado`).ok && modalAgDetalhe(agId);
@@ -6542,7 +6764,7 @@ function modalVendaProduto(pref = {}) {
     <label class="f">Cliente (opcional)</label>${clientePickerHTML('vp', pref.clienteId || '', false)}
     <div id="vp-ben"></div>
     <div><div class="bar" style="justify-content:space-between;margin-bottom:8px"><span class="sec" style="margin:0">Produtos</span><button class="btn sm" id="vp-add" type="button">+ Adicionar produto</button></div><div id="vp-l" class="stack" style="gap:8px"></div></div>
-    <div class="form"><label class="f">Desconto (R$)<input id="vp-ds" inputmode="decimal" value="0,00"></label><label class="f">Pagamento<select id="vp-f">${opt([['pix', 'Pix'], ['debito', 'Cartão de débito'], ['credito', 'Cartão de crédito']], 'pix')}</select></label>
+    <div class="form"><label class="f">Desconto (R$)<input id="vp-ds" inputmode="decimal" value="0,00"></label><label class="f">Pagamento<select id="vp-f">${opt([['pix', 'Pix'], ['debito', 'Cartão de débito'], ['credito', 'Cartão de crédito'], ['dinheiro', 'Dinheiro']], 'pix')}</select></label>
       <label class="f">Quem vendeu (comissão)<select id="vp-fn">${opt([['', 'Ninguém / sem comissão'], ...vendedores.map(f => [f.id, f.dona ? `${f.nome} · proprietária` : f.nome])], pref.funcId || eu)}</select></label>
       <label class="f">Data<input type="date" id="vp-d" value="${pref.data || TODAY}"></label>${campoHora('vp-h', 'Hora')}
       <label class="f full">Observação (opcional)<input id="vp-o"></label></div>
@@ -7528,6 +7750,7 @@ function pgPainel() {
       ${kpi('Pix', brl(tf('pix')), `${ps.filter(p => p.forma === 'pix').length} parcelas`)}
       ${kpi('Cartão de débito', brl(tf('debito')), `${ps.filter(p => p.forma === 'debito').length} parcelas`)}
       ${kpi('Cartão de crédito', brl(tf('credito')), `${ps.filter(p => p.forma === 'credito').length} parcelas`)}
+      ${tf('dinheiro') ? kpi('Dinheiro', brl(tf('dinheiro')), `${ps.filter(p => p.forma === 'dinheiro').length} parcelas`) : ''}
       ${kpi('Convênios', brl(tf('convenio')), `acertado ${brl(sum(ps.filter(p => p.forma === 'convenio').map(p => p.acertado)))}`, 'info')}
     </div>
     ${pend.length ? `<div class="note warn"><b>${pend.length} pagamento(s) Pix/cartão marcados como pendentes</b> · ${brl(sum(pend.map(p => p.valor)))}. A comissão dessas parcelas só é liberada quando o recebimento for registrado em <a href="#" data-go="financeiro">Pix e Cartão</a>.</div>` : ''}
@@ -7801,6 +8024,7 @@ function modalAgendamento(pref = {}) {
     ${travados.length ? `<div class="note small">${travados.map(x => `${x.inicio} ${esc(SV(x.servicoId)?.nome)} com ${esc(first(x.funcId))} já foi concluído e não muda.`).join('<br>')}</div>` : ''}
     <div><div class="bar" style="justify-content:space-between;margin-bottom:8px"><span class="sec" style="margin:0">Serviços</span><button class="btn sm" id="a-add" type="button">+ Adicionar serviço</button></div><div class="srows" id="a-itens"></div></div>
     <div class="ag-tot" id="a-tot"></div>
+    ${(DB.pacotes || []).some(x => x.ativo !== false) && pode(DB, ACTOR, 'registrar') && !(ag && ag.pacoteVendaId) ? `<div class="ag-pk"><div class="small"><b>A cliente vai levar um pacote?</b><div class="muted">${editaveis.length ? 'Este horário vira a 1ª sessão do pacote.' : 'Vende o pacote e marca as sessões na agenda.'}</div></div><button class="btn sm" type="button" id="a-pk">Vender pacote</button></div>` : ''}
     <div class="note bad small" id="a-conf" role="alert" hidden></div>
     <div class="form"><label class="f">Canal de origem<select id="a-cn">${opt(Object.entries(CANAIS), d.canal)}</select></label><label class="f">Situação<select id="a-st">${opt(statusOpts, d.status)}</select></label>
       <label class="f full">Observações<textarea id="a-ob">${esc(d.obs)}</textarea></label></div>
@@ -7843,6 +8067,8 @@ function modalAgendamento(pref = {}) {
         draw(); }
       else if (k === 'preco') { it.preco = toCents(el.value) || 0; drawTotOnly(); } }; });
     q('#a-itens').querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { itens.splice(+b.dataset.rm, 1); draw(); });
+    // muitos serviços: pesquisa pelo nome em vez de procurar na lista
+    q('#a-itens').querySelectorAll('select[data-k="servicoId"]').forEach(s => buscaServico(ov, s));
   };
   // aviso na hora: horário ocupado da profissional ou da cliente (não deixa agendar por cima)
   const meus = new Set([...grupo.map(x => x.id), ...(ag ? [ag.id] : [])]);
@@ -7859,8 +8085,12 @@ function modalAgendamento(pref = {}) {
     if (bt) bt.disabled = !!uni.length;
   };
   q('#a-dt').addEventListener('change', draw);
+  q('#a-pk')?.addEventListener('click', () => { const cid = ov.querySelector('#a-cl')?.value;
+    if (!cid || cid === '__novo') return toast('Escolha a cliente primeiro (cadastre se for nova).', 'bad');
+    const conv = editaveis.filter(x => ABERTOS.includes(x.status) && !x.pacoteVendaId).map(x => x.id); calcHor();
+    closeModal(); modalVenderPacote('', cid, conv.length ? { converter: conv } : { primeira: { data: val('a-dt') || TODAY, inicio: fromMin(itens._st[0] ?? toMin(d.inicio)) } }); });
   const drawTotOnly = () => { const tot = sum(itens.map(x => x.preco || 0)); const b = q('#a-tot b:last-of-type'); const bs = q('#a-tot').querySelectorAll('b'); if (bs[1]) bs[1].textContent = brl(tot); };
-  q('#a-add').onclick = () => { const last = itens[itens.length - 1]; itens.push({ servicoId: '', funcId: last?.funcId || fid0, dur: 0, preco: 0, modo: 'seq' }); draw(); q('#a-itens .srow:last-child select')?.focus(); };
+  q('#a-add').onclick = () => { const last = itens[itens.length - 1]; itens.push({ servicoId: '', funcId: last?.funcId || fid0, dur: 0, preco: 0, modo: 'seq' }); draw(); q('#a-itens .srow:last-child .svb-in')?.focus(); };
   // mudou o "Começa às": todos os serviços andam juntos, mantendo os horários que a recepção ajustou
   q('#a-hi').onchange = () => { const nv = toMin(val('a-hi') || '09:00'), dl = nv - hiAnt; hiAnt = nv; itens.forEach(it => { if (it.manual) { it.st += dl; it.fim += dl; } }); draw(); };
   draw();
@@ -7944,7 +8174,7 @@ function modalRegistro(pref = {}) {
     <div><div class="bar" style="justify-content:space-between;margin-bottom:8px"><span class="sec" style="margin:0">Formas de pagamento</span><button class="btn sm" id="r-add" type="button">+ Adicionar forma</button></div><div class="stack" style="gap:8px" id="r-parc"></div></div>
     <div class="calc" id="r-calc"></div>
     <label class="f">Observações<textarea id="r-ob"></textarea></label>`,
-    `<button class="btn" data-close>Cancelar</button>${(pode(DB, ACTOR, 'estoque') || pode(DB, ACTOR, 'registrar')) && itensAtivos(DB).some(i => i.uso !== 'consumo' && i.ativo !== false) ? '<button class="btn" id="r-okv" title="Registra o serviço e abre a venda de produto para a mesma cliente">Registrar e vender produto</button>' : ''}<button class="btn pri" id="r-ok">${itens.length > 1 ? 'Fechar atendimento' : 'Concluir e registrar'}</button>`, true);
+    `<button class="btn" data-close>Cancelar</button>${vemDaAgenda && !ag.pacoteVendaId && (DB.pacotes || []).some(x => x.ativo !== false) ? '<button class="btn" id="r-pk" title="A cliente decidiu levar um pacote: este atendimento vira a 1ª sessão">Trocar por pacote</button>' : ''}${(pode(DB, ACTOR, 'estoque') || pode(DB, ACTOR, 'registrar')) && itensAtivos(DB).some(i => i.uso !== 'consumo' && i.ativo !== false) ? '<button class="btn" id="r-okv" title="Registra o serviço e abre a venda de produto para a mesma cliente">Registrar e vender produto</button>' : ''}<button class="btn pri" id="r-ok">${itens.length > 1 ? 'Fechar atendimento' : 'Concluir e registrar'}</button>`, true);
   const q = s => ov.querySelector(s);
   montarClientePicker(ov, 'r', id => { const el = q('#r-pend'); el.dataset.pendCli = id || ''; el.innerHTML = pendenciaHTML(id, 'registro'); descManual = false; drawParc(); sync(); });
   q('#r-pend').innerHTML = pendenciaHTML(ag?.clienteId || pref.clienteId || '', 'registro');
@@ -7958,7 +8188,7 @@ function modalRegistro(pref = {}) {
     q('#r-itens').innerHTML = itens.map((it, i) => { const sv = SV(it.servicoId); const fs = funcs.filter(f => !sv || sv.funcs.includes(f.id));
       return `<div class="srow"><span class="sn">${i + 1}</span><div class="srow-g">
         <label class="f sv">Serviço<select data-i="${i}" data-k="servicoId" ${it.agendamentoId ? 'disabled' : ''}>${servOpts(it.servicoId, s => !own || s.funcs.includes(ACTOR.funcId))}</select></label>
-        <label class="f">Profissional<select data-i="${i}" data-k="funcId" ${own || it.agendamentoId ? 'disabled' : ''}>${fs.length ? opt(fs.map(f => [f.id, isOwner(ACTOR) ? (f.dona ? `${f.nome} · proprietária` : `${f.nome} · ${f.pct}%`) : f.nome]), it.funcId) : '<option value="">Ninguém faz este serviço</option>'}</select></label>
+        <label class="f">Profissional<select data-i="${i}" data-k="funcId" ${own || it.agendamentoId ? 'disabled' : ''}>${fs.length ? opt(fs.map(f => [f.id, isOwner(ACTOR) ? (f.dona && !(f.pct > 0) ? `${f.nome} · proprietária` : `${f.nome} · ${f.pct}%`) : f.nome]), it.funcId) : '<option value="">Ninguém faz este serviço</option>'}</select></label>
         <label class="f">Valor (R$)<input data-i="${i}" data-k="valor" inputmode="decimal" value="${it.valor ? centsInput(it.valor) : ''}"></label></div>
         ${it.agendamentoId ? `<div class="stime">${DB.agendamentos.find(x => x.id === it.agendamentoId)?.inicio || ''}</div>` : ''}
         ${itens.length > 1 && !it.agendamentoId ? `<button class="btn sm ghost srm" data-rm="${i}" type="button">Remover</button>` : ''}</div>`; }).join('');
@@ -8008,7 +8238,7 @@ function modalRegistro(pref = {}) {
     const P = leParc(), pg = sum(P.map(p => p.valor)), descs = bruto() ? Engine.ratear(Math.min(desc(), bruto()), itens.map(x => x.valor || 0)) : itens.map(() => 0);
     q('#r-tot').innerHTML = `<div><span>Total do atendimento</span><b>${brl(total())}</b><small>${itens.length} serviço(s)${desc() ? ` · ${brl(bruto())} − ${brl(desc())} de desconto` : ''}</small></div>`;
     const linhas = itens.map((it, i) => { const f = F(it.funcId), fin = (it.valor || 0) - descs[i], ve = isOwner(ACTOR) || it.funcId === ACTOR.funcId;
-      return `<div class="split small"><span>${esc(SV(it.servicoId)?.nome || 'Serviço ' + (i + 1))} · ${esc(first(it.funcId))} · ${brl(fin)}</span>${ve && f && !f.dona ? `<b>comissão ${brl(Engine.comissao(Math.max(0, fin), f.pct))} (${f.pct}%)</b>` : f?.dona ? '<span class="muted">valor todo do salão</span>' : ''}</div>`; }).join('');
+      return `<div class="split small"><span>${esc(SV(it.servicoId)?.nome || 'Serviço ' + (i + 1))} · ${esc(first(it.funcId))} · ${brl(fin)}</span>${ve && f && (!f.dona || f.pct > 0) ? `<b>comissão ${brl(Engine.comissao(Math.max(0, fin), f.pct))} (${f.pct}%)</b>` : f?.dona && !(f.pct > 0) ? '<span class="muted">valor todo do salão</span>' : ''}</div>`; }).join('');
     const pgs = P.map(p => `<div class="split small"><span>${FORMAS[p.forma]} ${brl(p.valor)}${convInfo(p)}</span>${p.forma === 'convenio' ? pill('Aguarda acerto do convênio', 'warn') : p.status === 'pendente' ? pill('Aguarda recebimento', 'warn') : pill('Recebido', 'info')}</div>`).join('');
     const err = total() > 0 && pg !== total() ? `<div class="note bad" style="margin-top:8px">A soma das formas de pagamento (${brl(pg)}) precisa ser igual ao total (${brl(total())}).</div>` : '';
     const algumOculto = itens.some(it => !(isOwner(ACTOR) || it.funcId === ACTOR.funcId));
@@ -8034,6 +8264,7 @@ function modalRegistro(pref = {}) {
     if (res.ok) { closeModal(); if (vender) modalVendaProduto({ clienteId: res.r[0].clienteId, data: res.r[0].data }); }
   };
   q('#r-ok').onclick = () => concluir(false);
+  q('#r-pk')?.addEventListener('click', () => { closeModal(); modalVenderPacote('', ag.clienteId, { converter: doGrupo.map(x => x.id), concluir: true }); });
   q('#r-okv')?.addEventListener('click', () => concluir(true));
 }
 function pgRegistro() {
@@ -8095,6 +8326,7 @@ function modalAtendimento(id) {
   const acs = DB.acertos.filter(a => ps.some(p => p.id === a.parcelaId));
   const ov = openModal(`Registro ${at.codigo}`, `
     ${at.status === 'estornado' ? `<div class="note bad"><b>Estornado</b> por ${esc(at.estornadoPor)} em ${esc(at.estornadoEm)} · ${esc(at.motivoEstorno)}</div>` : ''}
+    ${at.estornoDesfeito ? `<div class="note ok small"><b>Estorno desfeito</b> por ${esc(at.estornoDesfeito.por)} em ${esc(at.estornoDesfeito.em)} · ${esc(at.estornoDesfeito.motivo)}</div>` : ''}${at.corrigidoEm ? `<div class="note small">Registro corrigido por ${esc(at.corrigidoPor || '')} em ${esc(at.corrigidoEm)}.</div>` : ''}
     <div class="grid g2" style="gap:14px"><dl class="dl"><dt>Cliente</dt><dd>${cliNome(at.clienteId)}</dd><dt>Serviço</dt><dd>${esc(SV(at.servicoId)?.nome)}</dd><dt>Executor</dt><dd>${esc(fn(at.funcId))}</dd><dt>Data</dt><dd>${dBR(at.data)}</dd><dt>Registrado por</dt><dd>${esc(at.registradoPor)} · ${esc(at.registradoEm)}</dd></dl>
     <dl class="dl">${veFaturamento() ? `<dt>Valor cobrado</dt><dd>${brl(at.valorCobrado)}</dd><dt>Desconto</dt><dd>${brl(at.desconto)}</dd><dt>Valor final</dt><dd>${brl(at.valorFinal)}</dd>` : ''}${vc ? `<dt>Comissão (${at.pct}%)</dt><dd>${brl(at.comissaoTotal)}</dd>` : ''}${isOwner(ACTOR) ? `<dt>Parte do salão</dt><dd>${brl(at.parteSalao)}</dd>` : ''}</dl></div>
     ${!vc ? `<div class="tw"><table><thead><tr><th>Forma de pagamento</th>${veFaturamento() ? '<th class="r">Valor</th>' : ''}<th>Situação</th></tr></thead><tbody>${ps.map(p => `<tr><td>${FORMAS[p.forma]}${p.forma === 'convenio' ? `<div class="muted small">${esc(CV(p.convenioId)?.nome)}</div>` : ''}</td>${veFaturamento() ? `<td class="r">${brl(p.valor)}</td>` : ''}<td>${p.forma === 'convenio' ? pill(CONV_STATUS[p.situacao], CONV_TONE[p.situacao]) : pill(PARC_STATUS[p.status], PARC_TONE[p.status])}</td></tr>`).join('')}</tbody></table></div>` : `
@@ -8104,10 +8336,12 @@ function modalAtendimento(id) {
     </tbody></table></div>`}
     ${acs.length ? `<div><div class="sec" style="margin:0 0 6px">Acertos de convênio</div>${acs.map(a => `<div class="split small"><span>${dataHora(a.data, a.hora)} · ${veFaturamento() ? brl(a.valor) + ' ' : ''}acertado ${isOwner(ACTOR) ? `· liberou ${brl(a.liberado)}` : ''}</span><span class="muted">${esc(a.responsavel)}</span></div>`).join('')}</div>` : ''}
     ${at.obs ? `<div class="muted">Obs.: ${esc(at.obs)}</div>` : ''}
+    ${(() => { const pv = at.pacoteVendaId && (DB.pacoteVendas || []).find(v => v.id === at.pacoteVendaId && v.atendimentoId === at.id); if (!pv) return '';
+      return `<div class="note small">Venda do pacote <b>${esc(pv.codigo)}</b> · ${esc(pv.nome)}${pv.cancelado ? ' · <b>estornado</b>' : ''}.${isOwner(ACTOR) && !pv.cancelado && at.status === 'concluido' ? ` Vendeu o pacote errado? Use <b>Corrigir venda</b>: troca o pacote ou o valor sem perder o pagamento.<div class="bar" style="margin-top:6px"><button class="btn sm pri" data-pk-corrigir="${pv.id}">Corrigir venda do pacote</button></div>` : ''}</div>`; })()}
     ${isOwner(ACTOR) && at.custoMaterial ? `<div class="small muted">Material gasto (baixado do estoque): ${brl(at.custoMaterial)} · lucro real ${brl(at.valorFinal - at.comissaoTotal - at.custoMaterial)}</div>` : ''}
     ${produtosDoDiaHTML(at.clienteId, at.data)}
     ${at.status === 'concluido' ? `<div class="bar">${ps.some(p => p.status === 'pendente') ? waBtn(`data-wa-at="${at.id}" data-wa-m="cobranca"`, 'Cobrar no WhatsApp', 'cobranca') : waBtn(`data-wa-at="${at.id}" data-wa-m="agradecimento"`, 'Agradecer no WhatsApp', 'agradecimento')}</div>` : ''}
-    ${isOwner(ACTOR) && at.status === 'concluido' ? `<details><summary class="small b" style="cursor:pointer">Estornar este registro</summary><div class="stack" style="gap:8px;margin-top:10px"><div class="note warn">O estorno preserva o histórico. Só é permitido antes do serviço entrar em fechamento ou ter acerto de convênio.</div><label class="f">Justificativa<textarea id="es-m"></textarea></label><div><button class="btn dng" id="es-ok">Estornar registro</button></div></div></details>` : ''}`,
+    ${isOwner(ACTOR) && at.status === 'concluido' ? `<details><summary class="small b" style="cursor:pointer">Estornar este registro</summary><div class="stack" style="gap:8px;margin-top:10px"><div class="note warn">O estorno preserva o histórico. Só é permitido antes do serviço entrar em fechamento ou ter acerto de convênio.${at.pacoteVendaId && (DB.pacoteVendas || []).some(v => v.id === at.pacoteVendaId && v.atendimentoId === at.id) ? ' <b>Este registro é a venda de um pacote:</b> o estorno cancela o pacote, as sessões marcadas saem da agenda e o valor sai do faturamento. Use só se a cliente desistiu e o dinheiro foi devolvido.' : ''}</div><label class="f">Justificativa<textarea id="es-m"></textarea></label><div><button class="btn dng" id="es-ok">Estornar registro</button></div></div></details>` : ''}`,
     '', true);
   ov.querySelector('#es-ok')?.addEventListener('click', () => run(() => estornarAtendimento(DB, ACTOR, id, val('es-m')), 'Registro estornado').ok && closeModal());
 }
@@ -8126,8 +8360,8 @@ function pgFinanceiro() {
   return `
   <div class="ph"><div><h1>Pix e Cartão</h1><p>${dono ? 'Valores informados pela equipe no registro. "Conferido" só é marcado depois que a proprietária confere no extrato ou na operadora. Não há integração bancária nesta versão.' : 'Quando um cliente que ficou devendo voltar para pagar, use "Registrar recebimento" no serviço dele, com a data e a hora do Pix ou da maquininha.'}</p></div></div>
   <div class="stack">
-    <div class="bar">${perBar()}<select id="fi-f" aria-label="Funcionário">${funcOpts(UI.finFunc)}</select><select id="fi-fp" aria-label="Forma">${opt([['', 'Pix e cartões'], ['pix', 'Pix'], ['debito', 'Cartão de débito'], ['credito', 'Cartão de crédito']], UI.finForma)}</select><select id="fi-s" aria-label="Situação">${opt([['', 'Todas as situações'], ...Object.entries(PARC_STATUS)], UI.finSit)}</select></div>
-    <div class="grid g4">${kpi('Pix', brl(tot('pix')))}${kpi('Cartão de débito', brl(tot('debito')))}${kpi('Cartão de crédito', brl(tot('credito')))}${kpi('Conferido em extrato', brl(conf), `de ${brl(sum(L.map(r => r.p.valor)))} registrados`, 'ok')}
+    <div class="bar">${perBar()}<select id="fi-f" aria-label="Funcionário">${funcOpts(UI.finFunc)}</select><select id="fi-fp" aria-label="Forma">${opt([['', 'Pix e cartões'], ['pix', 'Pix'], ['debito', 'Cartão de débito'], ['credito', 'Cartão de crédito'], ['dinheiro', 'Dinheiro']], UI.finForma)}</select><select id="fi-s" aria-label="Situação">${opt([['', 'Todas as situações'], ...Object.entries(PARC_STATUS)], UI.finSit)}</select></div>
+    <div class="grid g4">${kpi('Pix', brl(tot('pix')))}${kpi('Cartão de débito', brl(tot('debito')))}${kpi('Cartão de crédito', brl(tot('credito')))}${tot('dinheiro') ? kpi('Dinheiro', brl(tot('dinheiro'))) : ''}${kpi('Conferido em extrato', brl(conf), `de ${brl(sum(L.map(r => r.p.valor)))} registrados`, 'ok')}
       ${dono ? `${kpi('Comissão atribuída', brl(sum(L.map(r => r.comissao))), '', 'accent')}${kpi('Parte do salão', brl(sum(L.map(r => r.p.parteSalao))))}${kpi('Comissão a pagar', brl(sum(L.map(r => r.aPagar))), 'liberada e ainda não paga', 'warn')}` : kpi('Pendente de pagamento', brl(sum(L.filter(r => r.p.status === 'pendente').map(r => r.p.valor))), `${L.filter(r => r.p.status === 'pendente').length} serviço(s)`, 'warn')}</div>
     ${tabelaFinanceiro(L, dono, fechCod)}
   </div>`;
@@ -8192,6 +8426,31 @@ function tabelaConvenios(L, dono) {
         <td><div class="bar" style="flex-wrap:nowrap">${g.abertos.length ? `<button class="btn sm pri" data-acerto-com="${g.abertos.map(r => r.p.id).join(',')}">Registrar pagamento</button>` : ''}${g.pago === 0 && g.abertos.length ? `<select data-cvsit-com="${g.abertos.map(r => r.p.id).join(',')}" aria-label="Alterar situação" class="small">${opt([['registrado', 'Registrado'], ['conferencia', 'Aguardando conferência'], ['pendente', 'Pendente de acerto']], r0.p.situacao)}</select>` : ''}</div></td></tr>`; }).join('')}
   </tbody></table></div>${G.length > max ? `<div class="mais-linhas"><span class="muted small">Mostrando ${max} de ${G.length} comandas. Os totais acima consideram todas.</span><button class="btn" data-mais="cvMax">Mostrar mais</button></div>` : ''}`;
 }
+/* "Pagar convênio": o responsável pelo convênio pagou o total (ele cobra dos conveniados dele).
+   Todos os serviços em aberto marcados ficam pagos e a comissão é liberada na semana do pagamento. */
+function modalPagarConvenioTodo(cvId) {
+  const cv = CV(cvId), [, fim] = periodo(), ab = abertosDoConvenio(DB, cvId, fim);
+  if (!ab.length) return toast('Não há valor em aberto neste convênio.', 'bad');
+  const at = id => DB.atendimentos.find(x => x.id === id), meses = [...new Set(ab.map(p => competenciaConv(p.data)))].sort();
+  const mesTxt = c => { const [y, m] = c.split('-'); return `${MESES[+m - 1]}/${y}`; };
+  const ov = openModal(`Pagar convênio · ${cv.nome}`, `<div class="note small">Use quando o responsável pelo convênio paga o total de uma vez. Todos os serviços marcados ficam <b>pagos</b> e a comissão das profissionais é liberada na semana desta data de pagamento.</div>
+    <div class="bar" style="margin:8px 0;gap:6px">${meses.length > 1 ? meses.map(c => `<button class="btn sm" type="button" data-pcm="${c}">Só ${mesTxt(c)}</button>`).join('') + '<button class="btn sm" type="button" data-pcm="">Todos</button>' : ''}</div>
+    <div class="tw"><table><thead><tr><th></th><th>Data</th><th>Mês do convênio</th><th>Cliente</th><th>Serviço</th><th class="r">Em aberto</th></tr></thead><tbody>${ab.map(p => { const a = at(p.atendimentoId);
+      return `<tr><td><input type="checkbox" data-pct-id="${p.id}" data-mes="${competenciaConv(p.data)}" checked aria-label="Incluir"></td><td>${dBR(p.data)}</td><td class="small">${mesTxt(competenciaConv(p.data))} · vence ${dBR(vencimentoConv(p.data)).slice(0, 5)}</td><td>${cliNome(a?.clienteId)}</td><td class="small">${esc(SV(a?.servicoId)?.nome || '')}</td><td class="r b">${brl(totalConv(p) - p.acertado)}</td></tr>`; }).join('')}</tbody></table></div>
+    <div class="form"><label class="f">Data do pagamento<input type="date" id="pct-d" value="${TODAY}" max="${TODAY}"></label>${campoHora('pct-h')}
+      <label class="f">Forma<select id="pct-m">${opt([['Pix', 'Pix'], ['Transferência', 'Transferência'], ['Boleto', 'Boleto'], ['Dinheiro', 'Dinheiro'], ['Cartão', 'Cartão']], 'Pix')}</select></label><label class="f">Comprovante ou referência<input id="pct-r"></label></div>
+    <div class="calc" id="pct-t"></div>`,
+    `<button class="btn" data-close>Cancelar</button><button class="btn pri" id="pct-ok">Confirmar pagamento</button>`, true);
+  const marcados = () => [...ov.querySelectorAll('[data-pct-id]:checked')].map(x => x.dataset.pctId);
+  const tot = () => { const ids = new Set(marcados()), t = sum(ab.filter(p => ids.has(p.id)).map(p => totalConv(p) - p.acertado));
+    ov.querySelector('#pct-t').innerHTML = `<div class="split"><span>${ids.size} serviço(s) marcados</span><b>${brl(t)}</b></div>`; ov.querySelector('#pct-ok').textContent = `Confirmar pagamento de ${brl(t)}`; return t; };
+  ov.querySelectorAll('[data-pct-id]').forEach(x => x.onchange = tot);
+  ov.querySelectorAll('[data-pcm]').forEach(b => b.onclick = () => { ov.querySelectorAll('[data-pct-id]').forEach(x => { x.checked = !b.dataset.pcm || x.dataset.mes === b.dataset.pcm; }); tot(); });
+  tot();
+  const bind = () => { ov.querySelector('#pct-ok').onclick = () => { const t = tot(); confirmar(ov, `Confirmar que o <b>${esc(cv.nome)}</b> pagou <b>${brl(t)}</b> em <b>${dataHora(val('pct-d'), val('pct-h'))}</b>? Os serviços marcados ficam pagos e a comissão é liberada.`,
+    () => run(() => pagarConvenioTodo(DB, ACTOR, cvId, marcados(), { data: val('pct-d'), hora: val('pct-h'), metodo: val('pct-m'), referencia: val('pct-r') }), r => `${cv.nome} pago · ${r.n} serviço(s) · ${brl(r.total)}`).ok && closeModal(), 'Confirmar pagamento'); }; tot(); };
+  rebindFns.set(ov, bind); bind();
+}
 /* registrar pagamento do convênio de uma comanda ou de tudo o que a cliente deve: o valor quita as parcelas por vencimento */
 function modalPagarConvenio(ids, titulo) {
   const its = ids.flatMap(id => { const p = DB.parcelas.find(x => x.id === id); return p ? parcelasConvenio(p).filter(q => q.aberto > 0) : []; });
@@ -8239,9 +8498,9 @@ function pgConvenios() {
   const dono = isOwner(ACTOR);
   // a recepção vê todos os convênios para registrar pagamentos, mas sem comissões nem parte do salão
   const busca = (UI.cvBusca || '').trim().toLowerCase(), bd = digits(busca);
-  const L = linhasObrig(DB, dono ? ACTOR : { papel: 'proprietaria', id: '_cv' }, { tipo: 'convenio' }).filter(r => ((r.p.data >= ini && r.p.data <= fim) || (r.p.data < ini && convEmAberto(r.p))) && (!UI.cvFunc || r.o.funcId === UI.cvFunc) && (!UI.cvSit || r.p.situacao === UI.cvSit) && (!UI.cvConv || r.p.convenioId === UI.cvConv)
+  const L = linhasObrig(DB, dono ? ACTOR : { papel: 'proprietaria', id: '_cv' }, { tipo: 'convenio' }).filter(r => convNoPeriodo(r.p, ini, fim) && (!UI.cvFunc || r.o.funcId === UI.cvFunc) && (!UI.cvSit || r.p.situacao === UI.cvSit) && (!UI.cvConv || r.p.convenioId === UI.cvConv)
     && (!busca || (CL(r.at.clienteId)?.nome || '').toLowerCase().includes(busca) || (bd.length >= 3 && digits(CL(r.at.clienteId)?.telefone || '').includes(bd))));
-  const canc = DB.parcelas.filter(p => p.forma === 'convenio' && p.situacao === 'cancelado' && p.data >= ini && p.data <= fim && (!UI.cvSit || UI.cvSit === 'cancelado'));
+  const canc = DB.parcelas.filter(p => p.forma === 'convenio' && p.situacao === 'cancelado' && dataCompetenciaConv(p.data) >= ini && dataCompetenciaConv(p.data) <= fim && (!UI.cvSit || UI.cvSit === 'cancelado'));
   return `
   <div class="ph"><div><h1>Convênios</h1><p>${dono ? 'Quanto cada convênio gerou, quanto já pagou e quanto ainda deve. A comissão fica bloqueada até o acerto e acerto parcial libera só a parte proporcional.' : 'Quanto cada convênio deve e o que já pagou. Quando o convênio pagar, use "Registrar pagamento" no serviço, com a data e a hora que aparecem no extrato.'}</p></div>
     ${dono ? '<div class="act"><button class="btn pri" data-conv-novo>+ Novo convênio</button></div>' : ''}</div>
@@ -8253,7 +8512,8 @@ function pgConvenios() {
         <div class="cv-nums"><div><span>Serviços</span><b>${r.servicos}</b>${r.anteriores.n ? `<small>${r.anteriores.n} de meses anteriores em aberto</small>` : ''}</div><div><span>Total cobrado</span><b>${brl(r.gerado)}</b>${r.acrescimo ? `<small>${brl(r.servico)} + ${brl(r.acrescimo)} acréscimo</small>` : ''}</div><div><span>Pago</span><b class="ok">${brl(r.pago)}</b></div><div><span>A receber</span><b class="${r.pendente ? 'bad' : ''}">${brl(r.pendente)}</b>${r.anteriores.valor ? `<small>inclui ${brl(r.anteriores.valor)} de antes</small>` : ''}</div></div>
         <div class="meter" title="${pct}% pago"><i style="width:${pct}%"></i></div><div class="muted small">${pct}% pago pelo convênio</div>
         ${r.cv.taxa || r.repassadoTotal || r.aRepassar ? `<div class="rep"><div><span>Repasse ao conveniado</span><b class="${r.aRepassar ? 'bad' : ''}">${r.aRepassar ? 'A repassar ' + brl(r.aRepassar) : 'Nada a repassar'}</b><small>Acréscimo recebido no período ${brl(r.repDevido)} · já repassado (total) ${brl(r.repassadoTotal)}</small></div>${r.aRepassar && dono ? `<button class="btn sm pri" data-repasse="${r.cv.id}">Registrar repasse</button>` : ''}</div>` : ''}
-        <div class="bar"><button class="btn sm pri" data-conv-membros="${r.cv.id}">Conveniados (${conveniadosDe(DB, r.cv.id).length})</button>${lixo('conv', r.cv.id, r.cv.nome)}<button class="btn sm" data-conv-filtro="${r.cv.id}">${UI.cvConv === r.cv.id ? 'Mostrar todos' : 'Ver serviços'}</button>${dono ? `<button class="btn sm" data-pdf="conv:${r.cv.id}">Extrato PDF</button><button class="btn sm ghost" data-conv-edit="${r.cv.id}">Editar</button>` : ''}</div></div>`; }).join('')}</div>
+        ${(() => { const ab = abertosDoConvenio(DB, r.cv.id, fim); return ab.length ? `<div class="cv-pagar"><div class="small"><b>${brl(sum(ab.map(p => totalConv(p) - p.acertado)))}</b> em aberto · ${ab.length} serviço(s)<div class="muted">vence dia ${CONV_VENCE} do mês seguinte · vira no dia ${CONV_VIRA}</div></div><button class="btn sm pri" data-conv-pagar="${r.cv.id}">Pagar convênio</button></div>` : ''; })()}
+        <div class="bar"><button class="btn sm ${abertosDoConvenio(DB, r.cv.id, fim).length ? '' : 'pri'}" data-conv-membros="${r.cv.id}">Conveniados (${conveniadosDe(DB, r.cv.id).length})</button>${lixo('conv', r.cv.id, r.cv.nome)}<button class="btn sm" data-conv-filtro="${r.cv.id}">${UI.cvConv === r.cv.id ? 'Mostrar todos' : 'Ver serviços'}</button>${dono ? `<button class="btn sm" data-pdf="conv:${r.cv.id}">Extrato PDF</button><button class="btn sm ghost" data-conv-edit="${r.cv.id}">Editar</button>` : ''}</div></div>`; }).join('')}</div>
     ${(() => { const P = pendCache().lista; if (!P.length) return '';
       const porCli = new Map(); for (const x of P) { const k = x.at.clienteId; if (!porCli.has(k)) porCli.set(k, []); porCli.get(k).push(x); }
       const linhas = [...porCli.entries()].map(([k, l]) => ({ k, l, ab: sum(l.map(x => x.aberto)), venc: sum(l.filter(x => x.situacao === 'vencida').map(x => x.aberto)), prox: l[0].vencimento }))
@@ -8301,7 +8561,8 @@ function pgFechamento() {
   const t = R.t;
   const lista = DB.fechamentos.filter(f => f.funcId === fid).sort((a, b) => b.inicio.localeCompare(a.inicio));
   const jaFe = fechamentoDaSemana(DB, fid, UI.fechIni, UI.fechFim);
-  const linha = r => `<tr><td class="code">${r.at.codigo}</td><td>${dBR(r.p.data)}</td><td>${esc(SV(r.at.servicoId)?.nome)}</td><td>${FORMAS[r.p.forma]}${r.p.forma === 'convenio' && (r.p.nParcelas || 1) > 1 ? ` ${r.p.nParcelas}x` : ''}</td><td class="r">${brl(r.p.valor)}</td><td class="r">${brl(r.comissao)}</td><td class="r">${brl(r.liberado)}</td><td class="r">${brl(r.pago)}</td><td class="r b">${brl(r.aFechar)}</td><td>${pill(...situacaoComissao(r))}</td></tr>`;
+  const pgSem = r => r.p.forma === 'convenio' ? (DB.acertos || []).filter(x => x.parcelaId === r.p.id && x.data >= UI.fechIni && x.data <= UI.fechFim).map(x => dBR(x.data).slice(0, 5)) : [];
+  const linha = r => `<tr class="${r.p.forma === 'convenio' && r.p.data < UI.fechIni && r.bloqueado > 0 ? 'pend-pg' : ''}"><td class="code">${r.at.codigo}</td><td>${dBR(r.p.data)}</td><td>${esc(SV(r.at.servicoId)?.nome)}</td><td>${FORMAS[r.p.forma]}${r.p.forma === 'convenio' && (r.p.nParcelas || 1) > 1 ? ` ${r.p.nParcelas}x` : ''}</td><td class="r">${brl(r.p.valor)}</td><td class="r">${brl(r.comissao)}</td><td class="r">${brl(r.liberado)}</td><td class="r">${brl(r.pago)}</td><td class="r b">${brl(r.aFechar)}</td><td>${pill(...situacaoComissao(r))}${r.p.forma === 'convenio' && r.p.data < UI.fechIni ? `<div class="muted small">${pgSem(r).length ? `convênio pago em ${pgSem(r).join(', ')}` : r.bloqueado > 0 ? 'de semana anterior · aguarda o convênio' : 'de semana anterior'}</div>` : ''}</td></tr>`;
   const tabela = rows => rows.length ? `<div class="tw"><table><thead><tr><th>Atend.</th><th>Data</th><th>Serviço</th><th>Forma</th>${veFaturamento() ? '<th class="r">Valor</th>' : ''}<th class="r">Comissão</th><th class="r">Liberada</th><th class="r">Paga</th><th class="r">A fechar</th><th>Situação</th></tr></thead><tbody>${rows.slice(0, LIM('feMax', 150)).map(linha).join('')}</tbody></table></div>${rows.length > LIM('feMax', 150) ? `<div class="mais-linhas"><span class="muted small">Mostrando ${LIM('feMax', 150)} de ${rows.length}. Os totais acima consideram todos.</span><button class="btn" data-mais="feMax">Mostrar mais</button></div>` : ''}` : '<div class="muted small">Nada nesta seção.</div>';
   return `
   <div class="ph"><div><h1>Fechamento Semanal</h1><p>Um único fechamento por profissional e por semana, somando tudo o que já foi liberado: Pix, cartão e convênio acertado. O que for liberado depois entra no mesmo fechamento, e o pagamento é feito de uma vez.</p></div></div>
@@ -8315,10 +8576,11 @@ function pgFechamento() {
       <div class="muted small" style="flex-basis:100%">A semana de trabalho vai de <b>sábado a sexta</b>; o pagamento é feito no sábado seguinte e entra no faturamento do mês da semana trabalhada.</div>
     </div></div>
     <div class="sec">Pix e cartão</div>
-    <div class="grid g4">${kpi('1 · Pix', brl(t.pix))}${kpi('2 · Cartão de débito', brl(t.debito))}${kpi('3 · Cartão de crédito', brl(t.credito))}
+    <div class="grid g4">${kpi('1 · Pix', brl(t.pix))}${kpi('2 · Cartão de débito', brl(t.debito))}${kpi('3 · Cartão de crédito', brl(t.credito))}${t.dinheiro ? kpi('Dinheiro', brl(t.dinheiro)) : ''}
       ${kpi('4 · Comissões liberadas', brl(t.liberadaPC), `de ${brl(t.comPC)} calculadas${t.aguardandoRec ? ` · ${brl(t.aguardandoRec)} aguardam recebimento` : ''}`, 'info')}${kpi('5 · Já pagas', brl(t.pagaPC), 'em fechamentos anteriores', 'ok')}${kpi('6 · Pendentes de pagamento', brl(t.pendentePC), 'liberadas e não pagas', 'warn')}</div>
     ${tabela(R.pc)}
     <div class="sec">Convênios</div>
+    <div class="muted small">Convênio em aberto aparece aqui em todas as semanas (bloqueado) até o convênio pagar. A comissão é liberada na semana em que o pagamento foi registrado.</div>
     <div class="grid g4">${kpi('7 · Serviços por convênio', brl(t.conv), `comissão calculada ${brl(t.comConv)}`, 'info')}${kpi('8 · Comissão bloqueada', brl(t.convBloq), 'saldo ainda não acertado', 'warn')}${kpi('9 · Liberada após acerto', brl(t.convLib), `${brl(t.convAFechar)} ainda não fechada`, 'ok')}</div>
     ${tabela(R.cv)}
     <div class="panel" style="border-color:var(--accent)">
@@ -8821,12 +9083,12 @@ function pgPacotes() {
   <div class="ph"><div><h1>Pacotes</h1><p>A cliente paga o pacote uma vez e usa as sessões nos dias e horários escolhidos. Cada sessão fica marcada na agenda; ao concluir, não cobra de novo.</p></div>
     <div class="act">${dono ? '<button class="btn" data-pk-novo>Novo pacote</button>' : ''}${pode(DB, ACTOR, 'registrar') ? '<button class="btn pri" data-pk-vender="">Vender pacote</button>' : ''}</div></div>
   <div class="stack">
-    <div class="grid g4">${kpi('Pacotes ativos', ativos.length)}${kpi('Sessões a marcar', sum(ativos.map(v => situacaoVenda(DB, v).livres)), 'ainda sem data', 'warn')}${kpi('Sessões marcadas', sum(ativos.map(v => situacaoVenda(DB, v).marcadas)), '', 'info')}${kpi('Vendido no total', brl(sum(vendas.map(v => v.valor))), `${vendas.length} pacote(s)`, 'ok')}</div>
+    <div class="grid g4">${kpi('Pacotes ativos', ativos.length)}${kpi('Sessões a marcar', sum(ativos.map(v => situacaoVenda(DB, v).livres)), 'ainda sem data', 'warn')}${kpi('Sessões marcadas', sum(ativos.map(v => situacaoVenda(DB, v).marcadas)), '', 'info')}${kpi('Vendido no total', brl(sum(vendas.filter(v => !v.cancelado).map(v => v.valor))), `${vendas.filter(v => !v.cancelado).length} pacote(s)${vendas.some(v => v.cancelado) ? ` · ${vendas.filter(v => v.cancelado).length} estornado(s)` : ''}`, 'ok')}</div>
     ${(() => { const q = (UI.pkvBusca || '').trim(); return `<div class="pk-tit"><div class="sec" style="margin:0">Pacotes à venda</div>${(DB.pacotes || []).length ? `<div class="po-busca-c pk-tb">${icon('lupa')}<input id="pkv-b" type="text" enterkeyhint="search" autocomplete="off" placeholder="Pesquisar pacote ou serviço" aria-label="Pesquisar pacotes à venda" value="${esc(q)}">${q ? '<button type="button" class="btn sm ghost" data-pkv-limpa aria-label="Limpar pesquisa">Limpar</button>' : ''}</div>` : ''}</div>`; })()}
     ${(() => { const qn = nomeChave(UI.pkvBusca || ''), lv = (DB.pacotes || []).filter(pc => !qn || nomeChave(`${pc.nome} ${SV(pc.servicoId)?.nome || ''} ${pc.descricao || ''}`).includes(qn));
       return (DB.pacotes || []).length && !lv.length ? `<div class="panel">${empty('Nenhum pacote com essa pesquisa', 'Confira o nome do pacote ou do serviço.')}</div>` : ''; })()}
-    ${(DB.pacotes || []).length ? `<div class="pk-cat">${DB.pacotes.filter(pc => { const qn = nomeChave(UI.pkvBusca || ''); return !qn || nomeChave(`${pc.nome} ${SV(pc.servicoId)?.nome || ''} ${pc.descricao || ''}`).includes(qn); }).map(pc => { const sv = SV(pc.servicoId), avulso = (sv?.preco || 0) * pc.sessoes;
-      return `<div class="pk-item ${pc.ativo === false ? 'off' : ''}"><div><b>${esc(pc.nome)}</b><span class="muted small">${pc.sessoes}x ${esc(sv?.nome || '')}${pc.validadeDias ? ` · vale ${pc.validadeDias} dias` : ''}${pc.ativo === false ? ' · inativo' : ''}</span></div>
+    ${(DB.pacotes || []).length ? `<div class="pk-cat">${DB.pacotes.filter(pc => { const qn = nomeChave(UI.pkvBusca || ''); return !qn || nomeChave(`${pc.nome} ${SV(pc.servicoId)?.nome || ''} ${pc.descricao || ''}`).includes(qn); }).map(pc => { const sv = SV(pc.servicoId), avulso = pc.itens && pc.itens.length ? sum(pc.itens.map(i => (SV(i.servicoId)?.preco || 0) * i.qtd)) : (sv?.preco || 0) * pc.sessoes;
+      return `<div class="pk-item ${pc.ativo === false ? 'off' : ''}"><div><b>${esc(pc.nome)}</b><span class="muted small">${esc(composicaoTxt(pc))}${pc.validadeDias ? ` · vale ${pc.validadeDias} dias` : ''}${pc.ativo === false ? ' · inativo' : ''}</span></div>
         <div class="pk-preco"><b>${brl(pc.preco)}</b>${avulso > pc.preco ? `<span class="muted small">avulso ${brl(avulso)}</span>` : ''}</div>
         <div class="bar" style="flex-wrap:nowrap">${dono ? `<button class="btn sm" data-pk-edit="${pc.id}">Editar</button>` : ''}${pc.ativo !== false && pode(DB, ACTOR, 'registrar') ? `<button class="btn sm pri" data-pk-vender="${pc.id}">Vender</button>` : ''}</div></div>`; }).join('')}</div>`
       : `<div class="panel">${empty('Nenhum pacote cadastrado', dono ? 'Toque em "Novo pacote" para montar o primeiro.' : 'A proprietária cadastra os pacotes.')}</div>`}
@@ -8834,14 +9096,16 @@ function pgPacotes() {
       ${vendas.length ? `<div class="po-busca-c pk-tb">${icon('lupa')}<input id="pk-b" type="text" enterkeyhint="search" autocomplete="off" placeholder="Cliente, telefone, CPF ou pacote" aria-label="Pesquisar pacotes das clientes" value="${esc(pb)}">${pb ? '<button type="button" class="btn sm ghost" data-pk-limpa aria-label="Limpar pesquisa">Limpar</button>' : ''}</div>` : ''}
       <div class="seg">${[['ativos', 'Em uso'], ['encerrados', 'Encerrados'], ['todos', 'Todos']].map(([k, t]) => `<button data-pk-filtro="${k}" class="${filtro === k ? 'on' : ''}">${t}</button>`).join('')}</div></div>
     ${vendas.length ? `<span class="muted small">${pb ? `${linhas.length} de ${doFiltro.length} pacote(s)` : `${doFiltro.length} pacote(s) ${filtro === 'ativos' ? 'em uso' : filtro === 'encerrados' ? 'encerrado(s)' : 'no total'}`}</span>` : ''}
-    ${linhas.length ? `<div class="pk-lista">${linhas.map(({ v, st }) => `<article class="pk-venda">
-      <div class="pk-vh"><div style="min-width:0"><b>${cliNome(v.clienteId)}</b><div class="muted small">${esc(v.nome)} · ${esc(v.codigo)} · ${brl(v.valor)} · com ${esc(first(v.funcId))}${v.validoAte ? ` · vale até ${dBR(v.validoAte)}` : ''}</div></div>
+    ${linhas.length ? `<div class="pk-lista">${linhas.map(({ v, st }) => `<article class="pk-venda ${v.cancelado ? 'pk-canc' : ''}">
+      <div class="pk-vh"><div style="min-width:0"><b>${cliNome(v.clienteId)}</b><div class="muted small">${esc(v.nome)} · ${esc(v.codigo)} · ${brl(v.valor)} · com ${esc(first(v.funcId))}${v.validoAte ? ` · vale até ${dBR(v.validoAte)}` : ''}</div>
+        ${v.itens && v.itens.length ? `<div class="pk-its">${st.itens.map(i => `<span>${esc(SV(i.servicoId)?.nome || '')} <b>${i.usadas}/${i.qtd}</b></span>`).join('')}</div>` : ''}</div>
         <div class="pk-cont"><b>${st.usadas}</b>/${v.sessoes}<span>usadas</span></div></div>
+      ${v.cancelado ? `<div class="note bad small"><b>Pacote estornado</b> por ${esc(v.cancelado.por)} em ${esc(v.cancelado.em)} · ${esc(v.cancelado.motivo || '')}</div>` : ''}
       <div class="pk-ses">${Array.from({ length: v.sessoes }, (_, i) => { const ags = st.ags.filter(x => !['cancelado'].includes(x.status)), x = ags[i];
-        return x ? `<button class="pk-s s-${x.status}" data-ag="${x.id}"><b>${i + 1}</b><span>${dataCurta(x.data)} · ${x.inicio}</span><em>${x.status === 'concluido' ? 'Feita' : x.status === 'faltou' ? 'Faltou' : 'Marcada'}</em></button>`
+        return x ? `<button class="pk-s s-${x.status}" data-ag="${x.id}"><b>${i + 1}${v.itens && v.itens.length ? ` · ${esc(svCurto(x.servicoId))}` : ''}</b><span>${dataCurta(x.data)} · ${x.inicio}</span><em>${x.status === 'concluido' ? 'Feita' : x.status === 'faltou' ? 'Faltou' : 'Marcada'}</em></button>`
           : `<button class="pk-s livre" ${!st.encerrado && pode(DB, ACTOR, 'agendar') ? `data-pk-sessao="${v.id}"` : 'disabled'}><b>${i + 1}</b><span>Sem data</span><em>${pode(DB, ACTOR, 'agendar') ? '+ Marcar' : 'A marcar'}</em></button>`; }).join('')}</div>
       ${st.vencido ? '<div class="note warn small">Pacote vencido com sessões ainda sem uso.</div>' : ''}
-      ${pkAvisoHTML(v, st)}</article>`).join('')}</div>`
+      ${v.cancelado ? '' : pkAvisoHTML(v, st)}${dono && !v.cancelado ? `<div class="bar"><button class="btn sm ghost" data-pk-corrigir="${v.id}">Corrigir venda</button></div>` : ''}</article>`).join('')}</div>`
       : `<div class="panel">${empty(pb ? 'Nenhum pacote encontrado' : filtro === 'encerrados' ? 'Nenhum pacote encerrado' : 'Nenhum pacote em uso', pb ? 'Confira o nome, telefone ou CPF, ou troque o filtro (Em uso, Encerrados, Todos).' : 'Os pacotes vendidos aparecem aqui com as sessões.')}</div>`}
   </div>`;
 }
@@ -8851,80 +9115,140 @@ function pkAvisoHTML(v, st) {
   const bt = waBtn(`data-wa-pk="${v.id}"`, st.encerrado ? 'Avisar no WhatsApp' : 'Enviar saldo no WhatsApp', 'pacote');
   return `<div class="pk-aviso"><div class="small"><b>${st.usadas} usada(s) · ${r} restante(s)</b>${ult ? `<div class="muted">Saldo enviado no WhatsApp em ${esc(ult.quando)} por ${esc((ult.usuario || '').split(' ')[0])} (${ult.usadas} usada(s), ${ult.restantes} restante(s))${v.avisos.length > 1 ? ` · ${v.avisos.length} avisos no total` : ''}</div>` : '<div class="muted">A cliente ainda não recebeu o saldo pelo WhatsApp.</div>'}</div>${bt}</div>`;
 }
+/* composição do pacote em texto: "4x Manicure + 1x Pedicure" */
+const composicaoTxt = x => (x.itens && x.itens.length ? x.itens : [{ servicoId: x.servicoId, qtd: x.sessoes }]).map(i => `${i.qtd}x ${SV(i.servicoId)?.nome || ''}`).join(' + ');
+const svCurto = id => { const n = SV(id)?.nome || ''; return n.length > 14 ? n.slice(0, 13) + '…' : n; };
 function modalPacote(id) {
-  const pc = id ? DB.pacotes.find(x => x.id === id) : { nome: '', servicoId: '', sessoes: 4, preco: 0, validadeDias: 60, descricao: '', ativo: true };
+  const pc = id ? DB.pacotes.find(x => x.id === id) : { nome: '', servicoId: '', sessoes: 4, preco: 0, validadeDias: 60, descricao: '', ativo: true, itens: [] };
+  let comp = (pc.itens || []).map(x => ({ ...x }));
   const ov = openModal(id ? 'Editar pacote' : 'Novo pacote', `<div class="form">
-    <label class="f full">Nome do pacote<input id="pk-n" value="${esc(pc.nome)}" placeholder="Ex.: Pacote 4 escovas"></label>
-    <label class="f">Serviço<select id="pk-s">${servOpts(pc.servicoId)}</select></label>
-    <label class="f">Quantidade de sessões<input id="pk-q" type="number" min="2" max="20" value="${pc.sessoes}"></label>
+    <label class="f full">Nome do pacote<input id="pk-n" value="${esc(pc.nome)}" placeholder="Ex.: Pacote 4 mãos e 1 pé"></label>
+    <label class="f">Serviço do pacote (vai no registro da venda)<select id="pk-s">${servOpts(pc.servicoId)}</select></label>
+    <label class="f" id="pk-qw">Quantidade de sessões<input id="pk-q" type="number" min="2" max="20" value="${pc.sessoes}"></label>
     <label class="f">Valor do pacote (R$)<input id="pk-v" inputmode="decimal" value="${pc.preco ? centsInput(pc.preco) : ''}" placeholder="0,00"></label>
     <label class="f">Validade<select id="pk-d">${opt([['0', 'Sem validade'], ['30', '30 dias'], ['45', '45 dias'], ['60', '60 dias'], ['90', '90 dias'], ['120', '120 dias'], ['180', '180 dias']], String(pc.validadeDias || 0))}</select></label>
+    <div class="full pk-comp"><div class="split"><div><b>O que a cliente usa no pacote</b><div class="muted small">Para pacote com serviços diferentes (ex.: 4 manicures e 1 pedicure). Na hora de agendar e de concluir, escolhe qual serviço foi feito.</div></div><button class="btn sm" type="button" id="pk-ca">+ Serviço</button></div><div id="pk-cl" class="stack" style="gap:8px;margin-top:8px"></div></div>
     <div class="full" id="pk-info"></div>
     <label class="f full">Descrição (opcional)<input id="pk-o" value="${esc(pc.descricao || '')}" placeholder="Ex.: uma sessão por semana"></label>
     ${id ? `<label class="chk full"><input type="checkbox" id="pk-a" ${pc.ativo !== false ? 'checked' : ''}> Pacote à venda</label>` : ''}</div>`,
     `<button class="btn" data-close>Cancelar</button><button class="btn pri" id="pk-ok">Salvar pacote</button>`);
-  const info = () => { const sv = SV(val('pk-s')), q = parseInt(val('pk-q'), 10) || 0, v = toCents(val('pk-v')) || 0, av = (sv?.preco || 0) * q;
-    ov.querySelector('#pk-info').innerHTML = sv && q ? `<div class="note small">Avulso: ${q}x ${brl(sv.preco)} = <b>${brl(av)}</b>${v ? ` · no pacote: <b>${brl(v)}</b> (${brl(Math.round(v / q))} por sessão${av > v ? `, desconto de ${brl(av - v)}` : ''})` : ''}</div>` : ''; };
-  ['pk-s', 'pk-q', 'pk-v'].forEach(k => ov.querySelector('#' + k).addEventListener('input', info)); ov.querySelector('#pk-s').onchange = info; info();
-  buscaServico(ov, 'pk-s');
-  ov.querySelector('#pk-ok').onclick = () => run(() => salvarPacote(DB, ACTOR, { id, nome: val('pk-n'), servicoId: val('pk-s'), sessoes: val('pk-q'), preco: toCents(val('pk-v')), validadeDias: val('pk-d'), descricao: val('pk-o'), ativo: id ? ov.querySelector('#pk-a').checked : true }), 'Pacote salvo').ok && closeModal();
+  const q = s => ov.querySelector(s);
+  const info = () => { const v = toCents(val('pk-v')) || 0;
+    const linhas = comp.filter(x => x.servicoId && x.qtd > 0), qtd = linhas.length ? sum(linhas.map(x => +x.qtd)) : parseInt(val('pk-q'), 10) || 0;
+    const av = linhas.length ? sum(linhas.map(x => (SV(x.servicoId)?.preco || 0) * x.qtd)) : (SV(val('pk-s'))?.preco || 0) * qtd;
+    q('#pk-qw').hidden = !!linhas.length;
+    q('#pk-info').innerHTML = qtd ? `<div class="note small">${linhas.length ? `${qtd} sessões: ${esc(linhas.map(x => `${x.qtd}x ${SV(x.servicoId)?.nome || ''}`).join(' + '))}. ` : ''}Avulso: <b>${brl(av)}</b>${v ? ` · no pacote: <b>${brl(v)}</b> (${brl(Math.round(v / qtd))} por sessão${av > v ? `, desconto de ${brl(av - v)}` : ''})` : ''}</div>` : ''; };
+  const drawComp = () => {
+    q('#pk-cl').innerHTML = comp.map((x, i) => `<div class="pk-cr"><select data-ci="${i}">${servOpts(x.servicoId)}</select><input type="number" min="1" max="20" data-cq="${i}" value="${x.qtd || 1}" aria-label="Quantidade"><button class="btn sm ghost" type="button" data-cr="${i}">Remover</button></div>`).join('') || '<div class="muted small">Sem composição: todas as sessões são do serviço do pacote.</div>';
+    q('#pk-cl').querySelectorAll('[data-ci]').forEach(s => { s.onchange = () => { comp[+s.dataset.ci].servicoId = s.value; info(); }; buscaServico(ov, s); });
+    q('#pk-cl').querySelectorAll('[data-cq]').forEach(s => s.oninput = () => { comp[+s.dataset.cq].qtd = parseInt(s.value, 10) || 0; info(); });
+    q('#pk-cl').querySelectorAll('[data-cr]').forEach(b => b.onclick = () => { comp.splice(+b.dataset.cr, 1); drawComp(); });
+    info(); };
+  q('#pk-ca').onclick = () => { comp.push({ servicoId: '', qtd: 1 }); drawComp(); };
+  ['pk-s', 'pk-q', 'pk-v'].forEach(k => q('#' + k).addEventListener('input', info)); q('#pk-s').onchange = info;
+  buscaServico(ov, 'pk-s'); drawComp();
+  q('#pk-ok').onclick = () => run(() => salvarPacote(DB, ACTOR, { id, nome: val('pk-n'), servicoId: val('pk-s'), sessoes: val('pk-q'), itens: comp.filter(x => x.servicoId), preco: toCents(val('pk-v')), validadeDias: val('pk-d'), descricao: val('pk-o'), ativo: id ? q('#pk-a').checked : true }), 'Pacote salvo').ok && closeModal();
 }
 /* sugestão de datas: uma por semana, no mesmo dia da semana (pula domingo) */
 const sugerirSessoes = (n, d0 = addDays(TODAY, 1)) => Array.from({ length: n }, (_, i) => { let d = addDays(d0, 7 * i); if (fromIso(d).getDay() === 0) d = addDays(d, 1); return d; });
-function modalVenderPacote(pacoteId = '', clienteId = '') {
+/* horários do dia, incluindo um horário fora da grade (ex.: 10:45, quando a sessão anterior termina nessa hora) */
+const horasCom = h => h && !FA_HORAS.includes(h) ? [...FA_HORAS, h].sort() : FA_HORAS;
+/* opts.converter: horários já marcados (serviço avulso) que viram sessões do pacote; opts.concluir: já conclui essas sessões (cliente está sendo atendida) */
+function modalVenderPacote(pacoteId = '', clienteId = '', opts = {}) {
   const pcs = (DB.pacotes || []).filter(x => x.ativo !== false);
   if (!pcs.length) return toast('Cadastre um pacote primeiro (só a proprietária).', 'bad');
-  let pc = pcs.find(x => x.id === pacoteId) || pcs[0], ses = [];
-  const ov = openModal('Vender pacote', `<div class="stack" style="gap:14px">
-    <div><div class="sec" style="margin:0 0 6px">Cliente</div>${clientePickerHTML('pv', clienteId)}</div>
+  const conv = (opts.converter || []).map(id => DB.agendamentos.find(x => x.id === id)).filter(x => x && ABERTOS.includes(x.status) && !x.pacoteVendaId);
+  const temSv = (x, id) => x.servicoId === id || (x.itens || []).some(i => i.servicoId === id);
+  let pc = pcs.find(x => x.id === pacoteId) || (conv[0] && pcs.find(x => temSv(x, conv[0].servicoId))) || pcs[0], ses = [];
+  const ov = openModal(conv.length ? 'Trocar por pacote' : 'Vender pacote', `<div class="stack" style="gap:14px">
+    ${conv.length ? `<div class="note small">${conv.map(x => `<b>${dBR(x.data).slice(0, 5)} às ${x.inicio}</b> · ${esc(SV(x.servicoId)?.nome || '')}`).join('<br>')}<br>${opts.concluir ? 'Este atendimento vira a 1ª sessão do pacote e já fica <b>concluído</b>, sem cobrar de novo.' : 'Este horário vira a 1ª sessão do pacote (sem cobrança separada).'}</div>` : ''}
+    <div><div class="sec" style="margin:0 0 6px">Cliente</div>${clientePickerHTML('pv', clienteId, !!conv.length)}</div>
     <div class="form"><label class="f">Pacote<select id="pv-p">${opt(pcs.map(x => [x.id, `${x.nome} · ${brl(x.preco)}`]), pc.id)}</select></label><label class="f">Profissional<select id="pv-f"></select></label>
-      <label class="f">Valor cobrado (R$)<input id="pv-v" inputmode="decimal"></label><label class="f">Forma de pagamento<select id="pv-fp">${opt([['pix', 'Pix'], ['debito', 'Cartão de débito'], ['credito', 'Cartão de crédito']], 'pix')}</select></label>
+      <label class="f">Valor cobrado (R$)<input id="pv-v" inputmode="decimal"></label><label class="f">Forma de pagamento<select id="pv-fp">${opt([['pix', 'Pix'], ['debito', 'Cartão de débito'], ['credito', 'Cartão de crédito'], ['dinheiro', 'Dinheiro']], 'pix')}</select></label>
       <label class="f">Recebimento<select id="pv-st">${opt([['registrado', 'Recebido agora'], ['pendente', 'Não recebido (pendente)']], 'registrado')}</select></label><label class="f">Data do pagamento<input type="date" id="pv-d" value="${TODAY}" max="${TODAY}"></label></div>
     <div><div class="split"><div class="sec" style="margin:0">Datas das sessões</div><span class="muted small">Deixe em branco para marcar depois</span></div><div id="pv-ses" class="pv-ses"></div></div>
     <div class="note small" id="pv-res"></div></div>`,
     `<button class="btn" data-close>Cancelar</button><button class="btn pri" id="pv-ok">Confirmar venda</button>`, true);
   montarClientePicker(ov, 'pv');
   const q = s => ov.querySelector(s);
+  const misto = () => !!(pc.itens && pc.itens.length);
+  // ordem dos serviços nas sessões: 4x manicure, depois 1x pedicure... (tira o que o horário trocado já usa)
+  const filaServicos = () => { const f = (misto() ? pc.itens : [{ servicoId: pc.servicoId, qtd: pc.sessoes }]).flatMap(i => Array(i.qtd).fill(i.servicoId));
+    conv.forEach(x => { const k = f.indexOf(x.servicoId); f.splice(k >= 0 ? k : 0, 1); }); return f; };
   const desenhar = () => {
     const sv = SV(pc.servicoId), fs = DB.funcionarios.filter(f => f.ativo && sv?.funcs.includes(f.id));
-    const fsel = q('#pv-f'), fv = fsel.value; fsel.innerHTML = opt(fs.map(f => [f.id, f.nome]), fs.some(f => f.id === fv) ? fv : fs[0]?.id);
+    const fsel = q('#pv-f'), fv = fsel.value; fsel.innerHTML = opt(fs.map(f => [f.id, f.nome]), fs.some(f => f.id === fv) ? fv : (conv[0] && fs.some(f => f.id === conv[0].funcId) ? conv[0].funcId : fs[0]?.id));
     q('#pv-v').value = centsInput(pc.preco);
-    const sug = sugerirSessoes(pc.sessoes);
-    // horário sugerido: o primeiro livre a partir das 10h na agenda da profissional escolhida
-    const livre = d => { const dur = sv?.duracao || 60, ok = h => toMin(h) + dur <= 20 * 60 && !ocupacao(DB, fsel.value, d, h, fromMin(toMin(h) + dur), new Set(), pc.servicoId); return FA_HORAS.find(h => h >= '10:00' && ok(h)) || FA_HORAS.find(ok) || ''; };
-    ses = Array.from({ length: pc.sessoes }, (_, i) => ses[i] && !ses[i].auto ? ses[i] : ses[i] && ses[i].auto === false ? ses[i] : { data: sug[i], inicio: livre(sug[i]), auto: true });
-    q('#pv-ses').innerHTML = ses.map((x, i) => `<div class="pv-s"><span class="pv-n">${i + 1}</span><input type="date" data-sd="${i}" value="${x.data}" min="${TODAY}" aria-label="Data da sessão ${i + 1}"><select data-sh="${i}" aria-label="Horário da sessão ${i + 1}"><option value="">Sem horário</option>${opt(FA_HORAS.map(h => [h, h]), x.inicio)}</select><button class="btn sm ghost" type="button" data-sx="${i}" aria-label="Deixar sessão ${i + 1} para depois">Depois</button></div>`).join('');
-    q('#pv-ses').querySelectorAll('[data-sd]').forEach(el => el.onchange = () => { const x = ses[+el.dataset.sd]; x.data = el.value; x.auto = false; if (el.value && !x.inicio) x.inicio = livre(el.value); desenhar(); });
+    const fila = filaServicos(), n = fila.length, d0 = opts.primeira?.data || (conv[0] ? addDays(conv[0].data, 7) : addDays(TODAY, 1)), sug = sugerirSessoes(n, d0);
+    // horário sugerido: o primeiro livre a partir das 10h (ou logo depois da sessão anterior do mesmo dia)
+    const livre = (d, svId, aPartir = '10:00') => { const dur = SV(svId)?.duracao || 60, func = SV(svId)?.funcs.includes(fsel.value) ? fsel.value : SV(svId)?.funcs[0];
+      const ok = h => toMin(h) + dur <= 20 * 60 && !ocupacao(DB, func, d, h, fromMin(toMin(h) + dur), new Set(), svId);
+      return [aPartir, ...FA_HORAS.filter(h => h > aPartir)].find(ok) || FA_HORAS.find(ok) || ''; };
+    ses = Array.from({ length: n }, (_, i) => ses[i] && !ses[i].auto ? ses[i] : { data: i === 0 && opts.primeira ? opts.primeira.data : sug[i], inicio: i === 0 && opts.primeira ? opts.primeira.inicio : '', servicoId: fila[i], auto: true });
+    ses.forEach((x, i) => { if (!x.servicoId) x.servicoId = fila[i]; if (x.auto && x.data && !(i === 0 && opts.primeira)) { const ant = ses.slice(0, i).reverse().find(y => y.data === x.data && y.inicio); x.inicio = livre(x.data, x.servicoId, ant ? fromMin(toMin(ant.inicio) + (SV(ant.servicoId)?.duracao || 60)) : '10:00'); } });
+    const opSv = misto() ? pc.itens.map(i => [i.servicoId, SV(i.servicoId)?.nome || '']) : null;
+    q('#pv-ses').innerHTML = ses.map((x, i) => `<div class="pv-s ${misto() ? 'pv-s5' : ''}"><span class="pv-n">${i + 1 + conv.length}</span>${opSv ? `<select data-sv="${i}" aria-label="Serviço da sessão ${i + 1 + conv.length}">${opt(opSv, x.servicoId)}</select>` : ''}<input type="date" data-sd="${i}" value="${x.data}" min="${TODAY}" aria-label="Data da sessão ${i + 1 + conv.length}"><select data-sh="${i}" aria-label="Horário da sessão ${i + 1 + conv.length}"><option value="">Sem horário</option>${opt(horasCom(x.inicio).map(h => [h, h]), x.inicio)}</select><button class="btn sm ghost" type="button" data-sx="${i}" aria-label="Deixar sessão ${i + 1 + conv.length} para depois">Depois</button></div>`).join('') || '<div class="muted small">Todas as sessões já estão marcadas.</div>';
+    q('#pv-ses').querySelectorAll('[data-sv]').forEach(el => el.onchange = () => { const x = ses[+el.dataset.sv]; x.servicoId = el.value; x.auto = false; resumo(); });
+    q('#pv-ses').querySelectorAll('[data-sd]').forEach(el => el.onchange = () => { const i = +el.dataset.sd, x = ses[i]; x.data = el.value; x.auto = false;
+      if (el.value) { const ant = ses.slice(0, i).reverse().find(y => y.data === el.value && y.inicio); x.inicio = livre(el.value, x.servicoId, ant ? fromMin(toMin(ant.inicio) + (SV(ant.servicoId)?.duracao || 60)) : x.inicio || '10:00'); } desenhar(); });
     q('#pv-ses').querySelectorAll('[data-sh]').forEach(el => el.onchange = () => { const x = ses[+el.dataset.sh]; x.inicio = el.value; x.auto = false; resumo(); });
-    q('#pv-ses').querySelectorAll('[data-sx]').forEach(el => el.onclick = () => { const i = +el.dataset.sx; ses[i] = { data: '', inicio: '', auto: false }; desenhar(); });
+    q('#pv-ses').querySelectorAll('[data-sx]').forEach(el => el.onclick = () => { const i = +el.dataset.sx; ses[i] = { data: '', inicio: '', servicoId: ses[i].servicoId, auto: false }; desenhar(); });
     resumo();
   };
-  const resumo = () => { const m = ses.filter(x => x.data && x.inicio).length, sv = SV(pc.servicoId);
-    q('#pv-res').innerHTML = `<b>${esc(pc.nome)}</b>: ${pc.sessoes}x ${esc(sv?.nome || '')} por <b>${brl(toCents(q('#pv-v').value) || 0)}</b>. ${m} sessão(ões) vão para a agenda agora${pc.sessoes - m ? `, ${pc.sessoes - m} fica(m) para marcar depois` : ''}. A comissão é calculada sobre o valor do pacote.${pc.validadeDias ? ` Vale ${pc.validadeDias} dias.` : ''}`; };
+  const resumo = () => { const m = ses.filter(x => x.data && x.inicio).length + conv.length;
+    q('#pv-res').innerHTML = `<b>${esc(pc.nome)}</b>: ${esc(composicaoTxt(pc))} por <b>${brl(toCents(q('#pv-v').value) || 0)}</b>. ${m} sessão(ões) vão para a agenda agora${pc.sessoes - m ? `, ${pc.sessoes - m} fica(m) para marcar depois` : ''}. A comissão é calculada sobre o valor do pacote.${pc.validadeDias ? ` Vale ${pc.validadeDias} dias.` : ''}`; };
   q('#pv-p').onchange = () => { pc = pcs.find(x => x.id === q('#pv-p').value); ses = []; desenhar(); };
   q('#pv-f').onchange = () => { ses = ses.map(x => x.auto ? null : x); desenhar(); };
   q('#pv-v').oninput = resumo;
   desenhar();
   q('#pv-ok').onclick = () => { const r = run(() => { const cid = lerCliente(ov, 'pv'), v = toCents(q('#pv-v').value) || 0;
-      return venderPacote(DB, ACTOR, { pacoteId: pc.id, clienteId: cid, funcId: q('#pv-f').value, valor: v, data: q('#pv-d').value, parcelas: [{ forma: q('#pv-fp').value, valor: v, status: q('#pv-st').value }], sessoes: ses.filter(x => x.data && x.inicio) }); },
+      return venderPacote(DB, ACTOR, { pacoteId: pc.id, clienteId: cid, funcId: q('#pv-f').value, valor: v, data: q('#pv-d').value, parcelas: [{ forma: q('#pv-fp').value, valor: v, status: q('#pv-st').value }],
+        sessoes: ses.filter(x => x.data && x.inicio).map(x => ({ data: x.data, inicio: x.inicio, servicoId: x.servicoId })), converter: conv.map(x => x.id), concluirConvertidos: !!opts.concluir }); },
     v => `Pacote ${v.codigo} vendido`); if (r.ok) { closeModal(); UI.route = 'pacotes'; render(); } };
 }
+/* venda de pacote lançada errado: troca o pacote, o valor ou a profissional (sem estornar) */
+function modalEditarVendaPacote(vendaId) {
+  const v = DB.pacoteVendas.find(x => x.id === vendaId); if (!v) return;
+  const pcs = (DB.pacotes || []).filter(x => x.ativo !== false || x.id === v.pacoteId), st = situacaoVenda(DB, v), at = DB.atendimentos.find(x => x.id === v.atendimentoId);
+  const ov = openModal(`Corrigir venda ${v.codigo}`, `<div class="note small"><b>${cliNome(v.clienteId)}</b> · vendido em ${dBR(v.data)} por ${esc(v.vendidoPor || '')} · ${esc(v.nome)} · ${brl(v.valor)}${at ? ` · registro ${at.codigo}` : ''}. ${st.usadas + st.marcadas} sessão(ões) usadas ou marcadas.</div>
+    <div class="form"><label class="f">Pacote certo<select id="ev-p">${opt(pcs.map(x => [x.id, `${x.nome} · ${brl(x.preco)}`]), v.pacoteId)}</select></label><label class="f">Profissional<select id="ev-f"></select></label>
+    <label class="f">Valor cobrado (R$)<input id="ev-v" inputmode="decimal" value="${centsInput(v.valor)}"></label><label class="f">Motivo da correção<input id="ev-m" placeholder="Ex.: vendido o pacote errado"></label></div>
+    <div class="note small" id="ev-i"></div>`,
+    `<button class="btn" data-close>Cancelar</button><button class="btn pri" id="ev-ok">Salvar correção</button>`);
+  const q = s => ov.querySelector(s);
+  const upd = mudouPacote => { const pc = pcs.find(x => x.id === val('ev-p')), sv = SV(pc.servicoId), fs = DB.funcionarios.filter(f => f.ativo && sv?.funcs.includes(f.id));
+    q('#ev-f').innerHTML = opt(fs.map(f => [f.id, f.nome]), fs.some(f => f.id === v.funcId) ? v.funcId : fs[0]?.id);
+    if (mudouPacote) q('#ev-v').value = centsInput(pc.preco);
+    q('#ev-i').innerHTML = `Fica: <b>${esc(pc.nome)}</b> (${esc(composicaoTxt(pc))}) por <b>${brl(toCents(val('ev-v')) || 0)}</b>. O registro da venda, o pagamento, o faturamento e a comissão são corrigidos juntos; as sessões já marcadas continuam.`; };
+  q('#ev-p').onchange = () => upd(true); q('#ev-v').oninput = () => upd(false); upd(false);
+  q('#ev-ok').onclick = () => run(() => editarVendaPacote(DB, ACTOR, vendaId, { pacoteId: val('ev-p'), funcId: val('ev-f'), valor: toCents(val('ev-v')), motivo: val('ev-m') }), x => `Venda ${x.codigo} corrigida`).ok && closeModal();
+}
 function modalSessaoPacote(vendaId) {
-  const v = DB.pacoteVendas.find(x => x.id === vendaId), st = situacaoVenda(DB, v), sv = SV(v.servicoId);
-  const fs = DB.funcionarios.filter(f => f.ativo && sv?.funcs.includes(f.id)), ult = st.ags.filter(x => !INATIVOS.includes(x.status)).pop();
-  const sug = ult ? addDays(ult.data, 7) : addDays(TODAY, 1);
+  const v = DB.pacoteVendas.find(x => x.id === vendaId), st = situacaoVenda(DB, v), sv = SV(v.servicoId), misto = !!(v.itens && v.itens.length);
+  const fs = DB.funcionarios.filter(f => f.ativo && (misto ? v.itens.some(i => SV(i.servicoId)?.funcs.includes(f.id)) : sv?.funcs.includes(f.id))), ult = st.ags.filter(x => !INATIVOS.includes(x.status)).pop();
+  const sug = ult ? addDays(ult.data, 7) : addDays(TODAY, 1), comSaldo = st.itens.filter(i => i.livres > 0);
   const ov = openModal('Marcar sessão do pacote', `<div class="note small"><b>${esc(CL(v.clienteId)?.nome)}</b> · ${esc(v.nome)} · ${st.usadas + st.marcadas} de ${v.sessoes} sessões usadas ou marcadas${v.validoAte ? ` · vale até ${dBR(v.validoAte)}` : ''}</div>
-    <div class="form"><label class="f">Dia<input type="date" id="ps-d" value="${sug < TODAY ? TODAY : sug}" min="${TODAY}"${v.validoAte ? ` max="${v.validoAte}"` : ''}></label><label class="f">Horário<select id="ps-h">${opt(FA_HORAS.map(h => [h, h]), ult?.inicio || '10:00')}</select></label>
+    ${misto ? `<div><div class="sec" style="margin:0 0 6px">Qual serviço do pacote?</div><div class="pk-esc">${comSaldo.map((i, k) => `<label class="chk"><input type="checkbox" data-ps-sv="${i.servicoId}" ${k === 0 ? 'checked' : ''}> <span>${esc(SV(i.servicoId)?.nome || '')} <small class="muted">· resta(m) ${i.livres}</small></span></label>`).join('')}</div><div class="muted small" style="margin-top:4px">Marque mais de um para fazer no mesmo dia (ex.: a mão e o pé): ficam um depois do outro.</div></div>` : ''}
+    <div class="form"><label class="f">Dia<input type="date" id="ps-d" value="${sug < TODAY ? TODAY : sug}" min="${TODAY}"${v.validoAte ? ` max="${v.validoAte}"` : ''}></label><label class="f">Horário<select id="ps-h">${opt(horasCom(ult?.inicio).map(h => [h, h]), ult?.inicio || '10:00')}</select></label>
     <label class="f full">Profissional<select id="ps-f">${opt(fs.map(f => [f.id, f.nome]), v.funcId)}</select></label></div>`,
     `<button class="btn" data-close>Cancelar</button><button class="btn pri" id="ps-ok">Marcar na agenda</button>`);
-  ov.querySelector('#ps-ok').onclick = () => run(() => agendarSessaoPacote(DB, ACTOR, vendaId, { data: val('ps-d'), inicio: val('ps-h'), funcId: val('ps-f') }), 'Sessão marcada na agenda').ok && closeModal();
+  ov.querySelector('#ps-ok').onclick = () => run(() => { const ids = [...ov.querySelectorAll('[data-ps-sv]:checked')].map(x => x.dataset.psSv);
+    if (misto && !ids.length) throw new Error('Marque qual serviço do pacote.');
+    return agendarSessoesPacote(DB, ACTOR, vendaId, { data: val('ps-d'), inicio: val('ps-h'), funcId: val('ps-f'), servicoIds: ids }); }, ids => ids.length > 1 ? `${ids.length} sessões marcadas na agenda` : 'Sessão marcada na agenda').ok && closeModal();
 }
 function confirmarSessaoPacote(agId) {
-  const ag = DB.agendamentos.find(x => x.id === agId), v = DB.pacoteVendas.find(x => x.id === ag.pacoteVendaId), st = situacaoVenda(DB, v);
-  const ov = openModal('Concluir sessão do pacote', `<p><b>${esc(CL(ag.clienteId)?.nome)}</b> · ${esc(SV(ag.servicoId)?.nome)} · ${dBR(ag.data)} ${ag.inicio}</p>
-    <div class="note small">Sessão do <b>${esc(v.nome)}</b> (${esc(v.codigo)}). O pacote já foi pago na venda, então concluir esta sessão <b>não gera nova cobrança</b>. Depois dela: ${st.usadas + 1} de ${v.sessoes} sessões usadas.</div>`,
-    `<button class="btn" data-close>Voltar</button><button class="btn pri" id="cs-ok">Concluir sessão</button>`);
-  ov.querySelector('#cs-ok').onclick = () => run(() => concluirSessaoPacote(DB, ACTOR, agId), s => s.encerrado ? 'Sessão concluída · pacote encerrado' : `Sessão concluída · ${s.usadas} de ${v.sessoes} usadas`).ok && closeModal();
+  const ag = DB.agendamentos.find(x => x.id === agId), v = DB.pacoteVendas.find(x => x.id === ag.pacoteVendaId), st = situacaoVenda(DB, v), misto = !!(v.itens && v.itens.length);
+  // outras sessões do mesmo pacote no mesmo dia (ex.: mão e pé): concluem juntas
+  const doDia = st.ags.filter(x => x.data === ag.data && ABERTOS.includes(x.status)).sort((a, b) => (a.id === agId ? -1 : b.id === agId ? 1 : a.inicio.localeCompare(b.inicio)));
+  const opSv = misto ? v.itens.map(i => [i.servicoId, `${SV(i.servicoId)?.nome || ''} (${st.itens.find(k => k.servicoId === i.servicoId)?.usadas || 0} de ${i.qtd} usadas)`]) : null;
+  const ov = openModal('Concluir sessão do pacote', `<p><b>${esc(CL(ag.clienteId)?.nome)}</b> · ${dBR(ag.data)}</p>
+    <div class="stack" style="gap:8px">${doDia.map(x => `<div class="pk-cs">${doDia.length > 1 ? `<input type="checkbox" data-cs="${x.id}" checked aria-label="Concluir">` : `<input type="hidden" data-cs="${x.id}" value="1">`}<span class="b">${x.inicio}</span>${opSv ? `<label class="f" style="flex:1;min-width:0">Serviço que a cliente fez<select data-cs-sv="${x.id}">${opt(opSv, v.itens.some(i => i.servicoId === x.servicoId) ? x.servicoId : (st.itens.find(i => i.livres > 0) || v.itens[0]).servicoId)}</select></label>` : `<span>${esc(SV(x.servicoId)?.nome)}</span>`}</div>`).join('')}</div>
+    <div class="note small">Sessão do <b>${esc(v.nome)}</b> (${esc(v.codigo)}). O pacote já foi pago na venda, então concluir <b>não gera nova cobrança</b>. Usadas até agora: ${st.usadas} de ${v.sessoes}.</div>`,
+    `<button class="btn" data-close>Voltar</button><button class="btn pri" id="cs-ok">Concluir</button>`);
+  ov.querySelector('#cs-ok').onclick = () => run(() => { const ids = [...ov.querySelectorAll('[data-cs]')].filter(x => x.type === 'hidden' || x.checked).map(x => x.dataset.cs);
+    if (!ids.length) throw new Error('Marque ao menos uma sessão.');
+    return transacao(DB, () => ids.map(id => concluirSessaoPacote(DB, ACTOR, id, ov.querySelector(`[data-cs-sv="${id}"]`)?.value || '')).pop()); },
+    s => s.encerrado ? 'Sessão concluída · pacote encerrado' : `Sessão concluída · ${s.usadas} de ${v.sessoes} usadas`).ok && closeModal();
 }
 function pacotesDaClienteHTML(id) {
   const vs = (DB.pacoteVendas || []).filter(v => v.clienteId === id).map(v => ({ v, st: situacaoVenda(DB, v) })).filter(x => !x.st.encerrado);
@@ -9160,7 +9484,7 @@ function relatorioBase(tipo, ini, fim, fid) {
         ['Comissões calculadas', M(sum(L.map(r => r.comissao))), 'Sobre o valor final'],
         ['Pagamentos de comissões', M(pg), 'Pagos aos funcionários no período']] }; }
     case 'formas': { const by = f => ps.filter(p => p.forma === f);
-      return { resumo: ['pix', 'debito', 'credito'].map(f => [FORMAS[f], M(sum(by(f).map(p => p.valor)))]).concat([['Total Pix e cartão', M(sum(ps.filter(p => p.forma !== 'convenio').map(p => p.valor)))]]), cols: ['Forma', 'Parcelas', 'Valor registrado', 'Conferido', 'Pendente', 'Comissão', 'Salão'], rows: ['pix', 'debito', 'credito'].map(f => [FORMAS[f], by(f).length, M(sum(by(f).map(p => p.valor))), M(sum(by(f).filter(p => p.status === 'conferido').map(p => p.valor))), M(sum(by(f).filter(p => p.status === 'pendente').map(p => p.valor))), M(sum(by(f).map(p => p.comissao))), M(sum(by(f).map(p => p.parteSalao)))]) }; }
+      return { resumo: ['pix', 'debito', 'credito', 'dinheiro'].map(f => [FORMAS[f], M(sum(by(f).map(p => p.valor)))]).concat([['Total Pix, cartão e dinheiro', M(sum(ps.filter(p => p.forma !== 'convenio').map(p => p.valor)))]]), cols: ['Forma', 'Parcelas', 'Valor registrado', 'Conferido', 'Pendente', 'Comissão', 'Salão'], rows: ['pix', 'debito', 'credito'].map(f => [FORMAS[f], by(f).length, M(sum(by(f).map(p => p.valor))), M(sum(by(f).filter(p => p.status === 'conferido').map(p => p.valor))), M(sum(by(f).filter(p => p.status === 'pendente').map(p => p.valor))), M(sum(by(f).map(p => p.comissao))), M(sum(by(f).map(p => p.parteSalao)))]) }; }
     case 'convenios': { const cv = L.filter(r => r.o.tipo === 'convenio');
       return { resumo: [['Total cobrado dos convênios', M(sum(cv.map(r => totalConv(r.p))))], ['Acertado', M(sum(cv.map(r => r.p.acertado)))], ['Comissão liberada', M(sum(cv.map(r => r.liberado)))], ['Comissão bloqueada', M(sum(cv.map(r => r.bloqueado)))]], cols: ['Atend.', 'Data', 'Convênio', 'Funcionário', 'Valor', 'Acertado', 'Pendente', 'Comissão', 'Liberada', 'Bloqueada', 'Situação'], rows: cv.map(r => [r.at.codigo, dBR(r.p.data), CV(r.p.convenioId)?.nome, fn(r.o.funcId), M(totalConv(r.p)), M(r.p.acertado), M(totalConv(r.p) - r.p.acertado), M(r.comissao), M(r.liberado), M(r.bloqueado), CONV_STATUS[r.p.situacao]]),
         foot: ['Total', '', '', '', M(sum(cv.map(r => totalConv(r.p)))), M(sum(cv.map(r => r.p.acertado))), M(sum(cv.map(r => totalConv(r.p) - r.p.acertado))), M(sum(cv.map(r => r.comissao))), M(sum(cv.map(r => r.liberado))), M(sum(cv.map(r => r.bloqueado))), ''] }; }
@@ -9446,17 +9770,19 @@ function modalAtendimentoDona() {
   const f = donaFunc(DB) || garantirDona(DB);
   const meus = new Set(DB.servicos.filter(sv => sv.funcs.includes(f.id)).map(sv => sv.id));
   const cats = DB.categorias.map(c => [c, DB.servicos.filter(sv => sv.ativo && sv.catId === c.id)]).filter(([, l]) => l.length);
-  const ov = openModal('Meus atendimentos', `<p class="muted" style="margin-top:0">Você também atende no salão. Marque os serviços que você faz: eles aparecem com o seu nome na agenda, no registro de serviços e no formulário do cliente. Como proprietária, não tem comissão: o valor é todo do salão.</p>
+  const ov = openModal('Meus atendimentos', `<p class="muted" style="margin-top:0">Você também atende no salão. Marque os serviços que você faz: eles aparecem com o seu nome na agenda, no registro de serviços e no formulário do cliente. Com comissão em 0%, o valor é todo do salão; com um percentual, a sua comissão é calculada e aparece no Fechamento Semanal como a das profissionais.</p>
     <label class="chk" style="font-weight:600;margin-bottom:10px"><input type="checkbox" id="da-at" ${f.ativo ? 'checked' : ''}> Atendo clientes no salão (apareço na agenda)</label>
     <div id="da-box" ${f.ativo ? '' : 'hidden'}>
       <div class="form"><label class="f">Clientes ao mesmo tempo<select id="da-sim">${opt([['1', '1 por vez'], ['2', 'Até 2'], ['3', 'Até 3']], String(f.simultaneos || 1))}</select></label>
-      <label class="f">Especialidades (aparece para a equipe)<input id="da-esp" value="${esc(f.especialidades || '')}" placeholder="Ex.: Podologia, manicure e pedicure"></label></div>
+      <label class="f">Especialidades (aparece para a equipe)<input id="da-esp" value="${esc(f.especialidades || '')}" placeholder="Ex.: Podologia, manicure e pedicure"></label>
+      <label class="f">Minha comissão (%)<input id="da-pct" inputmode="decimal" value="${String(f.pct || 0).replace('.', ',')}" placeholder="0"></label>
+      <label class="f">Aplicar também nos serviços já registrados desde<input type="date" id="da-rec" value="" max="${TODAY}"><small class="muted">Opcional. Deixe vazio para valer só para os próximos serviços. Serviços que já entraram em fechamento não mudam.</small></label></div>
       <div class="sec" style="margin:14px 0 8px">Serviços que eu faço</div>
       <div class="da-cats">${cats.map(([c, l]) => `<div class="da-cat"><b>${esc(c.nome)}</b>${l.map(sv => { const outras = sv.funcs.filter(x => x !== f.id && F(x)?.ativo).map(x => first(x));
         return `<label class="chk"><input type="checkbox" data-da-sv="${sv.id}" ${meus.has(sv.id) ? 'checked' : ''}> <span>${esc(sv.nome)}<small class="muted"> · ${outras.length ? 'também ' + esc(outras.join(', ')) : 'só você'}</small></span></label>`; }).join('')}</div>`).join('')}</div>
     </div>`, `<button class="btn" data-close>Cancelar</button><button class="btn pri" id="da-ok">Salvar</button>`, true);
   const at = ov.querySelector('#da-at'); at.onchange = () => { ov.querySelector('#da-box').hidden = !at.checked; };
-  ov.querySelector('#da-ok').onclick = () => run(() => salvarAtendimentoDona(DB, ACTOR, { atende: at.checked, simultaneos: val('da-sim'), especialidades: val('da-esp'), servicos: [...ov.querySelectorAll('[data-da-sv]:checked')].map(x => x.dataset.daSv) }),
+  ov.querySelector('#da-ok').onclick = () => run(() => salvarAtendimentoDona(DB, ACTOR, { atende: at.checked, simultaneos: val('da-sim'), especialidades: val('da-esp'), pct: val('da-pct'), recalcularDesde: val('da-rec'), servicos: [...ov.querySelectorAll('[data-da-sv]:checked')].map(x => x.dataset.daSv) }),
     x => x.ativo ? 'Seus atendimentos foram salvos' : 'Você não aparece mais na agenda').ok && closeModal();
 }
 function modalFuncionario(id) {
@@ -9718,7 +10044,7 @@ const AFTER = {
 
 /* ---------- eventos globais (delegação) ---------- */
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-al-todos],[data-pkv-limpa],[data-online],[data-pg-dup],[data-wa-pk],[data-pk-limpa],[data-sv-limpa],[data-del-cat],[data-po-limpa],[data-ct-todos],[data-del],[data-dono-novo],[data-dono-edit],[data-podo-aba],[data-podo-nova],[data-podo-ficha],[data-cxcentro],[data-comanda],[data-av-teste],[data-av-qr],[data-av-copiar],[data-av-dl],[data-av-nota],[data-pk-novo],[data-pk-edit],[data-pk-vender],[data-pk-filtro],[data-pk-sessao],[data-cli-nivel],[data-dona-serv],[data-mov],[data-mov-ed],[data-mov-ex],[data-cxper],[data-cxnav],[data-cxtipo],[data-cli-acao],[data-conv-membros],[data-receb-com],[data-conf-com],[data-acerto-com],[data-pagar-cli],[data-cvst],[data-liberar],[data-conta],[data-sair],[data-codigo],[data-repasse],[data-adiant],[data-extrato],[data-abater],[data-conv-novo],[data-conv-edit],[data-conv-filtro],[data-alertas],[data-fechar],[data-faltou],[data-chegou],[data-tema],[data-pdf],[data-wa-ag],[data-wa-cli],[data-wa-cob],[data-wa-at],[data-fab],[data-go],[data-menu],[data-per],[data-agv],[data-agnav],[data-ag],[data-bl],[data-slot],[data-goday],[data-new-ag],[data-new-bl],[data-new-reg],[data-at-open],[data-receb],[data-conf],[data-acerto],[data-fesem],[data-fe-ver],[data-pagar],[data-new-cli],[data-cli],[data-new-func],[data-func],[data-new-serv],[data-serv],[data-new-cat],[data-mais],[data-pub-abrir],[data-pub-cliente],[data-origem-nova],[data-origem],[data-ped-agendar],[data-ped-recusar],[data-qr-copiar],[data-qr-dl],[data-qr-ver],[data-ped-dia]');
+  const t = e.target.closest('[data-al-todos],[data-pkv-limpa],[data-online],[data-pg-dup],[data-wa-pk],[data-pk-limpa],[data-sv-limpa],[data-del-cat],[data-po-limpa],[data-ct-todos],[data-del],[data-dono-novo],[data-dono-edit],[data-podo-aba],[data-podo-nova],[data-podo-ficha],[data-cxcentro],[data-comanda],[data-av-teste],[data-av-qr],[data-av-copiar],[data-av-dl],[data-av-nota],[data-pk-novo],[data-pk-corrigir],[data-pk-edit],[data-pk-vender],[data-pk-filtro],[data-pk-sessao],[data-cli-nivel],[data-dona-serv],[data-mov],[data-mov-ed],[data-mov-ex],[data-cxper],[data-cxnav],[data-cxtipo],[data-cli-acao],[data-conv-membros],[data-conv-pagar],[data-receb-com],[data-conf-com],[data-acerto-com],[data-pagar-cli],[data-cvst],[data-liberar],[data-conta],[data-sair],[data-codigo],[data-repasse],[data-adiant],[data-extrato],[data-abater],[data-conv-novo],[data-conv-edit],[data-conv-filtro],[data-alertas],[data-fechar],[data-faltou],[data-chegou],[data-tema],[data-pdf],[data-wa-ag],[data-wa-cli],[data-wa-cob],[data-wa-at],[data-fab],[data-go],[data-menu],[data-per],[data-agv],[data-agnav],[data-ag],[data-bl],[data-slot],[data-goday],[data-new-ag],[data-new-bl],[data-new-reg],[data-at-open],[data-receb],[data-conf],[data-acerto],[data-fesem],[data-fe-ver],[data-pagar],[data-new-cli],[data-cli],[data-new-func],[data-func],[data-new-serv],[data-serv],[data-new-cat],[data-mais],[data-pub-abrir],[data-pub-cliente],[data-origem-nova],[data-origem],[data-ped-agendar],[data-ped-recusar],[data-qr-copiar],[data-qr-dl],[data-qr-ver],[data-ped-dia]');
   if (!t) return;
   const ds = t.dataset;
   if ('waAg' in ds) { e.stopPropagation(); const x = DB.agendamentos.find(a => a.id === ds.waAg); return modalWhatsApp({ agendamentoId: ds.waAg }, ds.waM || waModeloPadrao(x)); }
@@ -9741,6 +10067,7 @@ document.addEventListener('click', e => {
   if ('pkVender' in ds) return modalVenderPacote(ds.pkVender, ds.cliPk || '');
   if ('pkFiltro' in ds) { UI.pkFiltro = ds.pkFiltro; render(); return; }
   if ('pkSessao' in ds) return modalSessaoPacote(ds.pkSessao);
+  if ('pkCorrigir' in ds) return modalEditarVendaPacote(ds.pkCorrigir);
   if ('cliNivel' in ds) { UI.cliNivel = UI.cliNivel === ds.cliNivel ? '' : ds.cliNivel; UI.cliMax = 0; render(); return; }
   if ('donaServ' in ds) return modalAtendimentoDona();
   if ('mov' in ds) return modalMovimento(ds.mov, null, { centro: ds.movCentro || '' });
@@ -9817,6 +10144,7 @@ document.addEventListener('click', e => {
   if ('newFunc' in ds) return modalFuncionario();
   if ('func' in ds) return modalFuncionario(ds.func);
   if ('convMembros' in ds) return modalConveniados(ds.convMembros);
+  if ('convPagar' in ds) return modalPagarConvenioTodo(ds.convPagar);
   if ('cliAcao' in ds) { const [acao, cid] = ds.cliAcao.split('|'); closeModal();
     if (acao === 'agendar') return modalAgendamento({ clienteId: cid });
     if (acao === 'registrar') return modalRegistro({ clienteId: cid });
