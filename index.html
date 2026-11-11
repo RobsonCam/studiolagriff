@@ -1181,6 +1181,9 @@ td.acts{width:1%;white-space:nowrap}
 .pk-its{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px} .pk-its span{font-size:12px;background:var(--sunk);border-radius:999px;padding:3px 9px}
 .pk-venda.pk-canc{opacity:.75} .pk-venda.pk-canc .pk-cont b{text-decoration:line-through}
 .pk-esc{display:flex;flex-direction:column;gap:6px}
+.vs-r{display:grid;grid-template-columns:minmax(0,1.4fr) 64px minmax(0,1fr) auto;gap:8px;align-items:start} .vs-r .svb{min-width:0}
+@media (max-width:560px){.vs-r{grid-template-columns:minmax(0,1fr) 64px}.vs-r .svb,.vs-r>select[data-vs-sv]{grid-column:1/3;grid-row:1}.vs-r [data-vs-f]{grid-column:1;grid-row:2}.vs-r [data-vs-q]{grid-column:2;grid-row:2}.vs-r [data-vs-rm]{grid-column:1/3;justify-self:start}}
+.ag-saldo{border-color:var(--ok)}
 .pk-cs{display:flex;gap:10px;align-items:center;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;padding:8px 10px}
 .ag-pk,.cv-pagar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border:1px dashed var(--accent);border-radius:12px;padding:10px 12px;margin:6px 0}
 /* ===== Cards de valores: todos iguais, sólidos como os botões principais, nas cores da marca =====
@@ -2620,13 +2623,20 @@ function estornarAtendimento(S, a, id, motivo) {
   if (obs.some(o => o.fechado > 0)) throw new Error('Este serviço já entrou em fechamento. Corrija com um ajuste no próximo fechamento, sem apagar o histórico.');
   const ps = S.parcelas.filter(p => p.atendimentoId === id);
   if (ps.some(p => (p.acertado || 0) > 0)) throw new Error('O convênio deste serviço já tem acerto registrado. Estorne o acerto com a operadora antes.');
+  // compra de serviços sem agendar com mais de um serviço: o estorno de uma linha tira só aquele saldo (se ainda não foi usado)
+  const pvC = at.pacoteVendaId && (S.pacoteVendas || []).find(v => v.id === at.pacoteVendaId && v.tipo === 'credito' && (v.atendimentoIds || []).includes(at.id) && !v.cancelado);
+  const parcial = pvC && pvC.atendimentoIds.some(x => x !== at.id && S.atendimentos.find(k => k.id === x)?.status === 'concluido');
+  if (parcial) { const it = situacaoVenda(S, pvC).itens.find(i => i.servicoId === at.servicoId), q = at.creditoQtd || 1;
+    if (!it || it.qtd - it.usadas - it.marcadas < q) throw new Error(`A cliente já usou ou marcou ${S.servicos.find(x => x.id === at.servicoId)?.nome || 'este serviço'} desta compra. Desmarque as sessões antes de estornar.`); }
   at.status = 'estornado'; at.motivoEstorno = motivo; at.estornadoPor = a.nome; at.estornadoEm = stamp();
   obs.forEach(o => { o.cancelada = true; });
   ps.forEach(p => { if (p.forma === 'convenio') p.situacao = 'cancelado'; });
   if (at.agendamentoId) { const ag = S.agendamentos.find(x => x.id === at.agendamentoId); if (ag) { ag.status = 'atendimento'; ag.historico.push({ quando: stamp(), usuario: a.nome, texto: `Registro ${at.codigo} estornado` }); const sn = sinalDoAtendimento(S, ag); if (sn && sn.usadoEm === at.codigo) sn.usadoEm = ''; } }
   if (S.estoqueMov) devolverConsumo(S, a, at.id, at.codigo);
   // estorno da venda de um pacote: o pacote é cancelado e as sessões ainda marcadas saem da agenda
-  const pv = at.pacoteVendaId && (S.pacoteVendas || []).find(v => v.id === at.pacoteVendaId && v.atendimentoId === at.id);
+  if (parcial) { const q = at.creditoQtd || 1, it = pvC.itens.find(i => i.servicoId === at.servicoId); it.qtd -= q; if (it.qtd <= 0) pvC.itens = pvC.itens.filter(i => i !== it);
+    pvC.sessoes -= q; pvC.valor -= at.valorFinal; (pvC.historico = pvC.historico || []).push({ quando: stamp(), usuario: a.nome, texto: `${at.codigo} estornado: saiu ${q}x ${S.servicos.find(x => x.id === at.servicoId)?.nome || ''} · ${motivo}` }); }
+  const pv = !parcial && at.pacoteVendaId && (S.pacoteVendas || []).find(v => v.id === at.pacoteVendaId && (v.atendimentoIds || [v.atendimentoId]).includes(at.id));
   if (pv) { pv.cancelado = { por: a.nome, em: stamp(), motivo };
     sessoesDaVenda(S, pv.id).filter(x => ABERTOS.includes(x.status)).forEach(x => { x.status = 'cancelado'; x.historico.push({ quando: stamp(), usuario: a.nome, texto: `Pacote ${pv.codigo} estornado · sessão cancelada` }); }); }
   audit(S, a, 'Estorno de serviço', `${at.codigo}${pv ? ` · pacote ${pv.codigo} cancelado` : ''} · ${motivo}`);
@@ -3316,7 +3326,7 @@ function agendarSessaoPacote(S, a, vendaId, d) {
   if (v.validoAte && d.data > v.validoAte) throw new Error(`O pacote vale até ${dBR(v.validoAte)}. Escolha uma data até lá.`);
   if (!d.data || !d.inicio) throw new Error('Escolha o dia e o horário da sessão.');
   const servicoId = servicoDaSessao(S, v, st, d.servicoId), sv = S.servicos.find(x => x.id === servicoId);
-  let funcId = d.funcId || v.funcId;
+  let funcId = d.funcId || (v.funcPorServico && v.funcPorServico[servicoId]) || v.funcId;
   if (sv && !sv.funcs.includes(funcId)) { const outra = sv.funcs.find(id => S.funcionarios.find(f => f.id === id)?.ativo); if (d.funcId || !outra) throw new Error(`${S.funcionarios.find(f => f.id === funcId)?.nome || 'A profissional'} não faz ${sv.nome}.`); funcId = outra; }
   const n = st.ags.filter(x => !INATIVOS.includes(x.status)).length + 1;
   return salvarAgendamento(S, a, { clienteId: v.clienteId, servicoId, funcId, data: d.data, inicio: d.inicio, fim: d.fim || fromMin(toMin(d.inicio) + (sv?.duracao || 60)),
@@ -3358,12 +3368,58 @@ function venderPacote(S, a, d) {
     return v;
   });
 }
+/* compra de serviços sem agendar (ex.: vendas na live): avulsos, combos ou vários de um serviço.
+   A cliente paga agora e fica com o saldo; quando quiser, agenda pelo saldo (já está pago).
+   O valor total é dividido entre os serviços pelo preço de tabela, para o faturamento por serviço e a comissão. */
+function venderServicos(S, a, d) {
+  if (!isOwner(a)) { exigirAcesso(S, a); if (!pode(S, a, 'registrar')) throw new Error('Seu usuário não registra vendas.'); }
+  if (!d.clienteId || !S.clientes.some(k => k.id === d.clienteId)) throw new Error('Escolha a cliente.');
+  const linhas = (d.linhas || []).map(l => ({ ...l, qtd: parseInt(l.qtd, 10) || 0, sv: S.servicos.find(x => x.id === l.servicoId) })).filter(l => l.sv && l.qtd > 0);
+  if (!linhas.length) throw new Error('Adicione ao menos um serviço comprado.');
+  if (linhas.some(l => l.qtd > 30)) throw new Error('Máximo de 30 de cada serviço por compra.');
+  if (new Set(linhas.map(l => l.servicoId)).size !== linhas.length) throw new Error('Cada serviço aparece uma vez: ajuste a quantidade.');
+  linhas.forEach(l => { const ok = id => id && l.sv.funcs.includes(id) && S.funcionarios.find(f => f.id === id)?.ativo !== false;
+    if (!ok(l.funcId)) l.funcId = l.sv.funcs.find(ok); if (!l.funcId) throw new Error(`Nenhuma profissional ativa faz ${l.sv.nome}.`); });
+  const total = d.valor > 0 ? d.valor : sum(linhas.map(l => l.sv.preco * l.qtd));
+  if (!(total > 0)) throw new Error('Informe o valor da compra.');
+  const valores = Engine.ratear(total, linhas.map(l => Math.max(l.sv.preco, 1) * l.qtd));
+  if (valores.some(v => v <= 0)) throw new Error('O valor é pequeno demais para dividir entre os serviços.');
+  return transacao(S, () => {
+    const nomeTxt = linhas.map(l => `${l.qtd}x ${l.sv.nome}`).join(' + '), origem = String(d.origem || '').trim();
+    const ats = registrarAtendimentoGrupo(S, a, { clienteId: d.clienteId, data: d.data || TODAY, hora: d.hora, desconto: 0, obs: `Compra sem agendar${origem ? ` (${origem})` : ''}: ${nomeTxt}`,
+      parcelas: d.parcelas && d.parcelas.length ? d.parcelas.map(p => ({ ...p, valor: p.valor || total })) : [{ forma: 'pix', valor: total }],
+      itens: linhas.map((l, i) => ({ funcId: l.funcId, servicoId: l.servicoId, valorCobrado: valores[i] })) });
+    S.seq.pk = (S.seq.pk || 0) + 1;
+    const v = { id: uid('pv'), codigo: 'PCT-' + S.seq.pk, tipo: 'credito', pacoteId: null, nome: String(d.nome || '').trim() || nomeTxt, servicoId: linhas[0].servicoId,
+      itens: linhas.map(l => ({ servicoId: l.servicoId, qtd: l.qtd })), funcId: linhas[0].funcId, funcPorServico: Object.fromEntries(linhas.map(l => [l.servicoId, l.funcId])),
+      clienteId: d.clienteId, sessoes: sum(linhas.map(l => l.qtd)), valor: total, atendimentoId: ats[0].id, atendimentoIds: ats.map(x => x.id), origem,
+      data: d.data || TODAY, validoAte: (parseInt(d.validadeDias, 10) || 0) > 0 ? addDays(d.data || TODAY, parseInt(d.validadeDias, 10)) : '', vendidoPor: a.nome, criadoEm: stamp() };
+    ats.forEach(at => { at.pacoteVendaId = v.id; at.creditoQtd = linhas.find(l => l.servicoId === at.servicoId)?.qtd || 1; });
+    S.pacoteVendas = S.pacoteVendas || []; S.pacoteVendas.push(v);
+    audit(S, a, 'Serviços vendidos sem agendar', `${v.codigo} · ${nomeTxt} · ${S.clientes.find(k => k.id === d.clienteId)?.nome || ''} · ${brl(total)}${origem ? ` · ${origem}` : ''}`);
+    return v;
+  });
+}
+/* saldo de serviços já pagos da cliente (pacotes e compras sem agendar), para agendar pelo saldo */
+const saldosDaCliente = (S, clienteId) => (S.pacoteVendas || []).filter(v => v.clienteId === clienteId && !v.cancelado).map(v => ({ v, st: situacaoVenda(S, v) })).filter(x => x.st.livres > 0 && !x.st.vencido);
+/* pagamento semanal da recepcionista (ela não tem comissão): vai para as saídas do financeiro como salário */
+function pagarRecepcao(S, a, d) {
+  exigirDono(a);
+  const f = S.funcionarios.find(x => x.id === d.funcId && !x.excluido);
+  if (!f || cargoDe(f) !== 'recepcao' || f.dona) throw new Error('Escolha a recepcionista.');
+  if (!d.ini || !d.fim || d.fim < d.ini) throw new Error('Informe a semana do pagamento.');
+  if (!d.data || d.data > TODAY) throw new Error('A data do pagamento não pode ser no futuro.');
+  return transacao(S, () => { const [m] = salvarMovimento(S, a, { tipo: 'saida', categoria: 'salarios', descricao: `Pagamento semanal · ${f.nome} · semana ${dBR(d.ini).slice(0, 5)} a ${dBR(d.fim).slice(0, 5)}`, valor: d.valor, data: d.data, forma: d.forma || 'pix', obs: d.obs });
+    Object.assign(m, { funcId: f.id, pagRecepcao: { ini: d.ini, fim: d.fim }, hora: d.hora || '' }); return m; });
+}
+const pagamentosRecepcao = (S, funcId) => (S.movimentos || []).filter(m => m.pagRecepcao && !m.excluido && (!funcId || m.funcId === funcId)).sort((x, y) => (y.data + (y.hora || '')).localeCompare(x.data + (x.hora || '')));
 /* venda lançada errado: troca o pacote, o valor ou a profissional sem estornar.
    O registro da venda, a forma de pagamento e a comissão são ajustados juntos; as sessões continuam. */
 function editarVendaPacote(S, a, vendaId, d) {
   exigirDono(a);
   const v = (S.pacoteVendas || []).find(x => x.id === vendaId); if (!v) throw new Error('Pacote não encontrado.');
   if (v.cancelado) throw new Error('Este pacote foi estornado e não pode ser editado.');
+  if (v.tipo === 'credito') throw new Error('Compra de serviços sem agendar não é corrigida aqui: estorne o serviço errado e lance a compra de novo.');
   const motivo = String(d.motivo || '').trim(); if (motivo.length < 5) throw new Error('Descreva o motivo da correção.');
   const pc = (S.pacotes || []).find(x => x.id === (d.pacoteId || v.pacoteId)); if (!pc) throw new Error('Escolha o pacote.');
   const valor = d.valor > 0 ? d.valor : pc.preco, sv = S.servicos.find(x => x.id === pc.servicoId);
@@ -5058,6 +5114,25 @@ function runTests() {
     salvarAtendimentoDona(S9, d9, { atende: true, servicos: S9.servicos.filter(s => s.funcs.includes(dona.id)).map(s => s.id), pct: '40', recalcularDesde: TODAY });
     const ob = S9.obrigacoes.find(o => o.atendimentoId === at.id);
     return (fora && equipeComissao(S9).some(f => f.id === dona.id) && at.comissaoTotal === 1200 && ob.comissao === 1200 && ob.liberado === 1200) || JSON.stringify([fora, at, ob]);
+  });
+  T('Compra sem agendar (live): fica o saldo pago, agenda pelo saldo sem cobrar e o estorno de um serviço tira só aquele saldo', () => {
+    const S7 = seedBase(), d7 = S7.users.find(u => u.id === 'u0');
+    const v = venderServicos(S7, d7, { clienteId: 'k1', linhas: [{ servicoId: 's7', qtd: 2 }, { servicoId: 's8', qtd: 1 }], valor: 9000, origem: 'Live', parcelas: [{ forma: 'pix', valor: 9000 }] });
+    const ats = v.atendimentoIds.map(id => S7.atendimentos.find(x => x.id === id)), fat = sum(ats.map(x => x.valorFinal));
+    const sd = saldosDaCliente(S7, 'k1').find(x => x.v.id === v.id);
+    const agId = agendarSessaoPacote(S7, d7, v.id, { data: addDays(TODAY, 3), inicio: '10:00', servicoId: 's7' }), ag = S7.agendamentos.find(x => x.id === agId);
+    const atPe = ats.find(x => x.servicoId === 's8'); estornarAtendimento(S7, d7, atPe.id, 'cliente desistiu do pé');
+    const st = situacaoVenda(S7, v), atMao = ats.find(x => x.servicoId === 's7');
+    const parcialOk = !v.cancelado && v.sessoes === 2 && st.livres === 1 && v.valor === 9000 - atPe.valorFinal;
+    estornarAtendimento(S7, d7, atMao.id, 'cliente desistiu de tudo');   // último serviço da compra: cancela o saldo e a sessão marcada
+    return (ats.length === 2 && fat === 9000 && sd && sd.st.livres === 3 && ag.preco === 0 && ag.pacoteVendaId === v.id && parcialOk && v.cancelado && ag.status === 'cancelado') || JSON.stringify([ats, v, st]);
+  });
+  T('Pagamento semanal da recepcionista vira saída de salário no financeiro', () => {
+    const S8b = seedBase(), d8 = S8b.users.find(u => u.id === 'u0');
+    S8b.funcionarios.push({ id: 'frx8', nome: 'Rec', email: 'r8@x.com', cargo: 'recepcao', pct: 0, ativo: true, acesso: 'ativo' });
+    const m = pagarRecepcao(S8b, d8, { funcId: 'frx8', valor: 30000, data: TODAY, ini: addDays(TODAY, -6), fim: TODAY, forma: 'pix' });
+    const prof = deveFalhar(() => pagarRecepcao(S8b, d8, { funcId: 'f1', valor: 100, data: TODAY, ini: TODAY, fim: TODAY }));
+    return (m.tipo === 'saida' && m.categoria === 'salarios' && m.funcId === 'frx8' && pagamentosRecepcao(S8b, 'frx8').length === 1 && /recepcionista/.test(prof)) || JSON.stringify([m, prof]);
   });
   return out;
 }
@@ -8023,6 +8098,7 @@ function modalAgendamento(pref = {}) {
     <div class="form"><label class="f">Data<input type="date" id="a-dt" value="${d.data}"></label><label class="f">Começa às<input type="time" id="a-hi" value="${d.inicio}" step="300"></label></div>
     ${travados.length ? `<div class="note small">${travados.map(x => `${x.inicio} ${esc(SV(x.servicoId)?.nome)} com ${esc(first(x.funcId))} já foi concluído e não muda.`).join('<br>')}</div>` : ''}
     <div><div class="bar" style="justify-content:space-between;margin-bottom:8px"><span class="sec" style="margin:0">Serviços</span><button class="btn sm" id="a-add" type="button">+ Adicionar serviço</button></div><div class="srows" id="a-itens"></div></div>
+    <div id="a-saldo">${saldoClienteHTML(d.clienteId)}</div>
     <div class="ag-tot" id="a-tot"></div>
     ${(DB.pacotes || []).some(x => x.ativo !== false) && pode(DB, ACTOR, 'registrar') && !(ag && ag.pacoteVendaId) ? `<div class="ag-pk"><div class="small"><b>A cliente vai levar um pacote?</b><div class="muted">${editaveis.length ? 'Este horário vira a 1ª sessão do pacote.' : 'Vende o pacote e marca as sessões na agenda.'}</div></div><button class="btn sm" type="button" id="a-pk">Vender pacote</button></div>` : ''}
     <div class="note bad small" id="a-conf" role="alert" hidden></div>
@@ -8031,7 +8107,7 @@ function modalAgendamento(pref = {}) {
     ${hist.length ? `<details><summary class="small b" style="cursor:pointer">Histórico de alterações</summary>${hist.map(h => `<div class="split small"><span>${esc(h.texto)}${grupo.length > 1 ? ` · ${esc(h.sv || '')}` : ''}</span><span class="muted">${esc(h.quando)} · ${esc(h.usuario)}</span></div>`).join('')}</details>` : ''}`,
     `<button class="btn" data-close>Cancelar</button><button class="btn pri" id="a-ok">${ag ? 'Salvar alterações' : 'Criar agendamento'}</button>`, true);
   const q = s => ov.querySelector(s);
-  montarClientePicker(ov, 'a', id => { conferir(); const el = q('#a-pend'); el.dataset.pendCli = id || ''; el.innerHTML = pendenciaHTML(id, 'agenda'); });
+  montarClientePicker(ov, 'a', id => { const sd = q('#a-saldo'); if (sd) sd.innerHTML = saldoClienteHTML(id); conferir(); const el = q('#a-pend'); el.dataset.pendCli = id || ''; el.innerHTML = pendenciaHTML(id, 'agenda'); });
   const horarios = () => { let ini = toMin(val('a-hi') || '09:00'); return itens.map((it, i) => { const st = i === 0 ? ini : it.modo === 'junto' ? itens._st[i - 1] : itens._fim[i - 1]; return [st, st + (it.dur || 0)]; }); };
   // cada serviço tem início e fim próprios: o padrão é um depois do outro, pela duração estimada,
   // mas a recepção pode mudar a hora de início e de fim (nem sempre termina na hora estimada)
@@ -8336,12 +8412,13 @@ function modalAtendimento(id) {
     </tbody></table></div>`}
     ${acs.length ? `<div><div class="sec" style="margin:0 0 6px">Acertos de convênio</div>${acs.map(a => `<div class="split small"><span>${dataHora(a.data, a.hora)} · ${veFaturamento() ? brl(a.valor) + ' ' : ''}acertado ${isOwner(ACTOR) ? `· liberou ${brl(a.liberado)}` : ''}</span><span class="muted">${esc(a.responsavel)}</span></div>`).join('')}</div>` : ''}
     ${at.obs ? `<div class="muted">Obs.: ${esc(at.obs)}</div>` : ''}
-    ${(() => { const pv = at.pacoteVendaId && (DB.pacoteVendas || []).find(v => v.id === at.pacoteVendaId && v.atendimentoId === at.id); if (!pv) return '';
+    ${(() => { const pv = at.pacoteVendaId && (DB.pacoteVendas || []).find(v => v.id === at.pacoteVendaId && (v.atendimentoIds || [v.atendimentoId]).includes(at.id)); if (!pv) return '';
+      if (pv.tipo === 'credito') return `<div class="note small">Compra sem agendar <b>${esc(pv.codigo)}</b> · ${esc(pv.nome)}${pv.cancelado ? ' · <b>estornada</b>' : ''}. O serviço fica de saldo para a cliente agendar depois.</div>`;
       return `<div class="note small">Venda do pacote <b>${esc(pv.codigo)}</b> · ${esc(pv.nome)}${pv.cancelado ? ' · <b>estornado</b>' : ''}.${isOwner(ACTOR) && !pv.cancelado && at.status === 'concluido' ? ` Vendeu o pacote errado? Use <b>Corrigir venda</b>: troca o pacote ou o valor sem perder o pagamento.<div class="bar" style="margin-top:6px"><button class="btn sm pri" data-pk-corrigir="${pv.id}">Corrigir venda do pacote</button></div>` : ''}</div>`; })()}
     ${isOwner(ACTOR) && at.custoMaterial ? `<div class="small muted">Material gasto (baixado do estoque): ${brl(at.custoMaterial)} · lucro real ${brl(at.valorFinal - at.comissaoTotal - at.custoMaterial)}</div>` : ''}
     ${produtosDoDiaHTML(at.clienteId, at.data)}
     ${at.status === 'concluido' ? `<div class="bar">${ps.some(p => p.status === 'pendente') ? waBtn(`data-wa-at="${at.id}" data-wa-m="cobranca"`, 'Cobrar no WhatsApp', 'cobranca') : waBtn(`data-wa-at="${at.id}" data-wa-m="agradecimento"`, 'Agradecer no WhatsApp', 'agradecimento')}</div>` : ''}
-    ${isOwner(ACTOR) && at.status === 'concluido' ? `<details><summary class="small b" style="cursor:pointer">Estornar este registro</summary><div class="stack" style="gap:8px;margin-top:10px"><div class="note warn">O estorno preserva o histórico. Só é permitido antes do serviço entrar em fechamento ou ter acerto de convênio.${at.pacoteVendaId && (DB.pacoteVendas || []).some(v => v.id === at.pacoteVendaId && v.atendimentoId === at.id) ? ' <b>Este registro é a venda de um pacote:</b> o estorno cancela o pacote, as sessões marcadas saem da agenda e o valor sai do faturamento. Use só se a cliente desistiu e o dinheiro foi devolvido.' : ''}</div><label class="f">Justificativa<textarea id="es-m"></textarea></label><div><button class="btn dng" id="es-ok">Estornar registro</button></div></div></details>` : ''}`,
+    ${isOwner(ACTOR) && at.status === 'concluido' ? `<details><summary class="small b" style="cursor:pointer">Estornar este registro</summary><div class="stack" style="gap:8px;margin-top:10px"><div class="note warn">O estorno preserva o histórico. Só é permitido antes do serviço entrar em fechamento ou ter acerto de convênio.${at.pacoteVendaId && (DB.pacoteVendas || []).some(v => v.id === at.pacoteVendaId && (v.atendimentoIds || [v.atendimentoId]).includes(at.id)) ? ' <b>Este registro é a venda de um pacote:</b> o estorno cancela o pacote, as sessões marcadas saem da agenda e o valor sai do faturamento. Use só se a cliente desistiu e o dinheiro foi devolvido.' : ''}</div><label class="f">Justificativa<textarea id="es-m"></textarea></label><div><button class="btn dng" id="es-ok">Estornar registro</button></div></div></details>` : ''}`,
     '', true);
   ov.querySelector('#es-ok')?.addEventListener('click', () => run(() => estornarAtendimento(DB, ACTOR, id, val('es-m')), 'Registro estornado').ok && closeModal());
 }
@@ -8562,7 +8639,7 @@ function pgFechamento() {
   const lista = DB.fechamentos.filter(f => f.funcId === fid).sort((a, b) => b.inicio.localeCompare(a.inicio));
   const jaFe = fechamentoDaSemana(DB, fid, UI.fechIni, UI.fechFim);
   const pgSem = r => r.p.forma === 'convenio' ? (DB.acertos || []).filter(x => x.parcelaId === r.p.id && x.data >= UI.fechIni && x.data <= UI.fechFim).map(x => dBR(x.data).slice(0, 5)) : [];
-  const linha = r => `<tr class="${r.p.forma === 'convenio' && r.p.data < UI.fechIni && r.bloqueado > 0 ? 'pend-pg' : ''}"><td class="code">${r.at.codigo}</td><td>${dBR(r.p.data)}</td><td>${esc(SV(r.at.servicoId)?.nome)}</td><td>${FORMAS[r.p.forma]}${r.p.forma === 'convenio' && (r.p.nParcelas || 1) > 1 ? ` ${r.p.nParcelas}x` : ''}</td><td class="r">${brl(r.p.valor)}</td><td class="r">${brl(r.comissao)}</td><td class="r">${brl(r.liberado)}</td><td class="r">${brl(r.pago)}</td><td class="r b">${brl(r.aFechar)}</td><td>${pill(...situacaoComissao(r))}${r.p.forma === 'convenio' && r.p.data < UI.fechIni ? `<div class="muted small">${pgSem(r).length ? `convênio pago em ${pgSem(r).join(', ')}` : r.bloqueado > 0 ? 'de semana anterior · aguarda o convênio' : 'de semana anterior'}</div>` : ''}</td></tr>`;
+  const linha = r => `<tr class="${r.p.forma === 'convenio' && r.p.data < UI.fechIni && r.bloqueado > 0 ? 'pend-pg' : ''}"><td class="code">${r.at.codigo}</td><td>${dBR(r.p.data)}</td><td>${esc(SV(r.at.servicoId)?.nome)}</td><td>${FORMAS[r.p.forma]}${r.p.forma === 'convenio' && (r.p.nParcelas || 1) > 1 ? ` ${r.p.nParcelas}x` : ''}</td><td class="r">${brl(r.p.valor)}</td><td class="r">${brl(r.comissao)}</td><td class="r">${brl(r.liberado)}</td><td class="r">${brl(r.pago)}</td><td class="r b">${brl(r.aFechar)}</td><td>${r.p.forma === 'convenio' && r.p.data < UI.fechIni && (r.bloqueado > 0 || pgSem(r).length) ? (pgSem(r).length && r.aFechar > 0 ? pill(`Liberada · convênio pago ${pgSem(r).join(', ')}`, 'info') : r.bloqueado > 0 ? pill('Bloqueada · de semana anterior', 'warn') : pill(...situacaoComissao(r))) : pill(...situacaoComissao(r))}</td></tr>`;
   const tabela = rows => rows.length ? `<div class="tw"><table><thead><tr><th>Atend.</th><th>Data</th><th>Serviço</th><th>Forma</th>${veFaturamento() ? '<th class="r">Valor</th>' : ''}<th class="r">Comissão</th><th class="r">Liberada</th><th class="r">Paga</th><th class="r">A fechar</th><th>Situação</th></tr></thead><tbody>${rows.slice(0, LIM('feMax', 150)).map(linha).join('')}</tbody></table></div>${rows.length > LIM('feMax', 150) ? `<div class="mais-linhas"><span class="muted small">Mostrando ${LIM('feMax', 150)} de ${rows.length}. Os totais acima consideram todos.</span><button class="btn" data-mais="feMax">Mostrar mais</button></div>` : ''}` : '<div class="muted small">Nada nesta seção.</div>';
   return `
   <div class="ph"><div><h1>Fechamento Semanal</h1><p>Um único fechamento por profissional e por semana, somando tudo o que já foi liberado: Pix, cartão e convênio acertado. O que for liberado depois entra no mesmo fechamento, e o pagamento é feito de uma vez.</p></div></div>
@@ -8756,7 +8833,7 @@ function pgPagamentos() {
   const totDev = sum(conta.map(c => c.dev));
   return `
   <div class="ph"><div><h1>${own ? 'Meus pagamentos' : 'Pagamentos de comissões'}</h1><p>${own ? 'Pagamentos recebidos, adiantamentos e o que ainda será descontado das suas comissões.' : 'Pagamento de fechamento não passa do saldo. Adiantamento é pago antes do fechamento e vira saldo negativo, descontado automaticamente das próximas comissões.'}</p></div>
-    ${own ? '' : '<div class="act"><button class="btn" data-adiant="">Adiantamento</button><button class="btn pri" data-pagar="">Registrar pagamento</button></div>'}</div>
+    ${own ? '' : `<div class="act"><button class="btn" data-adiant="">Adiantamento</button>${DB.funcionarios.some(f => cargoDe(f) === 'recepcao' && !f.dona && f.ativo && !f.excluido) ? '<button class="btn" data-pg-rec="">Pagamento da recepção</button>' : ''}<button class="btn pri" data-pagar="">Registrar pagamento</button></div>`}</div>
   <div class="stack">
     ${avisoDuplicadosHTML()}
     <div class="grid g4">${kpi(own ? 'Recebido de comissões' : 'Pago de comissões', brl(sum(fechPg.map(p => p.valor))), `${fechPg.length} pagamento(s)`, 'ok')}${kpi('Adiantamentos pagos', brl(sum(adPg.map(p => p.valor))), `${adPg.length} adiantamento(s)`, 'info')}
@@ -8766,6 +8843,7 @@ function pgPagamentos() {
       ${conta.map(c => `<tr><td class="b">${esc(c.f.nome)}</td><td class="r">${brl(c.rec)}</td><td class="r" style="color:${c.dev ? 'var(--bad)' : 'inherit'}">${c.dev ? '−' + brl(c.dev) : '—'}</td>
         <td class="r b" style="color:${c.saldo < 0 ? 'var(--bad)' : c.saldo > 0 ? 'var(--ok)' : 'inherit'}">${c.saldo < 0 ? '−' + brl(-c.saldo) : brl(c.saldo)}${c.saldo < 0 ? '<div class="muted small" style="font-weight:400">saldo negativo</div>' : ''}</td>
         <td><div class="bar" style="flex-wrap:nowrap;justify-content:flex-end"><button class="btn sm" data-extrato="${c.f.id}">Extrato</button>${own ? '' : `<button class="btn sm" data-adiant="${c.f.id}">Adiantamento</button>`}</div></td></tr>`).join('')}</tbody></table></div>
+    ${recepcaoPagamentosHTML(own)}
     <div class="sec">Histórico</div>
     ${pgs.length ? `<div class="tw"><table><thead><tr><th>Data e hora</th><th>Tipo</th><th>Funcionário</th><th>Fechamento</th><th>Período</th><th>Método</th><th class="r">Valor</th><th>Referência</th><th>Registrado por</th></tr></thead><tbody>
     ${pgs.map(p => { const fe = p.fechamentoId ? DB.fechamentos.find(x => x.id === p.fechamentoId) : null; return `<tr><td>${dataHora(p.data, p.hora)}</td><td>${p.tipo === 'adiantamento' ? pill('Adiantamento', 'info') : pill('Fechamento', 'ok')}</td><td>${esc(fn(p.funcId))}</td><td>${p.fechamentoId ? `<span class="code" data-fe-ver="${p.fechamentoId}" style="cursor:pointer">${p.codigo}</span>` : '<span class="muted">—</span>'}</td><td class="small" style="white-space:nowrap">${fe ? `<b>${dBR(fe.inicio)} a ${dBR(fe.fim)}</b><div class="muted">semana trabalhada</div>` : p.tipo === 'adiantamento' ? '<span class="muted">Antecipação · desconta<br>no próximo fechamento</span>' : '<span class="muted">—</span>'}</td><td>${esc(p.metodo)}</td><td class="r b">${brl(p.valor)}</td><td class="small">${esc(p.referencia) || '—'}${p.obs ? `<div class="muted">${esc(p.obs)}</div>` : ''}</td><td class="small">${esc(p.responsavel)}<div class="muted">${esc(p.criadoEm)}</div></td></tr>`; }).join('')}</tbody></table></div>`
@@ -9081,7 +9159,7 @@ function pgPacotes() {
   const ativos = vendas.filter(v => !situacaoVenda(DB, v).encerrado);
   return `
   <div class="ph"><div><h1>Pacotes</h1><p>A cliente paga o pacote uma vez e usa as sessões nos dias e horários escolhidos. Cada sessão fica marcada na agenda; ao concluir, não cobra de novo.</p></div>
-    <div class="act">${dono ? '<button class="btn" data-pk-novo>Novo pacote</button>' : ''}${pode(DB, ACTOR, 'registrar') ? '<button class="btn pri" data-pk-vender="">Vender pacote</button>' : ''}</div></div>
+    <div class="act">${dono ? '<button class="btn" data-pk-novo>Novo pacote</button>' : ''}${pode(DB, ACTOR, 'registrar') ? '<button class="btn" data-vender-sv="">Vender sem agendar</button><button class="btn pri" data-pk-vender="">Vender pacote</button>' : ''}</div></div>
   <div class="stack">
     <div class="grid g4">${kpi('Pacotes ativos', ativos.length)}${kpi('Sessões a marcar', sum(ativos.map(v => situacaoVenda(DB, v).livres)), 'ainda sem data', 'warn')}${kpi('Sessões marcadas', sum(ativos.map(v => situacaoVenda(DB, v).marcadas)), '', 'info')}${kpi('Vendido no total', brl(sum(vendas.filter(v => !v.cancelado).map(v => v.valor))), `${vendas.filter(v => !v.cancelado).length} pacote(s)${vendas.some(v => v.cancelado) ? ` · ${vendas.filter(v => v.cancelado).length} estornado(s)` : ''}`, 'ok')}</div>
     ${(() => { const q = (UI.pkvBusca || '').trim(); return `<div class="pk-tit"><div class="sec" style="margin:0">Pacotes à venda</div>${(DB.pacotes || []).length ? `<div class="po-busca-c pk-tb">${icon('lupa')}<input id="pkv-b" type="text" enterkeyhint="search" autocomplete="off" placeholder="Pesquisar pacote ou serviço" aria-label="Pesquisar pacotes à venda" value="${esc(q)}">${q ? '<button type="button" class="btn sm ghost" data-pkv-limpa aria-label="Limpar pesquisa">Limpar</button>' : ''}</div>` : ''}</div>`; })()}
@@ -9097,7 +9175,7 @@ function pgPacotes() {
       <div class="seg">${[['ativos', 'Em uso'], ['encerrados', 'Encerrados'], ['todos', 'Todos']].map(([k, t]) => `<button data-pk-filtro="${k}" class="${filtro === k ? 'on' : ''}">${t}</button>`).join('')}</div></div>
     ${vendas.length ? `<span class="muted small">${pb ? `${linhas.length} de ${doFiltro.length} pacote(s)` : `${doFiltro.length} pacote(s) ${filtro === 'ativos' ? 'em uso' : filtro === 'encerrados' ? 'encerrado(s)' : 'no total'}`}</span>` : ''}
     ${linhas.length ? `<div class="pk-lista">${linhas.map(({ v, st }) => `<article class="pk-venda ${v.cancelado ? 'pk-canc' : ''}">
-      <div class="pk-vh"><div style="min-width:0"><b>${cliNome(v.clienteId)}</b><div class="muted small">${esc(v.nome)} · ${esc(v.codigo)} · ${brl(v.valor)} · com ${esc(first(v.funcId))}${v.validoAte ? ` · vale até ${dBR(v.validoAte)}` : ''}</div>
+      <div class="pk-vh"><div style="min-width:0"><b>${cliNome(v.clienteId)}</b><div class="muted small">${v.tipo === 'credito' ? `<b style="color:var(--accent)">Comprado sem agendar${v.origem ? ' · ' + esc(v.origem) : ''}</b> · ` : ''}${esc(v.nome)} · ${esc(v.codigo)} · ${brl(v.valor)}${v.tipo === 'credito' ? '' : ` · com ${esc(first(v.funcId))}`}${v.validoAte ? ` · vale até ${dBR(v.validoAte)}` : ''}</div>
         ${v.itens && v.itens.length ? `<div class="pk-its">${st.itens.map(i => `<span>${esc(SV(i.servicoId)?.nome || '')} <b>${i.usadas}/${i.qtd}</b></span>`).join('')}</div>` : ''}</div>
         <div class="pk-cont"><b>${st.usadas}</b>/${v.sessoes}<span>usadas</span></div></div>
       ${v.cancelado ? `<div class="note bad small"><b>Pacote estornado</b> por ${esc(v.cancelado.por)} em ${esc(v.cancelado.em)} · ${esc(v.cancelado.motivo || '')}</div>` : ''}
@@ -9105,7 +9183,7 @@ function pgPacotes() {
         return x ? `<button class="pk-s s-${x.status}" data-ag="${x.id}"><b>${i + 1}${v.itens && v.itens.length ? ` · ${esc(svCurto(x.servicoId))}` : ''}</b><span>${dataCurta(x.data)} · ${x.inicio}</span><em>${x.status === 'concluido' ? 'Feita' : x.status === 'faltou' ? 'Faltou' : 'Marcada'}</em></button>`
           : `<button class="pk-s livre" ${!st.encerrado && pode(DB, ACTOR, 'agendar') ? `data-pk-sessao="${v.id}"` : 'disabled'}><b>${i + 1}</b><span>Sem data</span><em>${pode(DB, ACTOR, 'agendar') ? '+ Marcar' : 'A marcar'}</em></button>`; }).join('')}</div>
       ${st.vencido ? '<div class="note warn small">Pacote vencido com sessões ainda sem uso.</div>' : ''}
-      ${v.cancelado ? '' : pkAvisoHTML(v, st)}${dono && !v.cancelado ? `<div class="bar"><button class="btn sm ghost" data-pk-corrigir="${v.id}">Corrigir venda</button></div>` : ''}</article>`).join('')}</div>`
+      ${v.cancelado ? '' : pkAvisoHTML(v, st)}${dono && !v.cancelado && v.tipo !== 'credito' ? `<div class="bar"><button class="btn sm ghost" data-pk-corrigir="${v.id}">Corrigir venda</button></div>` : ''}</article>`).join('')}</div>`
       : `<div class="panel">${empty(pb ? 'Nenhum pacote encontrado' : filtro === 'encerrados' ? 'Nenhum pacote encerrado' : 'Nenhum pacote em uso', pb ? 'Confira o nome, telefone ou CPF, ou troque o filtro (Em uso, Encerrados, Todos).' : 'Os pacotes vendidos aparecem aqui com as sessões.')}</div>`}
   </div>`;
 }
@@ -9206,6 +9284,78 @@ function modalVenderPacote(pacoteId = '', clienteId = '', opts = {}) {
         sessoes: ses.filter(x => x.data && x.inicio).map(x => ({ data: x.data, inicio: x.inicio, servicoId: x.servicoId })), converter: conv.map(x => x.id), concluirConvertidos: !!opts.concluir }); },
     v => `Pacote ${v.codigo} vendido`); if (r.ok) { closeModal(); UI.route = 'pacotes'; render(); } };
 }
+/* compra de serviços sem agendar (lives, combos, avulsos): a cliente paga e fica com o saldo para agendar depois */
+function modalVenderServicos(clienteId = '') {
+  let linhas = [{ servicoId: '', qtd: 1, funcId: '' }], valorEditado = false;
+  const combos = (DB.pacotes || []).filter(x => x.ativo !== false);
+  const ov = openModal('Vender sem agendar', `<div class="stack" style="gap:14px">
+    <div class="note small">Para vendas na live, combos e serviços avulsos que a cliente <b>paga agora e agenda depois</b>. O serviço fica como <b>saldo já pago</b> da cliente: na hora de agendar, é só usar o saldo, sem cobrar de novo.</div>
+    <div><div class="sec" style="margin:0 0 6px">Cliente</div>${clientePickerHTML('vs', clienteId)}</div>
+    ${combos.length ? `<label class="f">Usar um pacote ou combo cadastrado (opcional)<select id="vs-pk"><option value="">Não, escolher os serviços abaixo</option>${opt(combos.map(x => [x.id, `${x.nome} · ${brl(x.preco)}`]), '')}</select></label>` : ''}
+    <div><div class="split"><div class="sec" style="margin:0">Serviços comprados</div><button class="btn sm" type="button" id="vs-add">+ Serviço</button></div><div id="vs-l" class="stack" style="gap:8px;margin-top:8px"></div></div>
+    <div class="form"><label class="f">Valor total pago (R$)<input id="vs-v" inputmode="decimal"></label><label class="f">Forma de pagamento<select id="vs-fp">${opt([['pix', 'Pix'], ['debito', 'Cartão de débito'], ['credito', 'Cartão de crédito'], ['dinheiro', 'Dinheiro']], 'pix')}</select></label>
+      <label class="f">Recebimento<select id="vs-st">${opt([['registrado', 'Recebido agora'], ['pendente', 'Não recebido (pendente)']], 'registrado')}</select></label><label class="f">Data da compra<input type="date" id="vs-d" value="${TODAY}" max="${TODAY}"></label>
+      <label class="f">Onde vendeu<input id="vs-o" value="Live" placeholder="Ex.: Live do Instagram"></label><label class="f">Validade do saldo<select id="vs-val">${opt([['0', 'Sem validade'], ['30', '30 dias'], ['60', '60 dias'], ['90', '90 dias'], ['180', '180 dias']], '0')}</select></label></div>
+    <div class="note small" id="vs-res"></div></div>`,
+    `<button class="btn" data-close>Cancelar</button><button class="btn pri" id="vs-ok">Confirmar venda</button>`, true);
+  montarClientePicker(ov, 'vs');
+  const q = s => ov.querySelector(s);
+  const tabela = () => sum(linhas.filter(l => l.servicoId).map(l => (SV(l.servicoId)?.preco || 0) * (+l.qtd || 0)));
+  const res = () => { if (!valorEditado) q('#vs-v').value = tabela() ? centsInput(tabela()) : ''; const v = toCents(q('#vs-v').value) || 0, ls = linhas.filter(l => l.servicoId && l.qtd > 0);
+    q('#vs-res').innerHTML = ls.length ? `Fica de saldo para a cliente: <b>${esc(ls.map(l => `${l.qtd}x ${SV(l.servicoId)?.nome || ''}`).join(' + '))}</b> · pago <b>${brl(v)}</b>${tabela() > v && v ? ` (tabela ${brl(tabela())}, desconto de ${brl(tabela() - v)})` : ''}. O valor entra no faturamento hoje e a comissão é calculada como na venda de pacote.` : 'Adicione os serviços que a cliente comprou.'; };
+  const draw = () => {
+    q('#vs-l').innerHTML = linhas.map((l, i) => { const sv = SV(l.servicoId), fs = sv ? DB.funcionarios.filter(f => f.ativo && sv.funcs.includes(f.id)) : [];
+      return `<div class="vs-r"><select data-vs-sv="${i}">${servOpts(l.servicoId)}</select><input type="number" min="1" max="30" data-vs-q="${i}" value="${l.qtd}" aria-label="Quantidade"><select data-vs-f="${i}" aria-label="Profissional">${fs.length ? opt(fs.map(f => [f.id, f.nome]), l.funcId || fs[0].id) : '<option value="">Profissional</option>'}</select>${linhas.length > 1 ? `<button class="btn sm ghost" type="button" data-vs-rm="${i}">Remover</button>` : ''}</div>`; }).join('');
+    q('#vs-l').querySelectorAll('[data-vs-sv]').forEach(s => { s.onchange = () => { linhas[+s.dataset.vsSv].servicoId = s.value; linhas[+s.dataset.vsSv].funcId = ''; draw(); }; buscaServico(ov, s); });
+    q('#vs-l').querySelectorAll('[data-vs-q]').forEach(s => s.oninput = () => { linhas[+s.dataset.vsQ].qtd = parseInt(s.value, 10) || 0; res(); });
+    q('#vs-l').querySelectorAll('[data-vs-f]').forEach(s => s.onchange = () => { linhas[+s.dataset.vsF].funcId = s.value; });
+    q('#vs-l').querySelectorAll('[data-vs-rm]').forEach(b => b.onclick = () => { linhas.splice(+b.dataset.vsRm, 1); draw(); });
+    res(); };
+  q('#vs-add').onclick = () => { linhas.push({ servicoId: '', qtd: 1, funcId: '' }); draw(); q('#vs-l .vs-r:last-child .svb-in')?.focus(); };
+  q('#vs-v').oninput = () => { valorEditado = true; res(); };
+  q('#vs-pk')?.addEventListener('change', e => { const pc = combos.find(x => x.id === e.target.value); if (!pc) return;
+    linhas = (pc.itens && pc.itens.length ? pc.itens : [{ servicoId: pc.servicoId, qtd: pc.sessoes }]).map(i => ({ servicoId: i.servicoId, qtd: i.qtd, funcId: '' }));
+    valorEditado = true; q('#vs-v').value = centsInput(pc.preco); draw(); });
+  draw();
+  q('#vs-ok').onclick = () => { const r = run(() => { const cid = lerCliente(ov, 'vs'), v = toCents(q('#vs-v').value) || 0, pc = combos.find(x => x.id === q('#vs-pk')?.value);
+      return venderServicos(DB, ACTOR, { clienteId: cid, nome: pc ? pc.nome : '', linhas: linhas.map(l => ({ servicoId: l.servicoId, qtd: l.qtd, funcId: l.funcId || q(`[data-vs-f="${linhas.indexOf(l)}"]`)?.value })), valor: v, data: q('#vs-d').value,
+        origem: q('#vs-o').value, validadeDias: q('#vs-val').value, parcelas: [{ forma: q('#vs-fp').value, valor: v, status: q('#vs-st').value }] }); },
+    v => `${v.codigo} vendido · saldo de ${v.sessoes} serviço(s) para agendar`); if (r.ok) { closeModal(); UI.route = 'pacotes'; render(); } };
+}
+/* aviso no agendamento: a cliente tem serviços já pagos para usar */
+function saldoClienteHTML(clienteId) {
+  const l = clienteId ? saldosDaCliente(DB, clienteId) : [];
+  if (!l.length) return '';
+  return `<div class="ag-pk ag-saldo"><div class="small"><b>Esta cliente tem serviços já pagos</b>${l.map(({ v, st }) => `<div class="muted">${esc(v.codigo)} · ${esc(st.itens.filter(i => i.livres > 0).map(i => `${i.livres}x ${SV(i.servicoId)?.nome || ''}`).join(' + '))}</div>`).join('')}</div>
+    <div class="bar">${l.map(({ v }) => `<button class="btn sm pri" type="button" data-usar-saldo="${v.id}">Agendar pelo saldo${l.length > 1 ? ' ' + esc(v.codigo) : ''}</button>`).join('')}</div></div>`;
+}
+/* pagamento semanal da recepcionista (sem comissão): fica nas saídas do financeiro */
+function modalPagarRecepcao(funcId) {
+  const recs = DB.funcionarios.filter(f => cargoDe(f) === 'recepcao' && !f.dona && !f.excluido && (f.ativo || f.id === funcId));
+  if (!recs.length) return toast('Não há recepcionista cadastrada na Equipe.', 'bad');
+  const f0 = recs.find(f => f.id === funcId) || recs[0], ult = pagamentosRecepcao(DB, f0.id)[0], [ini, fim] = semanaAPagar();
+  const ov = openModal('Pagamento da recepção', `<div class="note small">A recepcionista não tem comissão: o valor da semana é combinado com a Claudia. O pagamento fica registrado aqui e nas <b>saídas do Financeiro</b> (categoria Salários).</div>
+    <div class="form"><label class="f full">Recepcionista<select id="rp-f">${opt(recs.map(f => [f.id, f.nome]), f0.id)}</select></label>
+    <label class="f">Semana de<input type="date" id="rp-i" value="${ini}"></label><label class="f">até<input type="date" id="rp-a" value="${fim}"></label>
+    <label class="f">Valor pago (R$)<input id="rp-v" inputmode="decimal" value="${ult ? centsInput(ult.valor) : ''}" placeholder="0,00"></label><label class="f">Forma<select id="rp-fp">${opt(Object.entries(CAIXA_FORMAS), ult?.forma || 'pix')}</select></label>
+    <label class="f">Data do pagamento<input type="date" id="rp-d" value="${TODAY}" max="${TODAY}"></label>${campoHora('rp-h')}
+    <label class="f full">Observação (opcional)<input id="rp-o" placeholder="Ex.: inclui hora extra de sábado"></label></div>
+    <div class="muted small" id="rp-u">${ult ? `Último pagamento: ${brl(ult.valor)} em ${dBR(ult.data)} (semana ${dBR(ult.pagRecepcao.ini).slice(0, 5)} a ${dBR(ult.pagRecepcao.fim).slice(0, 5)})` : ''}</div>`,
+    `<button class="btn" data-close>Cancelar</button><button class="btn pri" id="rp-ok">Registrar pagamento</button>`);
+  ov.querySelector('#rp-i').onchange = e => { if (e.target.value) ov.querySelector('#rp-a').value = addDays(semanaTrabalho(e.target.value), 6), ov.querySelector('#rp-i').value = semanaTrabalho(e.target.value); };
+  ov.querySelector('#rp-ok').onclick = () => run(() => pagarRecepcao(DB, ACTOR, { funcId: val('rp-f'), ini: val('rp-i'), fim: val('rp-a'), valor: toCents(val('rp-v')), forma: val('rp-fp'), data: val('rp-d'), hora: val('rp-h'), obs: val('rp-o') }),
+    m => `Pagamento de ${brl(m.valor)} registrado nas saídas`).ok && closeModal();
+}
+function recepcaoPagamentosHTML(own) {
+  const recs = own ? [F(ACTOR.funcId)].filter(f => f && cargoDe(f) === 'recepcao') : DB.funcionarios.filter(f => cargoDe(f) === 'recepcao' && !f.dona && !f.excluido && (f.ativo || pagamentosRecepcao(DB, f.id).length));
+  if (!recs.length) return '';
+  const mes = TODAY.slice(0, 7), lista = recs.flatMap(f => pagamentosRecepcao(DB, f.id));
+  return `<div class="sec">${own ? 'Meus pagamentos semanais' : 'Recepção · pagamento semanal'}</div>
+    <div class="tw"><table><thead><tr><th>Recepcionista</th><th>Último pagamento</th><th class="r">Pago no mês</th><th></th></tr></thead><tbody>${recs.map(f => { const ps = pagamentosRecepcao(DB, f.id), u = ps[0];
+      return `<tr><td class="b">${esc(f.nome)}<div class="muted small" style="font-weight:400">sem comissão · valor semanal combinado</div></td><td>${u ? `${brl(u.valor)} · ${dBR(u.data)}<div class="muted small">semana ${dBR(u.pagRecepcao.ini).slice(0, 5)} a ${dBR(u.pagRecepcao.fim).slice(0, 5)}</div>` : '<span class="muted">nenhum ainda</span>'}</td><td class="r b">${brl(sum(ps.filter(p => p.data.slice(0, 7) === mes).map(p => p.valor)))}</td>
+        <td>${own ? '' : `<button class="btn sm pri" data-pg-rec="${f.id}">Registrar pagamento</button>`}</td></tr>`; }).join('')}</tbody></table></div>
+    ${lista.length ? `<div class="tw"><table><thead><tr><th>Data</th><th>Recepcionista</th><th>Semana</th><th>Forma</th><th class="r">Valor</th><th>Lançamento</th></tr></thead><tbody>${lista.slice(0, 30).map(m => `<tr><td>${dataHora(m.data, m.hora)}</td><td>${esc(F(m.funcId)?.nome || '')}</td><td class="small">${dBR(m.pagRecepcao.ini).slice(0, 5)} a ${dBR(m.pagRecepcao.fim).slice(0, 5)}</td><td>${esc(CAIXA_FORMAS[m.forma] || m.forma)}</td><td class="r b">${brl(m.valor)}</td><td class="code">${esc(m.codigo)}</td></tr>`).join('')}</tbody></table></div>` : ''}`;
+}
 /* venda de pacote lançada errado: troca o pacote, o valor ou a profissional (sem estornar) */
 function modalEditarVendaPacote(vendaId) {
   const v = DB.pacoteVendas.find(x => x.id === vendaId); if (!v) return;
@@ -9227,7 +9377,7 @@ function modalSessaoPacote(vendaId) {
   const v = DB.pacoteVendas.find(x => x.id === vendaId), st = situacaoVenda(DB, v), sv = SV(v.servicoId), misto = !!(v.itens && v.itens.length);
   const fs = DB.funcionarios.filter(f => f.ativo && (misto ? v.itens.some(i => SV(i.servicoId)?.funcs.includes(f.id)) : sv?.funcs.includes(f.id))), ult = st.ags.filter(x => !INATIVOS.includes(x.status)).pop();
   const sug = ult ? addDays(ult.data, 7) : addDays(TODAY, 1), comSaldo = st.itens.filter(i => i.livres > 0);
-  const ov = openModal('Marcar sessão do pacote', `<div class="note small"><b>${esc(CL(v.clienteId)?.nome)}</b> · ${esc(v.nome)} · ${st.usadas + st.marcadas} de ${v.sessoes} sessões usadas ou marcadas${v.validoAte ? ` · vale até ${dBR(v.validoAte)}` : ''}</div>
+  const ov = openModal(v.tipo === 'credito' ? 'Agendar pelo saldo' : 'Marcar sessão do pacote', `<div class="note small"><b>${esc(CL(v.clienteId)?.nome)}</b> · ${esc(v.nome)} · ${st.usadas + st.marcadas} de ${v.sessoes} sessões usadas ou marcadas${v.validoAte ? ` · vale até ${dBR(v.validoAte)}` : ''}</div>
     ${misto ? `<div><div class="sec" style="margin:0 0 6px">Qual serviço do pacote?</div><div class="pk-esc">${comSaldo.map((i, k) => `<label class="chk"><input type="checkbox" data-ps-sv="${i.servicoId}" ${k === 0 ? 'checked' : ''}> <span>${esc(SV(i.servicoId)?.nome || '')} <small class="muted">· resta(m) ${i.livres}</small></span></label>`).join('')}</div><div class="muted small" style="margin-top:4px">Marque mais de um para fazer no mesmo dia (ex.: a mão e o pé): ficam um depois do outro.</div></div>` : ''}
     <div class="form"><label class="f">Dia<input type="date" id="ps-d" value="${sug < TODAY ? TODAY : sug}" min="${TODAY}"${v.validoAte ? ` max="${v.validoAte}"` : ''}></label><label class="f">Horário<select id="ps-h">${opt(horasCom(ult?.inicio).map(h => [h, h]), ult?.inicio || '10:00')}</select></label>
     <label class="f full">Profissional<select id="ps-f">${opt(fs.map(f => [f.id, f.nome]), v.funcId)}</select></label></div>`,
@@ -9253,7 +9403,7 @@ function confirmarSessaoPacote(agId) {
 function pacotesDaClienteHTML(id) {
   const vs = (DB.pacoteVendas || []).filter(v => v.clienteId === id).map(v => ({ v, st: situacaoVenda(DB, v) })).filter(x => !x.st.encerrado);
   if (!vs.length) return '';
-  return `<div class="cli-conv"><div class="sec" style="margin:0 0 6px">Pacotes em uso</div>${vs.map(({ v, st }) => `<div class="split small" style="padding:4px 0"><span><b>${esc(v.nome)}</b> · ${st.usadas} de ${v.sessoes} usadas${st.proxima ? ` · próxima ${dataCurta(st.proxima.data)} ${st.proxima.inicio}` : ''}</span>${st.livres && pode(DB, ACTOR, 'agendar') ? `<button class="btn sm" data-pk-sessao="${v.id}">Marcar sessão</button>` : ''}</div>`).join('')}</div>`;
+  return `<div class="cli-conv"><div class="sec" style="margin:0 0 6px">Pacotes e serviços já pagos</div>${vs.map(({ v, st }) => `<div class="split small" style="padding:4px 0"><span><b>${esc(v.nome)}</b> · ${st.usadas} de ${v.sessoes} usadas${st.proxima ? ` · próxima ${dataCurta(st.proxima.data)} ${st.proxima.inicio}` : ''}</span>${st.livres && pode(DB, ACTOR, 'agendar') ? `<button class="btn sm" data-pk-sessao="${v.id}">Marcar sessão</button>` : ''}</div>`).join('')}</div>`;
 }
 
 /* =================== ENTRADA E SAÍDA (só a proprietária) =================== */
@@ -10044,7 +10194,7 @@ const AFTER = {
 
 /* ---------- eventos globais (delegação) ---------- */
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-al-todos],[data-pkv-limpa],[data-online],[data-pg-dup],[data-wa-pk],[data-pk-limpa],[data-sv-limpa],[data-del-cat],[data-po-limpa],[data-ct-todos],[data-del],[data-dono-novo],[data-dono-edit],[data-podo-aba],[data-podo-nova],[data-podo-ficha],[data-cxcentro],[data-comanda],[data-av-teste],[data-av-qr],[data-av-copiar],[data-av-dl],[data-av-nota],[data-pk-novo],[data-pk-corrigir],[data-pk-edit],[data-pk-vender],[data-pk-filtro],[data-pk-sessao],[data-cli-nivel],[data-dona-serv],[data-mov],[data-mov-ed],[data-mov-ex],[data-cxper],[data-cxnav],[data-cxtipo],[data-cli-acao],[data-conv-membros],[data-conv-pagar],[data-receb-com],[data-conf-com],[data-acerto-com],[data-pagar-cli],[data-cvst],[data-liberar],[data-conta],[data-sair],[data-codigo],[data-repasse],[data-adiant],[data-extrato],[data-abater],[data-conv-novo],[data-conv-edit],[data-conv-filtro],[data-alertas],[data-fechar],[data-faltou],[data-chegou],[data-tema],[data-pdf],[data-wa-ag],[data-wa-cli],[data-wa-cob],[data-wa-at],[data-fab],[data-go],[data-menu],[data-per],[data-agv],[data-agnav],[data-ag],[data-bl],[data-slot],[data-goday],[data-new-ag],[data-new-bl],[data-new-reg],[data-at-open],[data-receb],[data-conf],[data-acerto],[data-fesem],[data-fe-ver],[data-pagar],[data-new-cli],[data-cli],[data-new-func],[data-func],[data-new-serv],[data-serv],[data-new-cat],[data-mais],[data-pub-abrir],[data-pub-cliente],[data-origem-nova],[data-origem],[data-ped-agendar],[data-ped-recusar],[data-qr-copiar],[data-qr-dl],[data-qr-ver],[data-ped-dia]');
+  const t = e.target.closest('[data-al-todos],[data-pkv-limpa],[data-online],[data-pg-dup],[data-wa-pk],[data-pk-limpa],[data-sv-limpa],[data-del-cat],[data-po-limpa],[data-ct-todos],[data-del],[data-dono-novo],[data-dono-edit],[data-podo-aba],[data-podo-nova],[data-podo-ficha],[data-cxcentro],[data-comanda],[data-av-teste],[data-av-qr],[data-av-copiar],[data-av-dl],[data-av-nota],[data-pk-novo],[data-pk-corrigir],[data-vender-sv],[data-pg-rec],[data-usar-saldo],[data-pk-edit],[data-pk-vender],[data-pk-filtro],[data-pk-sessao],[data-cli-nivel],[data-dona-serv],[data-mov],[data-mov-ed],[data-mov-ex],[data-cxper],[data-cxnav],[data-cxtipo],[data-cli-acao],[data-conv-membros],[data-conv-pagar],[data-receb-com],[data-conf-com],[data-acerto-com],[data-pagar-cli],[data-cvst],[data-liberar],[data-conta],[data-sair],[data-codigo],[data-repasse],[data-adiant],[data-extrato],[data-abater],[data-conv-novo],[data-conv-edit],[data-conv-filtro],[data-alertas],[data-fechar],[data-faltou],[data-chegou],[data-tema],[data-pdf],[data-wa-ag],[data-wa-cli],[data-wa-cob],[data-wa-at],[data-fab],[data-go],[data-menu],[data-per],[data-agv],[data-agnav],[data-ag],[data-bl],[data-slot],[data-goday],[data-new-ag],[data-new-bl],[data-new-reg],[data-at-open],[data-receb],[data-conf],[data-acerto],[data-fesem],[data-fe-ver],[data-pagar],[data-new-cli],[data-cli],[data-new-func],[data-func],[data-new-serv],[data-serv],[data-new-cat],[data-mais],[data-pub-abrir],[data-pub-cliente],[data-origem-nova],[data-origem],[data-ped-agendar],[data-ped-recusar],[data-qr-copiar],[data-qr-dl],[data-qr-ver],[data-ped-dia]');
   if (!t) return;
   const ds = t.dataset;
   if ('waAg' in ds) { e.stopPropagation(); const x = DB.agendamentos.find(a => a.id === ds.waAg); return modalWhatsApp({ agendamentoId: ds.waAg }, ds.waM || waModeloPadrao(x)); }
@@ -10068,6 +10218,9 @@ document.addEventListener('click', e => {
   if ('pkFiltro' in ds) { UI.pkFiltro = ds.pkFiltro; render(); return; }
   if ('pkSessao' in ds) return modalSessaoPacote(ds.pkSessao);
   if ('pkCorrigir' in ds) return modalEditarVendaPacote(ds.pkCorrigir);
+  if ('venderSv' in ds) return modalVenderServicos(ds.venderSv);
+  if ('pgRec' in ds) return modalPagarRecepcao(ds.pgRec);
+  if ('usarSaldo' in ds) { closeModal(); return modalSessaoPacote(ds.usarSaldo); }
   if ('cliNivel' in ds) { UI.cliNivel = UI.cliNivel === ds.cliNivel ? '' : ds.cliNivel; UI.cliMax = 0; render(); return; }
   if ('donaServ' in ds) return modalAtendimentoDona();
   if ('mov' in ds) return modalMovimento(ds.mov, null, { centro: ds.movCentro || '' });
