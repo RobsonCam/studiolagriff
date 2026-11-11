@@ -1181,6 +1181,8 @@ td.acts{width:1%;white-space:nowrap}
 .pk-its{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px} .pk-its span{font-size:12px;background:var(--sunk);border-radius:999px;padding:3px 9px}
 .pk-venda.pk-canc{opacity:.75} .pk-venda.pk-canc .pk-cont b{text-decoration:line-through}
 .pk-esc{display:flex;flex-direction:column;gap:6px}
+.mt-k{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:4px 0 12px}.mt-k>div{background:var(--sunk);border-radius:12px;padding:10px 12px;min-width:0}.mt-k span{display:block;font-size:12px;color:var(--muted)}.mt-k b{font-size:18px}
+@media (max-width:560px){.mt-k{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .vs-r{display:grid;grid-template-columns:minmax(0,1fr) 72px auto;gap:8px;align-items:start} .vs-r .svb{min-width:0}
 @media (max-width:560px){.vs-r{grid-template-columns:minmax(0,1fr) 64px}.vs-r [data-vs-rm]{grid-column:1/3;justify-self:start}}
 .ag-saldo{border-color:var(--ok)}
@@ -6686,8 +6688,11 @@ function linhaMeta(nome, l, valores, extra = '') {
 }
 function painelMetas(modo) {
   const mes = TODAY.slice(0, 7), P = progressoMetas(DB, mes), nomeMes = MESES[+mes.slice(5) - 1];
-  if (modo === 'prof') { const eu = P.funcs.find(x => x.f.id === ACTOR.funcId); if (!eu || !eu.meta) return '';
-    return `<div class="panel metas"><div class="split" style="margin-bottom:8px"><h2 style="margin:0">Minha meta de ${nomeMes}</h2><span class="muted small">${P.restantes} dia(s) para acabar o mês</span></div>${linhaMeta('Meu desempenho no mês', eu, false)}</div>`; }
+  if (modo === 'prof') { const eu = P.funcs.find(x => x.f.id === ACTOR.funcId); if (!eu || (!eu.meta && !eu.real)) return '';
+    // a profissional vê a própria meta em reais e quanto já fez (só dela)
+    return `<div class="panel metas"><div class="split" style="margin-bottom:8px"><h2 style="margin:0">Minha meta de ${nomeMes}</h2><span class="muted small">${P.restantes} dia(s) para acabar o mês</span></div>
+      ${eu.meta ? `<div class="mt-k"><div><span>Meta do mês</span><b>${brl(eu.meta)}</b></div><div><span>Já fiz</span><b>${brl(eu.real)}</b></div><div><span>${eu.falta ? 'Falta' : 'Meta batida'}</span><b>${eu.falta ? brl(eu.falta) : '✓'}</b></div><div><span>Atendimentos</span><b>${eu.n}</b></div></div>` : ''}
+      ${linhaMeta('Meu desempenho no mês', eu, true)}</div>`; }
   if (!P.salao.meta && !P.funcs.some(x => x.meta)) return isOwner(ACTOR) ? `<div class="note small metas-vazio">Defina a meta do mês para acompanhar o progresso aqui. <a href="#" data-go="regras">Definir metas</a></div>` : '';
   const valores = veFaturamento();
   return `<div class="panel metas"><div class="split" style="margin-bottom:8px;flex-wrap:wrap;gap:6px"><h2 style="margin:0">Metas de ${nomeMes}</h2><span class="muted small">${P.restantes} dia(s) para acabar o mês${isOwner(ACTOR) ? ' · <a href="#" data-go="regras">editar</a>' : ''}</span></div>
