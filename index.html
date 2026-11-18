@@ -1115,6 +1115,7 @@ td.acts{width:1%;white-space:nowrap}
 .po-pac:hover{border-color:var(--accent)} .po-pac .wa-av{grid-area:av} .po-pi{grid-area:i;display:flex;flex-direction:column;gap:2px;min-width:0} .po-num:nth-of-type(1){grid-area:n1} .po-num:nth-of-type(2){grid-area:n2} .po-ult{grid-area:ult;text-align:right}
 .po-num{display:flex;flex-direction:column;align-items:center;line-height:1.1} .po-num b{font-size:18px} .po-num span{font-size:11.5px;color:var(--muted)}
 .po-alerta{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;font-size:12.5px;font-weight:700;color:var(--bad);background:var(--bad-soft);border-radius:8px;padding:2px 8px;max-width:100%;overflow-wrap:anywhere}
+.srow .sjt{grid-column:1/-1;justify-self:start;font-size:13px;padding:4px 10px}.srow .sjt.on{color:var(--ok);font-weight:700}
 .pdf-op{display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}.pdf-op .btn{align-self:flex-start}
 .pct-l{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden}.pct-i{display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer}.pct-i+.pct-i{border-top:1px solid var(--line)}.pct-i input{width:20px;height:20px;flex:none}.pct-c{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}.pct-v{flex:none;white-space:nowrap}
 .au-f{display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:10px;align-items:end;margin-bottom:6px}.au-f .au-b{align-self:end}
@@ -2196,7 +2197,7 @@ const servicoExclusivo = (S, servicoId) => !!S.servicos.find(s => s.id === servi
 function ocupacao(S, funcId, data, ini, fim, ignorar = new Set(), servicoId = '', grupo = null) {
   const i = toMin(ini), f = toMin(fim);
   const bl = S.bloqueios.find(b => b.funcId === funcId && b.data === data && i < toMin(b.fim) && f > toMin(b.inicio));
-  if (bl) return { tipo: 'bloqueio', inicio: bl.inicio, fim: bl.fim, motivo: bl.motivo };
+  if (bl) return { tipo: 'bloqueio', inicio: bl.inicio, fim: bl.fim, motivo: bl.motivo, id: bl.id };
   const sob = S.agendamentos.filter(x => !ignorar.has(x.id) && x.funcId === funcId && x.data === data && !INATIVOS.includes(x.status) && !(grupo && x.grupo === grupo) && i < toMin(x.fim) && f > toMin(x.inicio));
   if (!sob.length) return null;
   const cap = capacidade(S, funcId);
@@ -2496,9 +2497,10 @@ function salvarAgendamento(S, a, d, opt = {}) {
     const ign = new Set([...ignorar, ...(d.id ? [d.id] : [])]);
     const conf = ocupacao(S, d.funcId, d.data, d.inicio, d.fim, ign, d.servicoId);
     if (conf) throw new Error(conf.tipo === 'bloqueio' ? `Horário indisponível (${conf.motivo}, ${conf.inicio}–${conf.fim}).` : `Horário ocupado: ${textoOcupacao(S, d.funcId, conf)} Escolha outro horário ou outra profissional.`);
-    // a mesma cliente não pode estar em dois atendimentos ao mesmo tempo (serviços do mesmo atendimento podem ser juntos)
-    const dupCli = S.agendamentos.find(x => x.id !== d.id && !ignorar.has(x.id) && x.clienteId === d.clienteId && x.data === d.data && !INATIVOS.includes(x.status) && !(d.grupo && x.grupo === d.grupo) && i < toMin(x.fim) && f > toMin(x.inicio));
-    if (dupCli) throw new Error(`${S.clientes.find(k => k.id === d.clienteId)?.nome || 'Esta cliente'} já tem agendamento das ${dupCli.inicio} às ${dupCli.fim} nesse dia com ${S.funcionarios.find(x => x.id === dupCli.funcId)?.nome.split(' ')[0] || 'outra profissional'}.`);
+    // a cliente pode fazer dois serviços ao mesmo tempo (ex.: cabelo e unhas). Só bloqueia o lançamento repetido:
+    // o mesmo serviço, com a mesma profissional, no mesmo horário
+    const dupCli = S.agendamentos.find(x => x.id !== d.id && !ignorar.has(x.id) && x.clienteId === d.clienteId && x.data === d.data && !INATIVOS.includes(x.status) && !(d.grupo && x.grupo === d.grupo) && x.funcId === d.funcId && x.servicoId === d.servicoId && i < toMin(x.fim) && f > toMin(x.inicio));
+    if (dupCli) throw new Error(`${S.clientes.find(k => k.id === d.clienteId)?.nome || 'Esta cliente'} já tem este mesmo serviço das ${dupCli.inicio} às ${dupCli.fim} nesse dia com ${S.funcionarios.find(x => x.id === dupCli.funcId)?.nome.split(' ')[0] || 'a mesma profissional'} (lançamento repetido).`);
   }
   if (d.status === 'concluido') throw new Error('Para concluir, use "Concluir e registrar serviço". Agendamento não vira receita sozinho.');
   if (ant) {
@@ -2533,11 +2535,12 @@ function salvarAgendamentoGrupo(S, a, d) {
   if (!itens.length && !(d.itens || []).length) throw new Error('Adicione ao menos um serviço.');
   itens.forEach((it, i) => { if (!it.servicoId) throw new Error(`Escolha o serviço ${i + 1}.`); if (!it.funcId) throw new Error(`Escolha a profissional do serviço ${i + 1}.`);
     const sv = S.servicos.find(s => s.id === it.servicoId); if (sv && !sv.funcs.includes(it.funcId)) throw new Error(`${S.funcionarios.find(f => f.id === it.funcId)?.nome || 'A profissional'} não faz ${sv.nome}.`); });
-  // dois serviços da mesma profissional no mesmo horário
+  // dois serviços da mesma cliente no mesmo horário são permitidos (mesma profissional ou outra): ex. cabelo e unhas juntos.
+  // Só não pode o mesmo serviço repetido com a mesma profissional no mesmo horário
   for (let i = 0; i < itens.length; i++) for (let j = i + 1; j < itens.length; j++) {
     const x = itens[i], y = itens[j];
-    if (x.funcId === y.funcId && toMin(x.inicio) < toMin(y.fim) && toMin(y.inicio) < toMin(x.fim))
-      throw new Error(`${S.funcionarios.find(f => f.id === x.funcId).nome} ficou com dois serviços no mesmo horário (${x.inicio} e ${y.inicio}). Coloque um depois do outro.`);
+    if (x.funcId === y.funcId && x.servicoId === y.servicoId && toMin(x.inicio) < toMin(y.fim) && toMin(y.inicio) < toMin(x.fim))
+      throw new Error(`O serviço ${S.servicos.find(sv => sv.id === x.servicoId)?.nome || ''} com ${S.funcionarios.find(f => f.id === x.funcId).nome} está repetido no mesmo horário (${x.inicio} e ${y.inicio}). Remova a linha repetida.`);
   }
   return transacao(S, () => {
     const grupo = d.grupo || ((d.itens || []).length > 1 ? uid('gr') : null);
@@ -3935,6 +3938,19 @@ function fechamentosSalao(S, hoje = TODAY, dias = 120) {
 }
 const salaoFechadoEm = (S, data, hora, dur = 30) => fechamentosSalao(S).find(x => x.data === data && toMin(hora) < toMin(x.fim) && toMin(hora) + dur > toMin(x.inicio)) || null;
 const salaoFechadoODia = (S, data) => { const l = fechamentosSalao(S).filter(x => x.data === data); return l.find(x => toMin(x.inicio) <= 8 * 60 && toMin(x.fim) >= 20 * 60) || null; };
+/* desbloquear direto do agendamento: a profissional mudou de ideia. Tira todos os bloqueios dela que pegam o horário
+   (inclusive bloqueios repetidos). Bloqueio de vários dias/da equipe toda: libera só o dia dela. */
+function liberarBloqueiosNoHorario(S, a, funcId, data, ini, fim) {
+  exigirAcesso(S, a);
+  if (!podeBloquearPara(S, a, funcId)) throw new Error('Sem permissão para liberar a agenda desta profissional.');
+  const i = toMin(ini), f = toMin(fim);
+  const bs = S.bloqueios.filter(b => b.funcId === funcId && b.data === data && i < toMin(b.fim) && f > toMin(b.inicio));
+  if (!bs.length) throw new Error('Não há bloqueio neste horário.');
+  const ids = new Set(bs.map(b => b.id)); S.bloqueios = S.bloqueios.filter(b => !ids.has(b.id));
+  const nome = S.funcionarios.find(x => x.id === funcId)?.nome || '';
+  audit(S, a, 'Bloqueio removido', `${nome} · ${dBR(data)} ${bs.map(b => `${b.inicio}–${b.fim}${b.motivo ? ' (' + b.motivo + ')' : ''}`).join(', ')}${bs.length > 1 ? ` · ${bs.length} bloqueios` : ''}`);
+  return bs.length;
+}
 function removerBloqueio(S, a, id) {
   const b = S.bloqueios.find(x => x.id === id);
   exigirAcesso(S, a);
@@ -4894,8 +4910,9 @@ function runTests() {
     const ped = criarPedido(S, { nome: 'Teste Ocupado', telefone: '(55) 97777-3030', itens: [{ servicoId: 's7', funcId: 'f2' }], data: dia, hora: '10:15' });
     const pedPref = ped.pedido && conferirHorarioPedido(S, ped.pedido.itens, dia, '10:15') ? 'ocupado (aviso só para a equipe)' : 'sem aviso';
     const porCima = deveFalhar(() => salvarAgendamento(S, dona, { funcId: 'f2', servicoId: 's7', clienteId: 'k8', data: dia, inicio: '10:20', fim: '11:00' }));
-    const mesmaCliente = deveFalhar(() => salvarAgendamento(S, dona, { funcId: 'f1', servicoId: 's1', clienteId: 'k7', data: dia, inicio: '10:15', fim: '10:55' }));
-    return (/ocupado/i.test(pedPref) && /ocupado/i.test(porCima) && /já tem agendamento/.test(mesmaCliente)) || JSON.stringify([pedPref, porCima, mesmaCliente]);
+    // a mesma cliente pode fazer outro serviço ao mesmo tempo com outra profissional (ex.: cabelo enquanto faz as unhas)
+    const mesmaCliente = salvarAgendamento(S, dona, { funcId: 'f1', servicoId: 's1', clienteId: 'k7', data: dia, inicio: '10:15', fim: '10:55' });
+    return (/ocupado/i.test(pedPref) && /ocupado/i.test(porCima) && !!mesmaCliente) || JSON.stringify([pedPref, porCima, mesmaCliente]);
   });
   T('Atendimento simultâneo: Ana atende até 3 ao mesmo tempo, a 4ª é recusada; serviço que ocupa sozinha não divide', () => {
     const dia = addDays(TODAY, 11), ag = (k, ini, fim, sv = 's1') => salvarAgendamento(S, dona, { funcId: 'f1', servicoId: sv, clienteId: k, data: dia, inicio: ini, fim, status: 'confirmado' });
@@ -5501,6 +5518,21 @@ function runTests() {
     const ed = pagamentosRecepcao(S, rec.id)[0];
     excluirMovimento(S, d, m.id, 'lançado duas vezes');
     return (s1 === 5000 && /descontad/.test(e1) && /descontada/.test(e2) && saldoDevedor(S, 'f1') === 0 && !S.pagamentos.some(x => x.id === pg.id) && ed.valor === 35000 && ed.forma === 'dinheiro' && ed.pagRecepcao && pagamentosRecepcao(S, rec.id).length === 0) || JSON.stringify([s1, e1, e2, ed]);
+  });
+  T('Cliente faz dois serviços ao mesmo tempo (mesma ou outra profissional) e desbloqueio direto do horário', () => {
+    const S = seedBase(), d = S.users.find(u => u.id === 'u0'), dia = addDays(TODAY, 4);
+    const sv1 = S.servicos.find(s => s.funcs.length), sv2 = S.servicos.find(s => s.id !== sv1.id && s.funcs.includes(sv1.funcs[0]));
+    const f = sv1.funcs[0], dur1 = sv1.duracao || 30, dur2 = sv2.duracao || 30;
+    // mesma profissional, dois serviços no mesmo horário, mesmo atendimento
+    const ids = salvarAgendamentoGrupo(S, d, { clienteId: 'k1', data: dia, itens: [{ servicoId: sv1.id, funcId: f, inicio: '10:00', fim: fromMin(600 + dur1) }, { servicoId: sv2.id, funcId: f, inicio: '10:00', fim: fromMin(600 + dur2) }] });
+    // outro agendamento separado da mesma cliente no mesmo horário com outra profissional
+    const f2 = (S.servicos.find(s => s.funcs.some(x => x !== f)) || {}).funcs?.find(x => x !== f), sv3 = S.servicos.find(s => s.funcs.includes(f2));
+    const id3 = f2 ? salvarAgendamento(S, d, { clienteId: 'k1', servicoId: sv3.id, funcId: f2, data: dia, inicio: '10:00', fim: '10:30', status: 'aguardando' }) : 'x';
+    const rep = deveFalhar(() => salvarAgendamento(S, d, { clienteId: 'k1', servicoId: sv1.id, funcId: f, data: dia, inicio: '10:00', fim: fromMin(600 + dur1), status: 'aguardando' }));
+    // bloqueio repetido (2x) e liberado de uma vez pelo agendamento
+    const fb = f2 || f; S.bloqueios.push({ id: 'b1', funcId: fb, data: dia, inicio: '16:00', fim: '20:00', motivo: 'Indisponível' }, { id: 'b2', funcId: fb, data: dia, inicio: '16:00', fim: '20:00', motivo: 'Indisponível' });
+    const antes = ocupacao(S, fb, dia, '17:00', '17:40'); const n = liberarBloqueiosNoHorario(S, d, fb, dia, '17:00', '17:40');
+    return (ids.length === 2 && id3 && /repetido/.test(rep) && antes && antes.tipo === 'bloqueio' && n === 2 && !ocupacao(S, fb, dia, '17:00', '17:40')) || JSON.stringify([ids, id3, rep, antes, n]);
   });
   return out;
 }
@@ -8480,10 +8512,10 @@ function modalAgendamento(pref = {}) {
     <div class="form"><label class="f">Data<input type="date" id="a-dt" value="${d.data}"></label><label class="f">Começa às<input type="time" id="a-hi" value="${d.inicio}" step="300"></label></div>
     ${travados.length ? `<div class="note small">${travados.map(x => `${x.inicio} ${esc(SV(x.servicoId)?.nome)} com ${esc(first(x.funcId))} já foi concluído e não muda.`).join('<br>')}</div>` : ''}
     <div><div class="bar" style="justify-content:space-between;margin-bottom:8px"><span class="sec" style="margin:0">Serviços</span><button class="btn sm" id="a-add" type="button">+ Adicionar serviço</button></div><div class="srows" id="a-itens"></div></div>
+    <div class="note bad small" id="a-conf" role="alert" hidden></div>
     <div id="a-saldo">${saldoClienteHTML(d.clienteId)}</div>
     <div class="ag-tot" id="a-tot"></div>
     ${(DB.pacotes || []).some(x => x.ativo !== false) && pode(DB, ACTOR, 'registrar') && !(ag && ag.pacoteVendaId) ? `<div class="ag-pk"><div class="small"><b>A cliente vai levar um pacote?</b><div class="muted">${editaveis.length ? 'Este horário vira a 1ª sessão do pacote.' : 'Vende o pacote e marca as sessões na agenda.'}</div></div><button class="btn sm" type="button" id="a-pk">Vender pacote</button></div>` : ''}
-    <div class="note bad small" id="a-conf" role="alert" hidden></div>
     <div class="form"><label class="f">Canal de origem<select id="a-cn">${opt(Object.entries(CANAIS), d.canal)}</select></label><label class="f">Situação<select id="a-st">${opt(statusOpts, d.status)}</select></label>
       <label class="f full">Observações<textarea id="a-ob">${esc(d.obs)}</textarea></label></div>
     ${hist.length ? `<details><summary class="small b" style="cursor:pointer">Histórico de alterações</summary>${hist.map(h => `<div class="split small"><span>${esc(h.texto)}${grupo.length > 1 ? ` · ${esc(h.sv || '')}` : ''}</span><span class="muted">${esc(h.quando)} · ${esc(h.usuario)}</span></div>`).join('')}</details>` : ''}`,
@@ -8510,6 +8542,7 @@ function modalAgendamento(pref = {}) {
           ${veFaturamento() ? `<label class="f">Preço (R$)<input data-i="${i}" data-k="preco" inputmode="decimal" value="${it.preco ? centsInput(it.preco) : ''}"></label>` : ''}
         </div>
         <div class="stime">${it.dur > 0 ? durTxt(itens._fim[i] - itens._st[i]) : '—'}${it.manual && SV(it.servicoId) && SV(it.servicoId).duracao !== itens._fim[i] - itens._st[i] ? `<small>estimado ${durTxt(SV(it.servicoId).duracao)}</small>` : ''}</div>
+        ${i > 0 && it.servicoId ? `<button class="btn sm ghost sjt ${itens._st[i] === itens._st[i - 1] ? 'on' : ''}" data-jt="${i}" type="button" title="A cliente faz este serviço ao mesmo tempo que o anterior">${itens._st[i] === itens._st[i - 1] ? '✓ Ao mesmo tempo que o serviço ' + i : '⇆ Fazer ao mesmo tempo que o serviço ' + i}</button>` : ''}
         ${itens.length > 1 ? `<button class="btn sm ghost srm" data-rm="${i}" type="button" aria-label="Remover serviço ${i + 1}">Remover</button>` : ''}</div>`; }).join('');
     const ini = itens._st.length ? Math.min(...itens._st) : 0, fim = itens._fim.length ? Math.max(...itens._fim) : 0, tot = sum(itens.map(x => x.preco || 0));
     conferir();
@@ -8525,6 +8558,11 @@ function modalAgendamento(pref = {}) {
         draw(); }
       else if (k === 'preco') { it.preco = toCents(el.value) || 0; drawTotOnly(); } }; });
     q('#a-itens').querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { itens.splice(+b.dataset.rm, 1); draw(); });
+    // cabelo e unhas juntos: este serviço começa junto com o anterior (com a mesma ou outra profissional)
+    q('#a-itens').querySelectorAll('[data-jt]').forEach(b => b.onclick = () => { const i = +b.dataset.jt, it = itens[i], st = itens._st[i - 1];
+      if (itens._st[i] === st) { const fimAnt = itens._fim[i - 1]; Object.assign(it, { manual: true, st: fimAnt, fim: fimAnt + (it.dur || 30) }); }
+      else Object.assign(it, { manual: true, st, fim: st + (it.dur || 30) });
+      it.dur = it.fim - it.st; draw(); });
     // muitos serviços: pesquisa pelo nome em vez de procurar na lista
     q('#a-itens').querySelectorAll('select[data-k="servicoId"]').forEach(s => buscaServico(ov, s));
   };
@@ -8532,14 +8570,24 @@ function modalAgendamento(pref = {}) {
   const meus = new Set([...grupo.map(x => x.id), ...(ag ? [ag.id] : [])]);
   const conferir = () => {
     const el = q('#a-conf'), bt = q('#a-ok'); if (!el) return;
-    const dt = val('a-dt'), cli = ov.querySelector('#a-cl')?.value, msgs = [];
+    const dt = val('a-dt'), cli = ov.querySelector('#a-cl')?.value, msgs = [], avisos = [], libs = new Map();
     itens.forEach((it, i) => { if (!it.funcId || !it.dur || !dt) return; const ini = fromMin(itens._st[i]), fim = fromMin(itens._fim[i]);
       const o = ocupacao(DB, it.funcId, dt, ini, fim, meus, it.servicoId);
-      if (o) msgs.push(esc(textoOcupacao(DB, it.funcId, o)));
-      if (cli && cli !== '__novo') { const x = DB.agendamentos.find(y => !meus.has(y.id) && y.clienteId === cli && y.data === dt && !INATIVOS.includes(y.status) && toMin(ini) < toMin(y.fim) && toMin(fim) > toMin(y.inicio));
-        if (x) msgs.push(`${esc(CL(cli)?.nome || 'A cliente')} já tem agendamento das ${x.inicio} às ${x.fim} nesse dia.`); } });
-    const uni = [...new Set(msgs)];
-    el.hidden = !uni.length; el.innerHTML = uni.length ? `<b>Horário ocupado: não é possível agendar por cima.</b><br>${uni.join('<br>')}<br>Escolha outro horário ou outra profissional.` : '';
+      if (o) { msgs.push(esc(textoOcupacao(DB, it.funcId, o))); if (o.tipo === 'bloqueio' && podeBloquearPara(DB, ACTOR, it.funcId)) libs.set(it.funcId + '|' + ini + '|' + fim, { funcId: it.funcId, ini, fim, bl: o }); }
+      if (cli && cli !== '__novo') DB.agendamentos.filter(y => !meus.has(y.id) && y.clienteId === cli && y.data === dt && !INATIVOS.includes(y.status) && toMin(ini) < toMin(y.fim) && toMin(fim) > toMin(y.inicio)).forEach(x => {
+        if (x.funcId === it.funcId && x.servicoId === it.servicoId) msgs.push(`${esc(CL(cli)?.nome || 'A cliente')} já tem este mesmo serviço das ${x.inicio} às ${x.fim} com ${esc(first(x.funcId))} (lançamento repetido).`);
+        else avisos.push(`${esc(CL(cli)?.nome || 'A cliente')} também tem ${esc(SV(x.servicoId)?.nome || 'serviço')} das ${x.inicio} às ${x.fim} com ${esc(first(x.funcId))}: os serviços vão acontecer ao mesmo tempo.`); }); });
+    const uni = [...new Set(msgs)], avs = [...new Set(avisos)];
+    el.hidden = !uni.length && !avs.length;
+    el.className = `note ${uni.length ? 'bad' : ''} small`;
+    el.innerHTML = (uni.length ? `<b>Horário ocupado: não é possível agendar por cima.</b><br>${uni.join('<br>')}<br>${libs.size ? 'A profissional mudou de ideia? Desbloqueie o horário:' : 'Escolha outro horário ou outra profissional.'}
+      ${libs.size ? `<div class="bar" style="margin-top:8px">${[...libs.values()].map((l, k) => `<button class="btn sm pri" type="button" data-a-lib="${k}">Desbloquear ${esc(first(l.funcId))} (${l.bl.inicio}–${l.bl.fim})</button>`).join('')}</div>` : ''}` : '')
+      + (avs.length ? `${uni.length ? '<hr style="border:0;border-top:1px solid var(--line);margin:8px 0">' : ''}${avs.join('<br>')}` : '');
+    const L = [...libs.values()];
+    el.querySelectorAll('[data-a-lib]').forEach(b => b.onclick = () => { const l = L[+b.dataset.aLib];
+      confirmar(ov, `Desbloquear a agenda de <b>${esc(fn(l.funcId))}</b> em ${dBR(dt)} (${esc(l.bl.motivo || 'bloqueio')} das ${l.bl.inicio} às ${l.bl.fim})? O bloqueio é removido e o horário fica livre para agendar.`,
+        () => { const r = run(() => liberarBloqueiosNoHorario(DB, ACTOR, l.funcId, dt, l.ini, l.fim), n => n > 1 ? `${n} bloqueios removidos. Horário liberado.` : 'Horário desbloqueado');
+          ov.querySelector('#cf-no')?.click(); if (r.ok) conferir(); }, 'Desbloquear'); });
     if (bt) bt.disabled = !!uni.length;
   };
   q('#a-dt').addEventListener('change', draw);
@@ -8552,7 +8600,8 @@ function modalAgendamento(pref = {}) {
   // mudou o "Começa às": todos os serviços andam juntos, mantendo os horários que a recepção ajustou
   q('#a-hi').onchange = () => { const nv = toMin(val('a-hi') || '09:00'), dl = nv - hiAnt; hiAnt = nv; itens.forEach(it => { if (it.manual) { it.st += dl; it.fim += dl; } }); draw(); };
   draw();
-  q('#a-ok').onclick = () => run(() => {
+  const bindOk = () => {
+    q('#a-ok').onclick = () => run(() => {
     const clienteId = lerCliente(ov, 'a'); calcHor();
     if (itens.some(x => !x.servicoId)) throw new Error('Escolha o serviço em todas as linhas, ou remova a linha vazia.');
     if (itens.some((x, i) => !(itens._fim[i] > itens._st[i]))) throw new Error('Confira o início e o fim de cada serviço: o fim precisa ser depois do início.');
@@ -8562,6 +8611,9 @@ function modalAgendamento(pref = {}) {
     if (!ped) return salvar();
     return transacao(DB, () => { const ids = salvar(); vincularPedido(DB, ACTOR, ped.id, ids); return ids; });
   }, ids => ped ? `Pedido ${ped.codigo} agendado` : ag ? 'Agendamento atualizado' : ids.length > 1 ? `Agendamento criado com ${ids.length} serviços` : 'Agendamento criado').ok && closeModal();
+    conferir();
+  };
+  rebindFns.set(ov, bindOk); bindOk();
 }
 function modalAgDetalhe(id) {
   const x = DB.agendamentos.find(a => a.id === id);
