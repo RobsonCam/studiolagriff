@@ -1115,6 +1115,8 @@ td.acts{width:1%;white-space:nowrap}
 .po-pac:hover{border-color:var(--accent)} .po-pac .wa-av{grid-area:av} .po-pi{grid-area:i;display:flex;flex-direction:column;gap:2px;min-width:0} .po-num:nth-of-type(1){grid-area:n1} .po-num:nth-of-type(2){grid-area:n2} .po-ult{grid-area:ult;text-align:right}
 .po-num{display:flex;flex-direction:column;align-items:center;line-height:1.1} .po-num b{font-size:18px} .po-num span{font-size:11.5px;color:var(--muted)}
 .po-alerta{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;font-size:12.5px;font-weight:700;color:var(--bad);background:var(--bad-soft);border-radius:8px;padding:2px 8px;max-width:100%;overflow-wrap:anywhere}
+.pdf-op{display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}.pdf-op .btn{align-self:flex-start}
+.pct-l{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden}.pct-i{display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer}.pct-i+.pct-i{border-top:1px solid var(--line)}.pct-i input{width:20px;height:20px;flex:none}.pct-c{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}.pct-v{flex:none;white-space:nowrap}
 .au-f{display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:10px;align-items:end;margin-bottom:6px}.au-f .au-b{align-self:end}
 @media (max-width:760px){.au-f{grid-template-columns:1fr 1fr}.au-f .au-b{grid-column:1/-1}}
 .au-lista{display:flex;flex-direction:column;gap:8px}
@@ -2870,6 +2872,35 @@ function registrarAdiantamento(S, a, d) {
   // se já houver fechamento em aberto, o adiantamento não abate sozinho: a proprietária escolhe em Pagamentos
   return pg;
 }
+/* adiantamento lançado errado: corrige valor, data, forma (o saldo devedor é recalculado) ou exclui.
+   Não deixa ficar menos do que já foi descontado das comissões. */
+function editarAdiantamento(S, a, pgId, d) {
+  exigirDono(a);
+  const pg = (S.pagamentos || []).find(x => x.id === pgId && x.tipo === 'adiantamento'); if (!pg) throw new Error('Adiantamento não encontrado.');
+  const motivo = String(d.motivo || '').trim(); if (motivo.length < 3) throw new Error('Informe o motivo da correção.');
+  if (!(d.valor > 0)) throw new Error('Informe o valor do adiantamento.');
+  if (!d.data) throw new Error('Informe a data do pagamento.');
+  if (d.data > TODAY) throw new Error('A data do pagamento não pode ser no futuro.');
+  const novoSaldo = saldoDevedor(S, pg.funcId) - pg.valor + d.valor;
+  if (novoSaldo < 0) throw new Error(`Já foram descontados ${brl(saldoDevedor(S, pg.funcId) >= 0 ? pg.valor - saldoDevedor(S, pg.funcId) : 0)} deste adiantamento nas comissões. O valor não pode ficar menor que ${brl(pg.valor - saldoDevedor(S, pg.funcId))}.`);
+  const antes = `${brl(pg.valor)} em ${dataHora(pg.data, pg.hora)} · ${pg.metodo}`;
+  Object.assign(pg, { valor: d.valor, data: d.data, hora: horaValida(d.hora), metodo: d.metodo || pg.metodo, referencia: d.referencia ?? pg.referencia, obs: d.obs ?? pg.obs, editadoPor: a.nome, editadoEm: stamp() });
+  (pg.historico = pg.historico || []).push({ quando: stamp(), usuario: a.nome, texto: `${antes} → ${brl(pg.valor)} em ${dataHora(pg.data, pg.hora)} · ${pg.metodo} · ${motivo}` });
+  const f = S.funcionarios.find(x => x.id === pg.funcId);
+  audit(S, a, 'Adiantamento corrigido', `${f?.nome || ''} · ${antes} → ${brl(pg.valor)} em ${dataHora(pg.data, pg.hora)} · ${motivo} · saldo devedor ${brl(saldoDevedor(S, pg.funcId))}`);
+  return pg;
+}
+function excluirAdiantamento(S, a, pgId, motivo) {
+  exigirDono(a);
+  const pg = (S.pagamentos || []).find(x => x.id === pgId && x.tipo === 'adiantamento'); if (!pg) throw new Error('Adiantamento não encontrado.');
+  motivo = String(motivo || '').trim(); if (motivo.length < 3) throw new Error('Informe o motivo da exclusão.');
+  const dev = saldoDevedor(S, pg.funcId);
+  if (dev - pg.valor < 0) throw new Error(`Parte deste adiantamento (${brl(pg.valor - dev)}) já foi descontada das comissões, então ele não pode ser excluído. Use "Editar" para corrigir o valor (mínimo ${brl(pg.valor - dev)}).`);
+  S.pagamentos = S.pagamentos.filter(x => x.id !== pgId);
+  const f = S.funcionarios.find(x => x.id === pg.funcId);
+  audit(S, a, 'Adiantamento excluído', `${f?.nome || ''} · ${brl(pg.valor)} de ${dataHora(pg.data, pg.hora)} · ${pg.metodo}${pg.referencia ? ' · ' + pg.referencia : ''} · ${motivo} · saldo devedor ${brl(saldoDevedor(S, pg.funcId))}`);
+  return pg;
+}
 function abaterAdiantamento(S, a, fechamentoId, auto = false) {
   exigirDono(a);
   const f = S.fechamentos.find(x => x.id === fechamentoId);
@@ -2886,7 +2917,7 @@ function abaterAdiantamento(S, a, fechamentoId, auto = false) {
 /* extrato da conta da profissional: adiantamentos (+ dívida) e abatimentos (− dívida) */
 function extratoConta(S, a, funcId) {
   const movs = [
-    ...ver(S, a, 'pagamentos').filter(p => p.tipo === 'adiantamento' && (!funcId || p.funcId === funcId)).map(p => ({ data: p.data, hora: p.hora || '', quando: p.criadoEm, funcId: p.funcId, tipo: 'adiantamento', desc: `Adiantamento · ${p.metodo}${p.obs ? ' · ' + p.obs : ''}`, valor: p.valor, mov: p.mov || 0 })),
+    ...ver(S, a, 'pagamentos').filter(p => p.tipo === 'adiantamento' && (!funcId || p.funcId === funcId)).map(p => ({ id: p.id, data: p.data, hora: p.hora || '', quando: p.criadoEm, funcId: p.funcId, tipo: 'adiantamento', desc: `Adiantamento · ${p.metodo}${p.obs ? ' · ' + p.obs : ''}`, valor: p.valor, mov: p.mov || 0 })),
     ...ver(S, a, 'abatimentos').filter(x => !funcId || x.funcId === funcId).map(x => ({ data: x.data, quando: x.criadoEm, funcId: x.funcId, tipo: 'abatimento', desc: `Descontado da comissão do ${x.codigo}`, valor: -x.valor, mov: x.mov || 0 }))
   ].sort((p, q) => p.data.localeCompare(q.data) || p.mov - q.mov);
   const saldo = {};
@@ -2917,14 +2948,24 @@ function abertosDoConvenio(S, convenioId, fim = '') {
   return S.parcelas.filter(p => p.convenioId === convenioId && p.forma === 'convenio' && ats.has(p.atendimentoId) && convEmAberto(p) && (!fim || dataCompetenciaConv(p.data) <= fim))
     .sort((a, b) => a.data.localeCompare(b.data) || a.id.localeCompare(b.id));
 }
+/* o que o convênio tem que pagar até o mês de vencimento escolhido (ex.: '2026-11' = parcelas que vencem dia 10/11
+   e as vencidas antes). Parcelas dos meses seguintes ficam de fora. mes vazio = tudo o que está em aberto. */
+function aPagarConvenioMes(S, convenioId, mes = TODAY.slice(0, 7)) {
+  return abertosDoConvenio(S, convenioId).map(p => {
+    const qs = parcelasConvenio(p).filter(q => q.aberto > 0 && (!mes || q.vencimento.slice(0, 7) <= mes));
+    return { p, qs, devido: sum(qs.map(q => q.aberto)), vencimento: qs[0]?.vencimento || '' };
+  }).filter(x => x.devido > 0);
+}
 function pagarConvenioTodo(S, a, convenioId, parcelaIds, d) {
   exigirConvenios(S, a);
   const cv = S.convenios.find(x => x.id === convenioId); if (!cv) throw new Error('Convênio não encontrado.');
-  const ids = new Set(parcelaIds || []), ps = abertosDoConvenio(S, convenioId).filter(p => ids.has(p.id));
+  const mes = d.mes === undefined ? '' : d.mes;
+  const ids = new Set(parcelaIds || []), ps = aPagarConvenioMes(S, convenioId, mes).filter(x => ids.has(x.p.id));
   if (!ps.length) throw new Error('Marque ao menos um serviço em aberto.');
-  const total = sum(ps.map(p => totalConv(p) - (p.acertado || 0)));
-  return transacao(S, () => { const lib = ps.map(p => registrarAcerto(S, a, p.id, { ...d, valor: totalConv(p) - (p.acertado || 0) }));
-    audit(S, a, 'Convênio pago (tudo)', `${cv.nome} · ${ps.length} serviço(s) · ${brl(total)} · ${dataHora(d.data, d.hora)}`);
+  const total = sum(ps.map(x => x.devido));
+  const { mes: _m, ...pg } = d;
+  return transacao(S, () => { const lib = ps.map(x => registrarAcerto(S, a, x.p.id, { ...pg, valor: x.devido }));
+    audit(S, a, 'Convênio pago', `${cv.nome} · ${ps.length} serviço(s) · ${brl(total)}${mes ? ` · parcelas que vencem até ${dBR(mes + '-' + String(CONV_VENCE).padStart(2, '0'))}` : ' · tudo em aberto'} · ${dataHora(d.data, d.hora)}`);
     return { n: ps.length, total, liberado: sum(lib) }; });
 }
 function resumoConvenios(S, ini, fim) {
@@ -3525,7 +3566,8 @@ function pagarRecepcao(S, a, d) {
   if (!f || cargoDe(f) !== 'recepcao' || f.dona) throw new Error('Escolha a recepcionista.');
   if (!d.ini || !d.fim || d.fim < d.ini) throw new Error('Informe a semana do pagamento.');
   if (!d.data || d.data > TODAY) throw new Error('A data do pagamento não pode ser no futuro.');
-  return transacao(S, () => { const [m] = salvarMovimento(S, a, { tipo: 'saida', categoria: 'salarios', descricao: `Pagamento semanal · ${f.nome} · semana ${dBR(d.ini).slice(0, 5)} a ${dBR(d.fim).slice(0, 5)}`, valor: d.valor, data: d.data, forma: d.forma || 'pix', obs: d.obs });
+  if (d.id && !(S.movimentos || []).some(x => x.id === d.id && x.pagRecepcao && !x.excluido)) throw new Error('Pagamento não encontrado.');
+  return transacao(S, () => { const [m] = salvarMovimento(S, a, { ...(d.id ? { id: d.id } : {}), tipo: 'saida', categoria: 'salarios', descricao: `Pagamento semanal · ${f.nome} · semana ${dBR(d.ini).slice(0, 5)} a ${dBR(d.fim).slice(0, 5)}`, valor: d.valor, data: d.data, forma: d.forma || 'pix', obs: d.obs });
     Object.assign(m, { funcId: f.id, pagRecepcao: { ini: d.ini, fim: d.fim }, hora: d.hora || '' }); return m; });
 }
 const pagamentosRecepcao = (S, funcId) => (S.movimentos || []).filter(m => m.pagRecepcao && !m.excluido && (!funcId || m.funcId === funcId)).sort((x, y) => (y.data + (y.hora || '')).localeCompare(x.data + (x.hora || '')));
@@ -5434,6 +5476,31 @@ function runTests() {
     const velho = { ...S.auditoria[1] }; CTX_AUD.forEach(k => delete velho[k]);   // registro antigo, sem cliente gravado
     const inf = inferirCtxAud(S, velho);
     return (c1.cliente === cli && c1.agId === id && c1.ref.includes(dBR(dia) + ' às 10:00') && c2.acao === 'Agendamento cancelado' && c2.cliente === cli && inf && inf.agId === id && inf.cliente === cli) || JSON.stringify([c1, c2, inf]);
+  });
+  T('Pagar convênio: soma só as parcelas que vencem no mês (e as vencidas), não o total em aberto', () => {
+    const S = seedBase(), d = S.users.find(u => u.id === 'u0');
+    const cv = S.convenios[0]; cv.taxa = 0; const k = S.clientes[0]; k.convenios = [cv.id];
+    const [at] = registrarAtendimentoGrupo(S, d, { clienteId: k.id, data: TODAY, itens: [{ funcId: 'f1', servicoId: 's1', valorCobrado: 30000 }], parcelas: [{ forma: 'convenio', valor: 30000, convenioId: cv.id, nParcelas: 3 }] });
+    const p = S.parcelas.find(x => x.atendimentoId === at.id); p.data = '2026-10-05'; p.nParcelas = 3;
+    const mesNov = aPagarConvenioMes(S, cv.id, '2026-11').find(x => x.p.id === p.id), tudo = aPagarConvenioMes(S, cv.id, '').find(x => x.p.id === p.id);
+    const r = pagarConvenioTodo(S, d, cv.id, [p.id], { data: TODAY, hora: '10:00', metodo: 'Pix', mes: '2026-11' });
+    const resta = parcelasConvenio(p).filter(q => q.aberto > 0).map(q => q.vencimento);
+    return (mesNov.devido === 10000 && tudo.devido === 30000 && r.total === 10000 && p.acertado === 10000 && resta.join() === '2026-12-10,2027-01-10') || JSON.stringify([mesNov.devido, tudo.devido, r.total, p.acertado, resta]);
+  });
+  T('Adiantamento e pagamento da recepção lançados errado: edita e exclui (sem apagar o que já foi descontado)', () => {
+    const S = seedBase(), d = S.users.find(u => u.id === 'u0');
+    const pg = registrarAdiantamento(S, d, { funcId: 'f1', valor: 50000, data: TODAY, hora: '10:00', metodo: 'Pix' });
+    editarAdiantamento(S, d, pg.id, { valor: 5000, data: TODAY, hora: '10:00', metodo: 'Dinheiro', motivo: 'digitei um zero a mais' });
+    const s1 = saldoDevedor(S, 'f1');
+    S.abatimentos = [{ id: 'ab1', funcId: 'f1', valor: 3000 }];
+    const e1 = deveFalhar(() => editarAdiantamento(S, d, pg.id, { valor: 2000, data: TODAY, motivo: 'teste baixo' })), e2 = deveFalhar(() => excluirAdiantamento(S, d, pg.id, 'errado'));
+    S.abatimentos = []; excluirAdiantamento(S, d, pg.id, 'lançado na profissional errada');
+    const rec = S.funcionarios.find(f => cargoDe(f) === 'recepcao' && !f.dona) || (() => { const f = S.funcionarios[0]; f.cargo = 'recepcao'; return f; })();
+    const m = pagarRecepcao(S, d, { funcId: rec.id, ini: weekStart(TODAY), fim: addDays(weekStart(TODAY), 6), valor: 40000, data: TODAY, forma: 'pix' });
+    pagarRecepcao(S, d, { id: m.id, funcId: rec.id, ini: weekStart(TODAY), fim: addDays(weekStart(TODAY), 6), valor: 35000, data: TODAY, forma: 'dinheiro' });
+    const ed = pagamentosRecepcao(S, rec.id)[0];
+    excluirMovimento(S, d, m.id, 'lançado duas vezes');
+    return (s1 === 5000 && /descontad/.test(e1) && /descontada/.test(e2) && saldoDevedor(S, 'f1') === 0 && !S.pagamentos.some(x => x.id === pg.id) && ed.valor === 35000 && ed.forma === 'dinheiro' && ed.pagRecepcao && pagamentosRecepcao(S, rec.id).length === 0) || JSON.stringify([s1, e1, e2, ed]);
   });
   return out;
 }
@@ -8848,27 +8915,37 @@ function tabelaConvenios(L, dono) {
 }
 /* "Pagar convênio": o responsável pelo convênio pagou o total (ele cobra dos conveniados dele).
    Todos os serviços em aberto marcados ficam pagos e a comissão é liberada na semana do pagamento. */
+const vencMesTxt = m => { const [y, mm] = m.split('-'); const iso = `${m}-${String(CONV_VENCE).padStart(2, '0')}`; return { mes: `${MESES[+mm - 1]}/${y}`, dia: dBR(iso).slice(0, 5), iso }; };
 function modalPagarConvenioTodo(cvId) {
-  const cv = CV(cvId), [, fim] = periodo(), ab = abertosDoConvenio(DB, cvId, fim);
-  if (!ab.length) return toast('Não há valor em aberto neste convênio.', 'bad');
-  const at = id => DB.atendimentos.find(x => x.id === id), meses = [...new Set(ab.map(p => competenciaConv(p.data)))].sort();
+  const cv = CV(cvId), mesAtual = TODAY.slice(0, 7);
+  if (!abertosDoConvenio(DB, cvId).length) return toast('Não há valor em aberto neste convênio.', 'bad');
+  const at = id => DB.atendimentos.find(x => x.id === id);
   const mesTxt = c => { const [y, m] = c.split('-'); return `${MESES[+m - 1]}/${y}`; };
-  const ov = openModal(`Pagar convênio · ${cv.nome}`, `<div class="note small">Use quando o responsável pelo convênio paga o total de uma vez. Todos os serviços marcados ficam <b>pagos</b> e a comissão das profissionais é liberada na semana desta data de pagamento.</div>
-    <div class="bar" style="margin:8px 0;gap:6px">${meses.length > 1 ? meses.map(c => `<button class="btn sm" type="button" data-pcm="${c}">Só ${mesTxt(c)}</button>`).join('') + '<button class="btn sm" type="button" data-pcm="">Todos</button>' : ''}</div>
-    <div class="tw"><table><thead><tr><th></th><th>Data</th><th>Mês do convênio</th><th>Cliente</th><th>Serviço</th><th class="r">Em aberto</th></tr></thead><tbody>${ab.map(p => { const a = at(p.atendimentoId);
-      return `<tr><td><input type="checkbox" data-pct-id="${p.id}" data-mes="${competenciaConv(p.data)}" checked aria-label="Incluir"></td><td>${dBR(p.data)}</td><td class="small">${mesTxt(competenciaConv(p.data))} · vence ${dBR(vencimentoConv(p.data)).slice(0, 5)}</td><td>${cliNome(a?.clienteId)}</td><td class="small">${esc(SV(a?.servicoId)?.nome || '')}</td><td class="r b">${brl(totalConv(p) - p.acertado)}</td></tr>`; }).join('')}</tbody></table></div>
+  let mes = mesAtual, L = [];
+  const ov = openModal(`Pagar convênio · ${cv.nome}`, `<div class="note small">O valor é das <b>parcelas que vencem no mês</b> (dia ${CONV_VENCE}) e das que já venceram. Parcelas dos próximos meses ficam para depois. Os serviços marcados ficam pagos nessas parcelas e a comissão é liberada na semana desta data de pagamento.</div>
+    <div class="bar" style="margin:8px 0;gap:6px" id="pct-ms"></div>
+    <div id="pct-l"></div>
     <div class="form"><label class="f">Data do pagamento<input type="date" id="pct-d" value="${TODAY}" max="${TODAY}"></label>${campoHora('pct-h')}
       <label class="f">Forma<select id="pct-m">${opt([['Pix', 'Pix'], ['Transferência', 'Transferência'], ['Boleto', 'Boleto'], ['Dinheiro', 'Dinheiro'], ['Cartão', 'Cartão']], 'Pix')}</select></label><label class="f">Comprovante ou referência<input id="pct-r"></label></div>
     <div class="calc" id="pct-t"></div>`,
     `<button class="btn" data-close>Cancelar</button><button class="btn pri" id="pct-ok">Confirmar pagamento</button>`, true);
   const marcados = () => [...ov.querySelectorAll('[data-pct-id]:checked')].map(x => x.dataset.pctId);
-  const tot = () => { const ids = new Set(marcados()), t = sum(ab.filter(p => ids.has(p.id)).map(p => totalConv(p) - p.acertado));
-    ov.querySelector('#pct-t').innerHTML = `<div class="split"><span>${ids.size} serviço(s) marcados</span><b>${brl(t)}</b></div>`; ov.querySelector('#pct-ok').textContent = `Confirmar pagamento de ${brl(t)}`; return t; };
-  ov.querySelectorAll('[data-pct-id]').forEach(x => x.onchange = tot);
-  ov.querySelectorAll('[data-pcm]').forEach(b => b.onclick = () => { ov.querySelectorAll('[data-pct-id]').forEach(x => { x.checked = !b.dataset.pcm || x.dataset.mes === b.dataset.pcm; }); tot(); });
-  tot();
-  const bind = () => { ov.querySelector('#pct-ok').onclick = () => { const t = tot(); confirmar(ov, `Confirmar que o <b>${esc(cv.nome)}</b> pagou <b>${brl(t)}</b> em <b>${dataHora(val('pct-d'), val('pct-h'))}</b>? Os serviços marcados ficam pagos e a comissão é liberada.`,
-    () => run(() => pagarConvenioTodo(DB, ACTOR, cvId, marcados(), { data: val('pct-d'), hora: val('pct-h'), metodo: val('pct-m'), referencia: val('pct-r') }), r => `${cv.nome} pago · ${r.n} serviço(s) · ${brl(r.total)}`).ok && closeModal(), 'Confirmar pagamento'); }; tot(); };
+  const tot = () => { const ids = new Set(marcados()), t = sum(L.filter(x => ids.has(x.p.id)).map(x => x.devido));
+    ov.querySelector('#pct-t').innerHTML = `<div class="split"><span>${ids.size} serviço(s) marcados${mes ? ` · vencem até ${vencMesTxt(mes).dia}` : ' · tudo em aberto'}</span><b>${brl(t)}</b></div>`; ov.querySelector('#pct-ok').textContent = `Confirmar pagamento de ${brl(t)}`; return t; };
+  const montar = () => {
+    L = aPagarConvenioMes(DB, cvId, mes);
+    const futuros = [...new Set(abertosDoConvenio(DB, cvId).flatMap(p => parcelasConvenio(p).filter(q => q.aberto > 0).map(q => q.vencimento.slice(0, 7))))].filter(m => m > mesAtual).sort();
+    ov.querySelector('#pct-ms').innerHTML = [mesAtual, ...futuros].map(m => `<button class="btn sm ${m === mes ? 'pri' : ''}" type="button" data-pcm="${m}">${m === mesAtual ? 'Este mês' : 'Até'} · vence ${vencMesTxt(m).dia}</button>`).join('') + (futuros.length ? `<button class="btn sm ${!mes ? 'pri' : ''}" type="button" data-pcm="">Tudo em aberto</button>` : '');
+    ov.querySelector('#pct-l').innerHTML = L.length ? `<div class="pct-l">${L.map(x => { const a = at(x.p.atendimentoId), venc = x.qs.some(q => q.vencimento < TODAY);
+      return `<label class="pct-i"><input type="checkbox" data-pct-id="${x.p.id}" checked aria-label="Incluir"><span class="pct-c"><b>${cliNome(a?.clienteId)}</b><span class="muted small">${esc(SV(a?.servicoId)?.nome || '')} · feito em ${dBR(x.p.data).slice(0, 5)}</span><span class="small">${x.qs.map(q => `${q.de > 1 ? 'parcela ' + q.n + '/' + q.de + ' · ' : ''}vence ${dBR(q.vencimento).slice(0, 5)}`).join(' · ')}${venc ? ' ' + pill('Vencida', 'bad') : ''}</span></span><b class="pct-v">${brl(x.devido)}</b></label>`; }).join('')}</div>`
+      : `<div class="panel">${empty(`Nada vence até ${vencMesTxt(mes).dia}`, 'Escolha outro mês acima para adiantar o pagamento.')}</div>`;
+    ov.querySelectorAll('[data-pct-id]').forEach(x => x.onchange = tot);
+    ov.querySelectorAll('[data-pcm]').forEach(b => b.onclick = () => { mes = b.dataset.pcm; montar(); });
+    tot();
+  };
+  montar();
+  const bind = () => { ov.querySelector('#pct-ok').onclick = () => { const t = tot(); if (!t) return toast('Marque ao menos um serviço.', 'bad'); confirmar(ov, `Confirmar que o <b>${esc(cv.nome)}</b> pagou <b>${brl(t)}</b> em <b>${dataHora(val('pct-d'), val('pct-h'))}</b>? As parcelas marcadas ficam pagas e a comissão é liberada.`,
+    () => run(() => pagarConvenioTodo(DB, ACTOR, cvId, marcados(), { data: val('pct-d'), hora: val('pct-h'), metodo: val('pct-m'), referencia: val('pct-r'), mes }), r => `${cv.nome} pago · ${r.n} serviço(s) · ${brl(r.total)}`).ok && closeModal(), 'Confirmar pagamento'); }; tot(); };
   rebindFns.set(ov, bind); bind();
 }
 /* registrar pagamento do convênio de uma comanda ou de tudo o que a cliente deve: o valor quita as parcelas por vencimento */
@@ -8932,7 +9009,9 @@ function pgConvenios() {
         <div class="cv-nums"><div><span>Serviços</span><b>${r.servicos}</b>${r.anteriores.n ? `<small>${r.anteriores.n} de meses anteriores em aberto</small>` : ''}</div><div><span>Total cobrado</span><b>${brl(r.gerado)}</b>${r.acrescimo ? `<small>${brl(r.servico)} + ${brl(r.acrescimo)} acréscimo</small>` : ''}</div><div><span>Pago</span><b class="ok">${brl(r.pago)}</b></div><div><span>A receber</span><b class="${r.pendente ? 'bad' : ''}">${brl(r.pendente)}</b>${r.anteriores.valor ? `<small>inclui ${brl(r.anteriores.valor)} de antes</small>` : ''}</div></div>
         <div class="meter" title="${pct}% pago"><i style="width:${pct}%"></i></div><div class="muted small">${pct}% pago pelo convênio</div>
         ${r.cv.taxa || r.repassadoTotal || r.aRepassar ? `<div class="rep"><div><span>Repasse ao conveniado</span><b class="${r.aRepassar ? 'bad' : ''}">${r.aRepassar ? 'A repassar ' + brl(r.aRepassar) : 'Nada a repassar'}</b><small>Acréscimo recebido no período ${brl(r.repDevido)} · já repassado (total) ${brl(r.repassadoTotal)}</small></div>${r.aRepassar && dono ? `<button class="btn sm pri" data-repasse="${r.cv.id}">Registrar repasse</button>` : ''}</div>` : ''}
-        ${(() => { const ab = abertosDoConvenio(DB, r.cv.id, fim); return ab.length ? `<div class="cv-pagar"><div class="small"><b>${brl(sum(ab.map(p => totalConv(p) - p.acertado)))}</b> em aberto · ${ab.length} serviço(s)<div class="muted">vence dia ${CONV_VENCE} do mês seguinte · vira no dia ${CONV_VIRA}</div></div><button class="btn sm pri" data-conv-pagar="${r.cv.id}">Pagar convênio</button></div>` : ''; })()}
+        ${(() => { const ab = abertosDoConvenio(DB, r.cv.id); if (!ab.length) return ''; const mes = aPagarConvenioMes(DB, r.cv.id), tm = sum(mes.map(x => x.devido)), tt = sum(ab.map(p => totalConv(p) - p.acertado)), vm = vencMesTxt(TODAY.slice(0, 7));
+          if (!tm) return `<div class="cv-pagar"><div class="small"><b>Nada vence em ${vm.mes}</b><div class="muted">${brl(tt)} em aberto para os próximos meses</div></div><button class="btn sm" data-conv-pagar="${r.cv.id}">Adiantar pagamento</button></div>`;
+          return `<div class="cv-pagar"><div class="small"><b>${brl(tm)}</b> a pagar em ${vm.mes} · ${mes.length} serviço(s)<div class="muted">parcelas que vencem até ${vm.dia}${mes.some(x => x.vencimento < vm.iso) ? ' (inclui vencidas)' : ''}${tt > tm ? ` · total em aberto ${brl(tt)} (o resto vence nos próximos meses)` : ''}</div></div><button class="btn sm pri" data-conv-pagar="${r.cv.id}">Pagar ${brl(tm)}</button></div>`; })()}
         <div class="bar"><button class="btn sm ${abertosDoConvenio(DB, r.cv.id, fim).length ? '' : 'pri'}" data-conv-membros="${r.cv.id}">Conveniados (${conveniadosDe(DB, r.cv.id).length})</button>${lixo('conv', r.cv.id, r.cv.nome)}<button class="btn sm" data-conv-filtro="${r.cv.id}">${UI.cvConv === r.cv.id ? 'Mostrar todos' : 'Ver serviços'}</button>${dono ? `<button class="btn sm" data-pdf="conv:${r.cv.id}">Extrato PDF</button><button class="btn sm ghost" data-conv-edit="${r.cv.id}">Editar</button>` : ''}</div></div>`; }).join('')}</div>
     ${(() => { const P = pendCache().lista; if (!P.length) return '';
       const porCli = new Map(); for (const x of P) { const k = x.at.clienteId; if (!porCli.has(k)) porCli.set(k, []); porCli.get(k).push(x); }
@@ -9055,15 +9134,52 @@ function modalConvenio(id) {
   ov.querySelector('#cv-x').oninput = ex; ex();
   ov.querySelector('#cv-ok').onclick = () => run(() => salvarConvenio(DB, ACTOR, { ...(id ? { id } : {}), nome: val('cv-n'), responsavel: val('cv-r'), telefone: val('cv-t'), email: val('cv-e'), obs: val('cv-o'), taxa: val('cv-x') || 0, ativo: ov.querySelector('#cv-a').checked }), id ? 'Convênio atualizado' : 'Convênio cadastrado').ok && closeModal();
 }
-function pdfConvenio(cvId) {
-  const [ini, fim] = periodo(); const r = resumoConvenios(DB, ini, fim).find(x => x.cv.id === cvId);
-  const ats = Object.fromEntries(DB.atendimentos.map(a => [a.id, a]));
-  const reps = (DB.repasses || []).filter(x => x.convenioId === cvId && x.data >= ini && x.data <= fim);
+function pdfConvenioEscolher(cvId) {
+  const cv = CV(cvId), mesAtual = TODAY.slice(0, 7), [ini, fim] = periodo();
+  const meses = [...new Set(DB.parcelas.filter(p => p.convenioId === cvId && p.forma === 'convenio' && p.situacao !== 'cancelado').flatMap(p => parcelasConvenio(p).map(q => q.vencimento.slice(0, 7))))].concat(mesAtual);
+  const ms = [...new Set(meses)].sort().reverse();
+  const ov = openModal(`Extrato em PDF · ${cv.nome}`, `<div class="stack" style="gap:12px">
+    <div class="pdf-op"><div><b>Parcial do mês</b><div class="muted small">Parcelas que vencem no dia ${CONV_VENCE} do mês escolhido e as vencidas que ainda estão em aberto. É o valor do botão "Pagar convênio".</div>
+      <label class="f" style="margin-top:8px">Mês do vencimento<select id="xp-m">${ms.map(m => `<option value="${m}" ${m === mesAtual ? 'selected' : ''}>${vencMesTxt(m).mes} · vence ${vencMesTxt(m).dia}</option>`).join('')}</select></label></div>
+      <button class="btn pri" id="xp-mes">${icon('pdf')}<span>Baixar parcial do mês</span></button></div>
+    <div class="pdf-op"><div><b>Total do convênio</b><div class="muted small">Todos os serviços do convênio desde o início: pagos e em aberto, com o total geral e o que ainda falta pagar.</div></div>
+      <button class="btn pri" id="xp-tot">${icon('pdf')}<span>Baixar total do convênio</span></button></div>
+    <button class="btn sm ghost" id="xp-per" style="align-self:flex-start">Ou só o período da tela (${dBR(ini)} a ${dBR(fim)})</button></div>`,
+    `<button class="btn" data-close>Fechar</button>`);
+  const go = (b, f) => { b.disabled = true; Promise.resolve(f()).finally(() => { b.disabled = false; }); };
+  ov.querySelector('#xp-mes').onclick = e => go(e.currentTarget, () => pdfConvenioMes(cvId, val('xp-m')));
+  ov.querySelector('#xp-tot').onclick = e => go(e.currentTarget, () => pdfConvenio(cvId, true));
+  ov.querySelector('#xp-per').onclick = e => go(e.currentTarget, () => pdfConvenio(cvId, false));
+}
+/* parcial do mês: o que vence no dia 10 do mês (e o vencido em aberto), igual ao botão "Pagar convênio" */
+function pdfConvenioMes(cvId, mes) {
+  const cv = CV(cvId), vm = vencMesTxt(mes), ats = Object.fromEntries(DB.atendimentos.map(a => [a.id, a]));
   const pct = x => String(x || 0).replace('.', ',') + '%';
-  return baixar(`extrato-${nomeArq(r.cv.nome)}-${ini}-a-${fim}.pdf`, gerarPDF({ titulo: 'Extrato do convênio', salao: DB.config.nome, tagline: 'Salão de beleza e podologia', geradoPor: geradoPor(),
-    meta: [['Convênio', r.cv.nome], ['Responsável', r.cv.responsavel || '-'], ['Acréscimo atual', pct(r.cv.taxa)], ['Período', `${dBR(ini)} a ${dBR(fim)}`]],
-    resumo: [['Serviços realizados', String(r.servicos)], ...(r.anteriores.n ? [['Em aberto de meses anteriores', `${r.anteriores.n} serviço(s) · ${brl(r.anteriores.valor)}`]] : []), ['Total cobrado', brl(r.gerado)], ['Já pago', brl(r.pago)], ['Ainda a pagar', brl(r.pendente)],
-      ...(r.acrescimo || r.repassadoTotal ? [['Acréscimo do conveniado', brl(r.acrescimo)], ['Repasse devido (já recebido)', brl(r.repDevido)], ['Repassado no período', brl(sum(reps.map(x => x.valor)))], ['A repassar ao conveniado', brl(r.aRepassar)]] : [])],
+  const L = [];
+  for (const p of DB.parcelas) {
+    if (p.convenioId !== cvId || p.forma !== 'convenio' || p.situacao === 'cancelado' || ats[p.atendimentoId]?.status !== 'concluido') continue;
+    for (const q of parcelasConvenio(p)) { const m = q.vencimento.slice(0, 7); if (m === mes || (m < mes && q.aberto > 0)) L.push({ p, q, at: ats[p.atendimentoId] }); }
+  }
+  L.sort((a, b) => a.q.vencimento.localeCompare(b.q.vencimento) || a.p.data.localeCompare(b.p.data));
+  const tv = sum(L.map(x => x.q.valor)), tp = sum(L.map(x => x.q.pago)), ta = sum(L.map(x => x.q.aberto)), venc = L.filter(x => x.q.vencimento.slice(0, 7) < mes);
+  const futuro = sum(abertosDoConvenio(DB, cvId).flatMap(p => parcelasConvenio(p).filter(q => q.aberto > 0 && q.vencimento.slice(0, 7) > mes).map(q => q.aberto)));
+  return baixar(`extrato-${nomeArq(cv.nome)}-${mes}-parcial.pdf`, gerarPDF({ titulo: 'Extrato do convênio · parcial do mês', salao: DB.config.nome, tagline: 'Salão de beleza e podologia', geradoPor: geradoPor(),
+    meta: [['Convênio', cv.nome], ['Responsável', cv.responsavel || '-'], ['Referente a', `${vm.mes} · vencimento ${dBR(vm.iso)}`], ['Regra', `vence dia ${CONV_VENCE} do mês seguinte · vira no dia ${CONV_VIRA}`]],
+    resumo: [['Parcelas do mês', String(L.length - venc.length)], ...(venc.length ? [['Vencidas de meses anteriores', `${venc.length} · ${brl(sum(venc.map(x => x.q.aberto)))}`]] : []), ['Total do mês', brl(tv)], ['Já pago', brl(tp)], ['A pagar até ' + dBR(vm.iso), brl(ta)], ['Fica para os próximos meses', brl(futuro)]],
+    secoes: [{ titulo: 'Parcelas', cols: ['Vencimento', 'Atend.', 'Data', 'Cliente', 'Serviço', 'Parcela', 'Valor', 'Pago', 'A pagar'],
+      rows: L.map(({ p, q, at }) => [dBR(q.vencimento) + (q.situacao === 'vencida' ? ' (vencida)' : ''), at?.codigo || '', dBR(p.data), CL(at?.clienteId)?.nome || '', SV(at?.servicoId)?.nome || '', `${q.n}/${q.de}`, brl(q.valor), brl(q.pago), brl(q.aberto)]),
+      foot: ['Total', '', '', '', '', '', brl(tv), brl(tp), brl(ta)] }],
+    assinatura: cv.responsavel || cv.nome, declaracao: `Valores conferidos pelas duas partes. "A pagar" é o que o convênio deve ao salão até ${dBR(vm.iso)}. Parcelas que vencem depois não entram neste extrato.` }), 'PDF');
+}
+function pdfConvenio(cvId, total = false) {
+  const [ini, fim] = total ? ['', ''] : periodo(); const r = resumoConvenios(DB, ini, fim).find(x => x.cv.id === cvId);
+  const ats = Object.fromEntries(DB.atendimentos.map(a => [a.id, a]));
+  const reps = (DB.repasses || []).filter(x => x.convenioId === cvId && (total || (x.data >= ini && x.data <= fim)));
+  const pct = x => String(x || 0).replace('.', ',') + '%';
+  return baixar(total ? `extrato-${nomeArq(r.cv.nome)}-total.pdf` : `extrato-${nomeArq(r.cv.nome)}-${ini}-a-${fim}.pdf`, gerarPDF({ titulo: total ? 'Extrato do convênio · total' : 'Extrato do convênio', salao: DB.config.nome, tagline: 'Salão de beleza e podologia', geradoPor: geradoPor(),
+    meta: [['Convênio', r.cv.nome], ['Responsável', r.cv.responsavel || '-'], ['Acréscimo atual', pct(r.cv.taxa)], total ? ['Período', 'Todos os serviços desde o início'] : ['Período', `${dBR(ini)} a ${dBR(fim)}`]],
+    resumo: [['Serviços realizados', String(r.servicos)], ...(!total && r.anteriores.n ? [['Em aberto de meses anteriores', `${r.anteriores.n} serviço(s) · ${brl(r.anteriores.valor)}`]] : []), ['Total cobrado', brl(r.gerado)], ['Já pago', brl(r.pago)], ['Ainda a pagar', brl(r.pendente)], ...(total ? [['A pagar em ' + vencMesTxt(TODAY.slice(0, 7)).mes, brl(sum(aPagarConvenioMes(DB, cvId).map(x => x.devido)))]] : []),
+      ...(r.acrescimo || r.repassadoTotal ? [['Acréscimo do conveniado', brl(r.acrescimo)], ['Repasse devido (já recebido)', brl(r.repDevido)], [total ? 'Repassado (total)' : 'Repassado no período', brl(sum(reps.map(x => x.valor)))], ['A repassar ao conveniado', brl(r.aRepassar)]] : [])],
     secoes: [{ titulo: 'Serviços', cols: ['Data', 'Atend.', 'Cliente', 'Serviço', 'Autorização', 'Valor', 'Acréscimo', 'Total', 'Pago', 'A pagar'],
       rows: r.parcelas.sort((a, b) => a.data.localeCompare(b.data)).map(p => { const at = ats[p.atendimentoId]; return [dBR(p.data), at?.codigo || '', CL(at?.clienteId)?.nome || '', SV(at?.servicoId)?.nome || '', p.autorizacao || '-', brl(p.valor), p.acrescimo ? `${brl(p.acrescimo)} (${pct(p.taxaPct)})` : '-', brl(totalConv(p)), brl(p.acertado), brl(totalConv(p) - p.acertado)]; }),
       foot: ['Total', '', '', '', '', brl(r.servico), brl(r.acrescimo), brl(r.gerado), brl(r.pago), brl(r.pendente)] },
@@ -9143,12 +9259,29 @@ function modalAdiantamento(funcId) {
       () => run(() => registrarAdiantamento(DB, ACTOR, { funcId: f, valor: v, data: val('ad-d'), hora: val('ad-h'), metodo: val('ad-m'), referencia: val('ad-r'), obs: val('ad-o') }), 'Adiantamento registrado. Saldo negativo lançado.').ok && closeModal(), 'Confirmar adiantamento'); }; };
   rebindFns.set(ov, bind); bind();
 }
+/* adiantamento lançado errado: corrigir ou excluir */
+function modalEditarAdiantamento(pgId, excluir = false) {
+  const pg = DB.pagamentos.find(x => x.id === pgId && x.tipo === 'adiantamento'); if (!pg) return toast('Adiantamento não encontrado.', 'bad');
+  const dev = saldoDevedor(DB, pg.funcId), desc = Math.max(0, pg.valor - dev);
+  const ov = openModal(excluir ? 'Excluir adiantamento' : 'Editar adiantamento', `<div class="note small"><b>${esc(fn(pg.funcId))}</b> · ${brl(pg.valor)} em ${dataHora(pg.data, pg.hora)} · ${esc(pg.metodo)} · lançado por ${esc(pg.responsavel)} em ${esc(pg.criadoEm)}</div>
+    ${desc ? `<div class="note warn small">${brl(desc)} deste adiantamento já foi descontado das comissões. ${excluir ? 'Por isso ele não pode ser excluído: corrija o valor em "Editar".' : `O valor não pode ficar menor que ${brl(desc)}.`}</div>` : ''}
+    ${excluir ? `<p>O adiantamento sai da conta de ${esc(fn(pg.funcId))} e o saldo devedor passa de <b>${brl(dev)}</b> para <b>${brl(Math.max(0, dev - pg.valor))}</b>. O registro fica na auditoria.</p>` : `<div class="form">
+      <label class="f">Valor (R$)<input id="ae-v" inputmode="decimal" value="${centsInput(pg.valor)}"></label><label class="f">Data<input type="date" id="ae-d" value="${pg.data}" max="${TODAY}"></label>${campoHora('ae-h', 'Hora do pagamento', pg.hora)}
+      <label class="f">Método<select id="ae-m">${opt([['Pix', 'Pix'], ['Dinheiro', 'Dinheiro'], ['Transferência', 'Transferência']], pg.metodo)}</select></label><label class="f">Comprovante ou referência<input id="ae-r" value="${esc(pg.referencia || '')}"></label>
+      <label class="f full">Observação<input id="ae-o" value="${esc(pg.obs || '')}"></label></div><div class="calc" id="ae-c"></div>`}
+    <div class="form"><label class="f full">Motivo ${excluir ? 'da exclusão' : 'da correção'}<input id="ae-mt" placeholder="${excluir ? 'Ex.: lançado em duplicidade' : 'Ex.: digitei o valor errado'}"></label></div>`,
+    `<button class="btn" data-close>Cancelar</button>${excluir ? `<button class="btn pri bad-b" id="ae-ok" ${desc ? 'disabled' : ''}>Excluir adiantamento</button>` : `<button class="btn pri" id="ae-ok">Salvar correção</button>`}`);
+  if (!excluir) { const calc = () => { const v = toCents(val('ae-v')) || 0; ov.querySelector('#ae-c').innerHTML = `<div class="split"><span>Saldo devedor depois da correção</span><b>${brl(Math.max(0, dev - pg.valor + v))}</b></div>`; }; ov.querySelector('#ae-v').oninput = calc; calc(); }
+  ov.querySelector('#ae-ok').onclick = () => excluir
+    ? run(() => excluirAdiantamento(DB, ACTOR, pgId, val('ae-mt')), 'Adiantamento excluído').ok && closeModal()
+    : run(() => editarAdiantamento(DB, ACTOR, pgId, { valor: toCents(val('ae-v')), data: val('ae-d'), hora: val('ae-h'), metodo: val('ae-m'), referencia: val('ae-r'), obs: val('ae-o'), motivo: val('ae-mt') }), 'Adiantamento corrigido').ok && closeModal();
+}
 function modalExtrato(funcId) {
   const m = extratoConta(DB, ACTOR, funcId).slice().reverse();
   const dev = saldoDevedor(DB, funcId);
   const ov = openModal(`Conta de ${fn(funcId)}`, `
     <div class="grid g4">${kpi('Saldo devedor', dev ? '−' + brl(dev) : brl(0), dev ? 'será descontado das próximas comissões' : 'sem adiantamento em aberto', dev ? 'bad' : 'ok')}${kpi('A receber em fechamentos', brl(sum(ver(DB, ACTOR, 'fechamentos').filter(f => f.funcId === funcId).map(aPagarFech))), '', 'warn')}</div>
-    ${m.length ? `<div class="tw"><table><thead><tr><th>Data e hora</th><th>Movimento</th><th class="r">Valor</th><th class="r">Saldo devedor</th></tr></thead><tbody>${m.map(x => `<tr><td>${dataHora(x.data, x.hora)}</td><td>${esc(x.desc)}</td><td class="r b" style="color:${x.valor > 0 ? 'var(--bad)' : 'var(--ok)'}">${x.valor > 0 ? '+' : '−'}${brl(Math.abs(x.valor))}</td><td class="r">${brl(x.saldo)}</td></tr>`).join('')}</tbody></table></div>` : empty('Nenhum adiantamento', 'Os adiantamentos e descontos aparecem aqui.')}`,
+    ${m.length ? `<div class="tw"><table><thead><tr><th>Data e hora</th><th>Movimento</th><th class="r">Valor</th><th class="r">Saldo devedor</th>${isOwner(ACTOR) ? '<th></th>' : ''}</tr></thead><tbody>${m.map(x => `<tr><td>${dataHora(x.data, x.hora)}</td><td>${esc(x.desc)}</td><td class="r b" style="color:${x.valor > 0 ? 'var(--bad)' : 'var(--ok)'}">${x.valor > 0 ? '+' : '−'}${brl(Math.abs(x.valor))}</td><td class="r">${brl(x.saldo)}</td>${isOwner(ACTOR) ? `<td>${x.tipo === 'adiantamento' && x.id ? `<div class="bar" style="flex-wrap:nowrap"><button class="btn sm" data-ad-ed="${x.id}">Editar</button><button class="btn sm ghost bad-t" data-ad-ex="${x.id}">Excluir</button></div>` : ''}</td>` : ''}</tr>`).join('')}</tbody></table></div>` : empty('Nenhum adiantamento', 'Os adiantamentos e descontos aparecem aqui.')}`,
     `<button class="btn" data-pdf="conta:${funcId}">${icon('pdf')}<span>Extrato em PDF</span></button>${isOwner(ACTOR) ? `<button class="btn pri" data-adiant="${funcId}">Novo adiantamento</button>` : ''}`, true);
 }
 function pdfConta(funcId) {
@@ -9189,7 +9322,7 @@ function pgPagamentos() {
     ${recepcaoPagamentosHTML(own)}
     <div class="sec">Histórico</div>
     ${pgs.length ? `<div class="tw"><table><thead><tr><th>Data e hora</th><th>Tipo</th><th>Funcionário</th><th>Fechamento</th><th>Período</th><th>Método</th><th class="r">Valor</th><th>Referência</th><th>Registrado por</th></tr></thead><tbody>
-    ${pgs.map(p => { const fe = p.fechamentoId ? DB.fechamentos.find(x => x.id === p.fechamentoId) : null; return `<tr><td>${dataHora(p.data, p.hora)}</td><td>${p.tipo === 'adiantamento' ? pill('Adiantamento', 'info') : pill('Fechamento', 'ok')}</td><td>${esc(fn(p.funcId))}</td><td>${p.fechamentoId ? `<span class="code" data-fe-ver="${p.fechamentoId}" style="cursor:pointer">${p.codigo}</span>` : '<span class="muted">—</span>'}</td><td class="small" style="white-space:nowrap">${fe ? `<b>${dBR(fe.inicio)} a ${dBR(fe.fim)}</b><div class="muted">semana trabalhada</div>` : p.tipo === 'adiantamento' ? '<span class="muted">Antecipação · desconta<br>no próximo fechamento</span>' : '<span class="muted">—</span>'}</td><td>${esc(p.metodo)}</td><td class="r b">${brl(p.valor)}</td><td class="small">${esc(p.referencia) || '—'}${p.obs ? `<div class="muted">${esc(p.obs)}</div>` : ''}</td><td class="small">${esc(p.responsavel)}<div class="muted">${esc(p.criadoEm)}</div></td></tr>`; }).join('')}</tbody></table></div>`
+    ${pgs.map(p => { const fe = p.fechamentoId ? DB.fechamentos.find(x => x.id === p.fechamentoId) : null; return `<tr><td>${dataHora(p.data, p.hora)}</td><td>${p.tipo === 'adiantamento' ? pill('Adiantamento', 'info') + (own ? '' : `<div class="bar" style="flex-wrap:nowrap;margin-top:6px"><button class="btn sm" data-ad-ed="${p.id}">Editar</button><button class="btn sm ghost bad-t" data-ad-ex="${p.id}">Excluir</button></div>`) : pill('Fechamento', 'ok')}</td><td>${esc(fn(p.funcId))}</td><td>${p.fechamentoId ? `<span class="code" data-fe-ver="${p.fechamentoId}" style="cursor:pointer">${p.codigo}</span>` : '<span class="muted">—</span>'}</td><td class="small" style="white-space:nowrap">${fe ? `<b>${dBR(fe.inicio)} a ${dBR(fe.fim)}</b><div class="muted">semana trabalhada</div>` : p.tipo === 'adiantamento' ? '<span class="muted">Antecipação · desconta<br>no próximo fechamento</span>' : '<span class="muted">—</span>'}</td><td>${esc(p.metodo)}</td><td class="r b">${brl(p.valor)}</td><td class="small">${esc(p.referencia) || '—'}${p.obs ? `<div class="muted">${esc(p.obs)}</div>` : ''}</td><td class="small">${esc(p.responsavel)}<div class="muted">${esc(p.criadoEm)}</div>${p.editadoEm ? `<div class="muted">corrigido ${esc(p.editadoEm)}</div>` : ''}</td></tr>`; }).join('')}</tbody></table></div>`
       : `<div class="panel">${empty('Nenhum pagamento registrado', own ? 'Seus pagamentos aparecem aqui depois do fechamento semanal.' : 'Confirme um fechamento e registre o pagamento, ou lance um adiantamento.')}</div>`}
   </div>`;
 }
@@ -9726,21 +9859,22 @@ function saldoClienteHTML(clienteId) {
     <div class="bar">${l.map(({ v }) => `<button class="btn sm pri" type="button" data-usar-saldo="${v.id}">Agendar pelo saldo${l.length > 1 ? ' ' + esc(v.codigo) : ''}</button>`).join('')}</div></div>`;
 }
 /* pagamento semanal da recepcionista (sem comissão): fica nas saídas do financeiro */
-function modalPagarRecepcao(funcId) {
+function modalPagarRecepcao(funcId, movId) {
+  const ed = movId ? (DB.movimentos || []).find(x => x.id === movId && x.pagRecepcao && !x.excluido) : null; if (ed) funcId = ed.funcId;
   const recs = DB.funcionarios.filter(f => cargoDe(f) === 'recepcao' && !f.dona && !f.excluido && (f.ativo || f.id === funcId));
   if (!recs.length) return toast('Não há recepcionista cadastrada na Equipe.', 'bad');
-  const f0 = recs.find(f => f.id === funcId) || recs[0], ult = pagamentosRecepcao(DB, f0.id)[0], [ini, fim] = semanaAPagar();
-  const ov = openModal('Pagamento da recepção', `<div class="note small">A recepcionista não tem comissão: o valor da semana é combinado com a Claudia. O pagamento fica registrado aqui e nas <b>saídas do Financeiro</b> (categoria Salários).</div>
+  const f0 = recs.find(f => f.id === funcId) || recs[0], ult = ed || pagamentosRecepcao(DB, f0.id)[0], [ini, fim] = ed ? [ed.pagRecepcao.ini, ed.pagRecepcao.fim] : semanaAPagar();
+  const ov = openModal(ed ? `Editar pagamento ${ed.codigo}` : 'Pagamento da recepção', `${ed ? `<div class="note warn small">Corrigindo o lançamento de <b>${brl(ed.valor)}</b> em ${dBR(ed.data)}. A saída no Financeiro é atualizada junto e a correção fica na auditoria.</div>` : ''}<div class="note small">A recepcionista não tem comissão: o valor da semana é combinado com a Claudia. O pagamento fica registrado aqui e nas <b>saídas do Financeiro</b> (categoria Salários).</div>
     <div class="form"><label class="f full">Recepcionista<select id="rp-f">${opt(recs.map(f => [f.id, f.nome]), f0.id)}</select></label>
     <label class="f">Semana de<input type="date" id="rp-i" value="${ini}"></label><label class="f">até<input type="date" id="rp-a" value="${fim}"></label>
     <label class="f">Valor pago (R$)<input id="rp-v" inputmode="decimal" value="${ult ? centsInput(ult.valor) : ''}" placeholder="0,00"></label><label class="f">Forma<select id="rp-fp">${opt(Object.entries(CAIXA_FORMAS), ult?.forma || 'pix')}</select></label>
-    <label class="f">Data do pagamento<input type="date" id="rp-d" value="${TODAY}" max="${TODAY}"></label>${campoHora('rp-h')}
-    <label class="f full">Observação (opcional)<input id="rp-o" placeholder="Ex.: inclui hora extra de sábado"></label></div>
-    <div class="muted small" id="rp-u">${ult ? `Último pagamento: ${brl(ult.valor)} em ${dBR(ult.data)} (semana ${dBR(ult.pagRecepcao.ini).slice(0, 5)} a ${dBR(ult.pagRecepcao.fim).slice(0, 5)})` : ''}</div>`,
-    `<button class="btn" data-close>Cancelar</button><button class="btn pri" id="rp-ok">Registrar pagamento</button>`);
+    <label class="f">Data do pagamento<input type="date" id="rp-d" value="${ed ? ed.data : TODAY}" max="${TODAY}"></label>${campoHora('rp-h', 'Hora do pagamento', ed?.hora)}
+    <label class="f full">Observação (opcional)<input id="rp-o" value="${esc(ed?.obs || '')}" placeholder="Ex.: inclui hora extra de sábado"></label></div>
+    <div class="muted small" id="rp-u">${ed ? '' : ult ? `Último pagamento: ${brl(ult.valor)} em ${dBR(ult.data)} (semana ${dBR(ult.pagRecepcao.ini).slice(0, 5)} a ${dBR(ult.pagRecepcao.fim).slice(0, 5)})` : ''}</div>`,
+    `<button class="btn" data-close>Cancelar</button><button class="btn pri" id="rp-ok">${ed ? 'Salvar correção' : 'Registrar pagamento'}</button>`);
   ov.querySelector('#rp-i').onchange = e => { if (e.target.value) ov.querySelector('#rp-a').value = addDays(semanaTrabalho(e.target.value), 6), ov.querySelector('#rp-i').value = semanaTrabalho(e.target.value); };
-  ov.querySelector('#rp-ok').onclick = () => run(() => pagarRecepcao(DB, ACTOR, { funcId: val('rp-f'), ini: val('rp-i'), fim: val('rp-a'), valor: toCents(val('rp-v')), forma: val('rp-fp'), data: val('rp-d'), hora: val('rp-h'), obs: val('rp-o') }),
-    m => `Pagamento de ${brl(m.valor)} registrado nas saídas`).ok && closeModal();
+  ov.querySelector('#rp-ok').onclick = () => run(() => pagarRecepcao(DB, ACTOR, { ...(ed ? { id: ed.id } : {}), funcId: val('rp-f'), ini: val('rp-i'), fim: val('rp-a'), valor: toCents(val('rp-v')), forma: val('rp-fp'), data: val('rp-d'), hora: val('rp-h'), obs: val('rp-o') }),
+    m => ed ? `Pagamento corrigido para ${brl(m.valor)}` : `Pagamento de ${brl(m.valor)} registrado nas saídas`).ok && closeModal();
 }
 function recepcaoPagamentosHTML(own) {
   const recs = own ? [F(ACTOR.funcId)].filter(f => f && cargoDe(f) === 'recepcao') : DB.funcionarios.filter(f => cargoDe(f) === 'recepcao' && !f.dona && !f.excluido && (f.ativo || pagamentosRecepcao(DB, f.id).length));
@@ -9750,7 +9884,7 @@ function recepcaoPagamentosHTML(own) {
     <div class="tw"><table><thead><tr><th>Recepcionista</th><th>Último pagamento</th><th class="r">Pago no mês</th><th></th></tr></thead><tbody>${recs.map(f => { const ps = pagamentosRecepcao(DB, f.id), u = ps[0];
       return `<tr><td class="b">${esc(f.nome)}<div class="muted small" style="font-weight:400">sem comissão · valor semanal combinado</div></td><td>${u ? `${brl(u.valor)} · ${dBR(u.data)}<div class="muted small">semana ${dBR(u.pagRecepcao.ini).slice(0, 5)} a ${dBR(u.pagRecepcao.fim).slice(0, 5)}</div>` : '<span class="muted">nenhum ainda</span>'}</td><td class="r b">${brl(sum(ps.filter(p => p.data.slice(0, 7) === mes).map(p => p.valor)))}</td>
         <td>${own ? '' : `<button class="btn sm pri" data-pg-rec="${f.id}">Registrar pagamento</button>`}</td></tr>`; }).join('')}</tbody></table></div>
-    ${lista.length ? `<div class="tw"><table><thead><tr><th>Data</th><th>Recepcionista</th><th>Semana</th><th>Forma</th><th class="r">Valor</th><th>Lançamento</th></tr></thead><tbody>${lista.slice(0, 30).map(m => `<tr><td>${dataHora(m.data, m.hora)}</td><td>${esc(F(m.funcId)?.nome || '')}</td><td class="small">${dBR(m.pagRecepcao.ini).slice(0, 5)} a ${dBR(m.pagRecepcao.fim).slice(0, 5)}</td><td>${esc(CAIXA_FORMAS[m.forma] || m.forma)}</td><td class="r b">${brl(m.valor)}</td><td class="code">${esc(m.codigo)}</td></tr>`).join('')}</tbody></table></div>` : ''}`;
+    ${lista.length ? `<div class="tw"><table><thead><tr><th>Data</th><th>Recepcionista</th><th>Semana</th><th>Forma</th><th class="r">Valor</th><th>Lançamento</th>${own ? '' : '<th></th>'}</tr></thead><tbody>${lista.slice(0, 30).map(m => `<tr><td>${dataHora(m.data, m.hora)}</td><td>${esc(F(m.funcId)?.nome || '')}</td><td class="small">${dBR(m.pagRecepcao.ini).slice(0, 5)} a ${dBR(m.pagRecepcao.fim).slice(0, 5)}</td><td>${esc(CAIXA_FORMAS[m.forma] || m.forma)}</td><td class="r b">${brl(m.valor)}</td><td class="code">${esc(m.codigo)}${m.editadoEm ? `<div class="muted small">corrigido ${esc(m.editadoEm)}</div>` : ''}</td>${own ? '' : `<td><div class="bar" style="flex-wrap:nowrap"><button class="btn sm" data-rec-ed="${m.id}">Editar</button><button class="btn sm ghost bad-t" data-mov-ex="${m.id}">Excluir</button></div></td>`}</tr>`).join('')}</tbody></table></div>` : ''}`;
 }
 /* venda de pacote lançada errado: troca o pacote, o valor ou a profissional (sem estornar) */
 /* pacote da cliente totalmente editável: pacote, valor, serviços e quantidades, validade, sessões (excluir/adicionar) e desfazer */
@@ -10664,7 +10798,7 @@ const AFTER = {
 
 /* ---------- eventos globais (delegação) ---------- */
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-al-todos],[data-pkv-limpa],[data-online],[data-pg-dup],[data-wa-pk],[data-pk-limpa],[data-sv-limpa],[data-del-cat],[data-po-limpa],[data-ct-todos],[data-del],[data-dono-novo],[data-dono-edit],[data-podo-aba],[data-podo-nova],[data-podo-ficha],[data-cxcentro],[data-comanda],[data-av-teste],[data-av-qr],[data-av-copiar],[data-av-dl],[data-av-nota],[data-pk-novo],[data-pk-corrigir],[data-trocar-pk],[data-vender-sv],[data-pg-rec],[data-usar-saldo],[data-pk-edit],[data-pk-vender],[data-pk-filtro],[data-pk-sessao],[data-cli-nivel],[data-dona-serv],[data-mov],[data-mov-ed],[data-mov-ex],[data-cxper],[data-cxnav],[data-cxtipo],[data-cli-acao],[data-conv-membros],[data-conv-pagar],[data-receb-com],[data-conf-com],[data-acerto-com],[data-pagar-cli],[data-cvst],[data-liberar],[data-conta],[data-sair],[data-codigo],[data-repasse],[data-adiant],[data-extrato],[data-abater],[data-conv-novo],[data-conv-edit],[data-conv-filtro],[data-alertas],[data-fechar],[data-faltou],[data-chegou],[data-tema],[data-pdf],[data-wa-ag],[data-wa-cli],[data-wa-cob],[data-wa-at],[data-fab],[data-go],[data-menu],[data-per],[data-agv],[data-agnav],[data-ag],[data-bl],[data-slot],[data-goday],[data-new-ag],[data-new-bl],[data-new-reg],[data-at-open],[data-receb],[data-conf],[data-acerto],[data-fesem],[data-fe-ver],[data-pagar],[data-new-cli],[data-cli],[data-new-func],[data-func],[data-new-serv],[data-serv],[data-new-cat],[data-mais],[data-pub-abrir],[data-pub-cliente],[data-origem-nova],[data-origem],[data-ped-agendar],[data-ped-recusar],[data-qr-copiar],[data-qr-dl],[data-qr-ver],[data-ped-dia]');
+  const t = e.target.closest('[data-al-todos],[data-pkv-limpa],[data-online],[data-pg-dup],[data-wa-pk],[data-pk-limpa],[data-sv-limpa],[data-del-cat],[data-po-limpa],[data-ct-todos],[data-del],[data-dono-novo],[data-dono-edit],[data-podo-aba],[data-podo-nova],[data-podo-ficha],[data-cxcentro],[data-comanda],[data-av-teste],[data-av-qr],[data-av-copiar],[data-av-dl],[data-av-nota],[data-pk-novo],[data-pk-corrigir],[data-trocar-pk],[data-vender-sv],[data-pg-rec],[data-ad-ed],[data-ad-ex],[data-rec-ed],[data-usar-saldo],[data-pk-edit],[data-pk-vender],[data-pk-filtro],[data-pk-sessao],[data-cli-nivel],[data-dona-serv],[data-mov],[data-mov-ed],[data-mov-ex],[data-cxper],[data-cxnav],[data-cxtipo],[data-cli-acao],[data-conv-membros],[data-conv-pagar],[data-receb-com],[data-conf-com],[data-acerto-com],[data-pagar-cli],[data-cvst],[data-liberar],[data-conta],[data-sair],[data-codigo],[data-repasse],[data-adiant],[data-extrato],[data-abater],[data-conv-novo],[data-conv-edit],[data-conv-filtro],[data-alertas],[data-fechar],[data-faltou],[data-chegou],[data-tema],[data-pdf],[data-wa-ag],[data-wa-cli],[data-wa-cob],[data-wa-at],[data-fab],[data-go],[data-menu],[data-per],[data-agv],[data-agnav],[data-ag],[data-bl],[data-slot],[data-goday],[data-new-ag],[data-new-bl],[data-new-reg],[data-at-open],[data-receb],[data-conf],[data-acerto],[data-fesem],[data-fe-ver],[data-pagar],[data-new-cli],[data-cli],[data-new-func],[data-func],[data-new-serv],[data-serv],[data-new-cat],[data-mais],[data-pub-abrir],[data-pub-cliente],[data-origem-nova],[data-origem],[data-ped-agendar],[data-ped-recusar],[data-qr-copiar],[data-qr-dl],[data-qr-ver],[data-ped-dia]');
   if (!t) return;
   const ds = t.dataset;
   if ('waAg' in ds) { e.stopPropagation(); const x = DB.agendamentos.find(a => a.id === ds.waAg); return modalWhatsApp({ agendamentoId: ds.waAg }, ds.waM || waModeloPadrao(x)); }
@@ -10691,6 +10825,9 @@ document.addEventListener('click', e => {
   if ('trocarPk' in ds) { const at = DB.atendimentos.find(x => x.id === ds.trocarPk); closeModal(); return modalVenderPacote('', at.clienteId, { trocarAt: at.id }); }
   if ('venderSv' in ds) return modalVenderServicos(ds.venderSv);
   if ('pgRec' in ds) return modalPagarRecepcao(ds.pgRec);
+  if ('adEd' in ds) return modalEditarAdiantamento(ds.adEd);
+  if ('adEx' in ds) return modalEditarAdiantamento(ds.adEx, true);
+  if ('recEd' in ds) return modalPagarRecepcao('', ds.recEd);
   if ('usarSaldo' in ds) { closeModal(); return modalSessaoPacote(ds.usarSaldo); }
   if ('cliNivel' in ds) { UI.cliNivel = UI.cliNivel === ds.cliNivel ? '' : ds.cliNivel; UI.cliMax = 0; render(); return; }
   if ('donaServ' in ds) return modalAtendimentoDona();
@@ -10726,7 +10863,7 @@ document.addEventListener('click', e => {
   if ('faltou' in ds) { const x = DB.agendamentos.find(a => a.id === ds.faltou); const ov = openModal('Confirmar falta', `<div class="note warn">Marcar <b>${cliNome(x.clienteId)}</b> (${dBR(x.data)} ${x.inicio}) como <b>não compareceu</b>? O horário fecha sem valor e o alerta sai. O histórico é mantido.</div>`, `<button class="btn" data-close>Voltar</button><button class="btn pri" id="ft-ok">Confirmar falta</button>`);
     ov.querySelector('#ft-ok').onclick = () => run(() => mudarStatusAgendamento(DB, ACTOR, x.id, 'faltou'), 'Falta registrada. Alerta encerrado.').ok && closeModal(); return; }
   if ('chegou' in ds) { run(() => mudarStatusAgendamento(DB, ACTOR, ds.chegou, 'chegou'), 'Chegada confirmada'); if (MODAL) modalAlertas(); return; }
-  if ('pdf' in ds) { const v = ds.pdf; t.disabled = true; Promise.resolve(v === 'rel' ? pdfRelatorio() : v === 'caixa' ? pdfCaixa() : v === 'podo' ? pdfPodologia() : v === 'convres' ? pdfConvResumo() : v.startsWith('conv:') ? pdfConvenio(v.slice(5)) : v.startsWith('conta:') ? pdfConta(v.slice(6)) : pdfFechamento(v.slice(3))).finally(() => { t.disabled = false; }); return; }
+  if ('pdf' in ds) { const v = ds.pdf; t.disabled = true; Promise.resolve(v === 'rel' ? pdfRelatorio() : v === 'caixa' ? pdfCaixa() : v === 'podo' ? pdfPodologia() : v === 'convres' ? pdfConvResumo() : v.startsWith('conv:') ? pdfConvenioEscolher(v.slice(5)) : v.startsWith('conta:') ? pdfConta(v.slice(6)) : pdfFechamento(v.slice(3))).finally(() => { t.disabled = false; }); return; }
   if ('tema' in ds) { aplicarTema(ds.tema); render(); return; }
   if ('menu' in ds) { const ov = openModal('Menu', menuCelular()); ov.querySelector('.md')?.classList.add('md-menu'); return; }
   if ('mais' in ds) { const k = ds.mais, base = { cliMax: 90 }[k] || 150, atual = LIM(k, base); UI[k] = atual + Math.max(30, Math.round(atual)); render(); return; }
