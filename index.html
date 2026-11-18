@@ -1115,6 +1115,26 @@ td.acts{width:1%;white-space:nowrap}
 .po-pac:hover{border-color:var(--accent)} .po-pac .wa-av{grid-area:av} .po-pi{grid-area:i;display:flex;flex-direction:column;gap:2px;min-width:0} .po-num:nth-of-type(1){grid-area:n1} .po-num:nth-of-type(2){grid-area:n2} .po-ult{grid-area:ult;text-align:right}
 .po-num{display:flex;flex-direction:column;align-items:center;line-height:1.1} .po-num b{font-size:18px} .po-num span{font-size:11.5px;color:var(--muted)}
 .po-alerta{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;font-size:12.5px;font-weight:700;color:var(--bad);background:var(--bad-soft);border-radius:8px;padding:2px 8px;max-width:100%;overflow-wrap:anywhere}
+.au-f{display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:10px;align-items:end;margin-bottom:6px}.au-f .au-b{align-self:end}
+@media (max-width:760px){.au-f{grid-template-columns:1fr 1fr}.au-f .au-b{grid-column:1/-1}}
+.au-lista{display:flex;flex-direction:column;gap:8px}
+.au-it{display:grid;grid-template-columns:150px 1fr;gap:14px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.au-q{display:flex;flex-direction:column;gap:2px;font-size:14px}.au-q b{font-size:15px}.au-q span{font-weight:700;color:var(--ink)}.au-q em{font-style:normal;color:var(--muted);font-size:13px}
+.au-c{display:flex;flex-direction:column;gap:4px;min-width:0}.au-a{font-weight:700}
+.au-cli{display:flex;align-items:center;gap:6px;font-weight:600}.au-cli svg{width:16px;height:16px;flex:none;color:var(--muted)}
+.au-cli .lk{background:none;border:0;padding:0;font:inherit;color:var(--ink);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.au-ref{font-size:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--sunk);border-radius:10px;padding:6px 10px;align-self:flex-start}
+.au-d{font-size:14px;color:var(--muted);overflow-wrap:anywhere}
+@media (max-width:560px){.au-it{grid-template-columns:1fr;gap:6px}.au-q{flex-direction:row;flex-wrap:wrap;gap:6px;align-items:baseline}.au-q em::before{content:'· '}}
+.pa-lista{display:flex;flex-direction:column;gap:8px;margin-bottom:90px}.pa-it{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}.pa-it-t{display:flex;flex-direction:column;gap:4px;align-items:flex-start;min-width:0}
+.pa-pick{display:flex;flex-direction:column;gap:8px;margin-top:6px} .pa-chips{display:flex;flex-wrap:wrap;gap:6px}
+.pa-chip{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--bad);background:var(--bad-soft);border-radius:999px;padding:4px 6px 4px 10px} .pa-chip svg{width:14px;height:14px}
+.pa-chip button{border:0;background:transparent;color:inherit;font-size:18px;line-height:1;cursor:pointer;padding:0 4px;min-width:28px;min-height:28px}
+.pa-res{display:flex;flex-wrap:wrap;gap:6px} .pa-op{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer;min-height:34px}
+.pa-op:hover{border-color:var(--accent)} .pa-op.pa-novo{border-style:dashed;color:var(--accent);font-weight:700}
+.pa-top{display:flex;gap:10px;flex-wrap:wrap;align-items:center} .pa-top .po-busca-c{flex:1;min-width:200px} .pa-nv{display:flex;gap:8px;flex:1;min-width:260px} .pa-nv input{flex:1;min-width:0}
+.pk-er{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;padding:8px 10px} .pk-er.off{opacity:.55;text-decoration:line-through}
+.pk-desf summary{cursor:pointer;color:var(--bad)}
 .po-alerta.grande{display:flex;font-size:15px;padding:10px 12px;border-radius:12px} .po-alerta svg{width:18px;height:18px;flex:none}
 .po-tabs{align-self:flex-start;flex-wrap:wrap}
 .po-ev-novo{display:flex;gap:8px;align-items:flex-end;margin-bottom:10px} .po-ev-novo textarea{flex:1}
@@ -1909,8 +1929,50 @@ function ver(S, a, col) {
   if (col === 'auditoria') return [];
   return arr;
 }
-function audit(S, a, acao, detalhe) {
-  S.auditoria.unshift({ id: uid('lg'), quando: stamp(), usuario: a.nome, acao, detalhe });
+/* ctx (opcional): de qual cliente e de qual agendamento/serviço é o registro, para achar depois na auditoria */
+const CTX_AUD = ['clienteId', 'cliente', 'agId', 'atId', 'ref'];
+function audit(S, a, acao, detalhe, ctx) {
+  const l = { id: uid('lg'), quando: stamp(), usuario: a.nome, acao, detalhe };
+  const c = ctx || inferirCtxAud(S, l, true);
+  if (c) CTX_AUD.forEach(k => { if (c[k]) l[k] = c[k]; });
+  S.auditoria.unshift(l);
+}
+const nomeCli = (S, id) => (S.clientes || []).find(k => k.id === id)?.nome || '';
+function ctxAg(S, ag, extra) {
+  if (!ag) return null;
+  const sv = (S.servicos || []).find(x => x.id === ag.servicoId), f = (S.funcionarios || []).find(x => x.id === ag.funcId);
+  return { clienteId: ag.clienteId, cliente: nomeCli(S, ag.clienteId), agId: ag.id,
+    ref: `Agendamento ${dBR(ag.data)} às ${ag.inicio}${sv ? ' · ' + sv.nome : ''}${f ? ' · ' + f.nome.split(' ')[0] : ''}${extra ? ' · ' + extra : ''}` };
+}
+function ctxAt(S, at) {
+  if (!at) return null;
+  const sv = (S.servicos || []).find(x => x.id === at.servicoId), f = (S.funcionarios || []).find(x => x.id === at.funcId);
+  return { clienteId: at.clienteId, cliente: nomeCli(S, at.clienteId), atId: at.id, agId: at.agendamentoId || '',
+    ref: `Serviço ${at.codigo} · ${dBR(at.data)}${at.hora ? ' às ' + at.hora : ''}${sv ? ' · ' + sv.nome : ''}${f ? ' · ' + f.nome.split(' ')[0] : ''}` };
+}
+const ctxCli = (S, id) => id ? { clienteId: id, cliente: nomeCli(S, id) } : null;
+/* descobre cliente/agendamento de um registro (também dos antigos, gravados antes de existir o ctx) */
+function indiceHistAg(S) {
+  return memoCalc(S, 'audHist', () => { const m = new Map();
+    for (const ag of S.agendamentos || []) for (const h of ag.historico || []) { const k = h.quando + '|' + h.usuario + '|' + h.texto; if (!m.has(k)) m.set(k, []); m.get(k).push(ag); }
+    return m; });
+}
+function inferirCtxAud(S, l, gravando) {
+  if (!gravando && (l.cliente || l.ref)) return { clienteId: l.clienteId, cliente: l.cliente, agId: l.agId, atId: l.atId, ref: l.ref };
+  const d = String(l.detalhe || ''); let m;
+  if ((m = d.match(/\bAT-\d+/))) { const at = (S.atendimentos || []).find(x => x.codigo === m[0]); if (at) return ctxAt(S, at); }
+  if ((m = d.match(/\bPCT-\d+/))) { const v = (S.pacoteVendas || []).find(x => x.codigo === m[0]); if (v) return { clienteId: v.clienteId, cliente: nomeCli(S, v.clienteId), ref: `Pacote ${v.codigo} · ${v.nome || ''}` }; }
+  if ((m = d.match(/\bSN-\d+/))) { const ag = (S.agendamentos || []).find(x => x.sinal && x.sinal.codigo === m[0]); if (ag) return ctxAg(S, ag); }
+  if ((m = d.match(/\bPD-\d+/))) { const p = (S.pedidos || []).find(x => x.codigo === m[0]); if (p) return { clienteId: p.clienteId, cliente: nomeCli(S, p.clienteId) || p.nome, ref: `Pedido ${p.codigo} · ${dBR(p.data)}${p.hora ? ' às ' + p.hora : ''}` }; }
+  if ((m = d.match(/\bVP-\d+/))) { const v = (S.vendasProduto || []).find(x => x.codigo === m[0]); if (v && v.clienteId) return { clienteId: v.clienteId, cliente: nomeCli(S, v.clienteId), ref: `Venda ${v.codigo} · ${dBR(v.data)}` }; }
+  if (!gravando && /agendamento|reagendamento|vários serviços/i.test(l.acao || '')) {
+    const ix = indiceHistAg(S);
+    const c = ix.get(l.quando + '|' + l.usuario + '|' + d) || (l.acao === 'Agendamento criado' ? (ix.get(l.quando + '|' + l.usuario + '|Agendamento criado') || []).filter(x => `${dBR(x.data)} ${x.inicio}` === d) : null);
+    if (c && c.length) return ctxAg(S, c[0], c.length > 1 ? `+${c.length - 1} no mesmo minuto` : '');
+  }
+  const nm = d.split(' · ')[0].trim();
+  if (nm && nm.length > 3) { const c = (S.clientes || []).find(k => k.nome === nm); if (c) return ctxCli(S, c.id); }
+  return null;
 }
 
 /* ---------- leituras financeiras derivadas ---------- */
@@ -2441,10 +2503,10 @@ function salvarAgendamento(S, a, d, opt = {}) {
     const mudou = ant.data !== d.data || ant.inicio !== d.inicio || ant.funcId !== d.funcId;
     const h = mudou ? `Reagendado de ${dBR(ant.data)} ${ant.inicio} para ${dBR(d.data)} ${d.inicio}` : (ant.status !== d.status ? `Situação: ${AG_STATUS[ant.status]} → ${AG_STATUS[d.status]}` : 'Dados editados');
     Object.assign(ant, d); ant.historico.push({ quando: stamp(), usuario: a.nome, texto: h });
-    audit(S, a, mudou ? 'Reagendamento' : 'Agendamento editado', h); return ant.id;
+    audit(S, a, ant.status === 'cancelado' && h.startsWith('Situação') ? 'Agendamento cancelado' : mudou ? 'Reagendamento' : 'Agendamento editado', h, ctxAg(S, ant)); return ant.id;
   }
   const ag = { id: uid('ag'), status: 'aguardando', canal: 'whatsapp', obs: '', preco: 0, ...d, historico: [{ quando: stamp(), usuario: a.nome, texto: 'Agendamento criado' }] };
-  S.agendamentos.push(ag); audit(S, a, 'Agendamento criado', `${dBR(ag.data)} ${ag.inicio}`); return ag.id;
+  S.agendamentos.push(ag); audit(S, a, 'Agendamento criado', `${dBR(ag.data)} ${ag.inicio}`, ctxAg(S, ag)); return ag.id;
 }
 
 /* ---------- vários serviços no mesmo atendimento ----------
@@ -2485,7 +2547,7 @@ function salvarAgendamentoGrupo(S, a, d) {
     const ficam = new Set([...ids, ...(d.itens || []).filter(x => x.travado).map(x => x.id)]);
     antigos.filter(x => !ficam.has(x.id) && !INATIVOS.includes(x.status) && x.status !== 'concluido').forEach(x => {
       x.status = 'cancelado'; x.historico.push({ quando: stamp(), usuario: a.nome, texto: 'Serviço retirado do atendimento' }); });
-    if (grupo) audit(S, a, d.grupo ? 'Atendimento com vários serviços editado' : 'Atendimento com vários serviços criado', `${ids.length} serviço(s) · ${dBR(d.data)} ${itens[0]?.inicio || ''}`);
+    if (grupo) audit(S, a, d.grupo ? 'Atendimento com vários serviços editado' : 'Atendimento com vários serviços criado', `${ids.length} serviço(s) · ${dBR(d.data)} ${itens[0]?.inicio || ''}`, ctxAg(S, S.agendamentos.find(x => x.id === ids[0])));
     return ids;
   });
 }
@@ -2618,7 +2680,7 @@ function registrarAtendimento(S, a, inp) {
   return at;
 }
 
-function estornarAtendimento(S, a, id, motivo) {
+function estornarAtendimento(S, a, id, motivo, opc = {}) {
   exigirDono(a);
   if (!motivo || motivo.trim().length < 5) throw new Error('Descreva a justificativa do estorno.');
   const at = S.atendimentos.find(x => x.id === id);
@@ -2629,7 +2691,7 @@ function estornarAtendimento(S, a, id, motivo) {
   if (ps.some(p => (p.acertado || 0) > 0)) throw new Error('O convênio deste serviço já tem acerto registrado. Estorne o acerto com a operadora antes.');
   // compra de serviços sem agendar com mais de um serviço: o estorno de uma linha tira só aquele saldo (se ainda não foi usado)
   const pvC = at.pacoteVendaId && (S.pacoteVendas || []).find(v => v.id === at.pacoteVendaId && v.tipo === 'credito' && (v.atendimentoIds || []).includes(at.id) && !v.cancelado);
-  const parcial = pvC && pvC.atendimentoIds.some(x => x !== at.id && S.atendimentos.find(k => k.id === x)?.status === 'concluido');
+  const parcial = !opc.inteiro && pvC && pvC.atendimentoIds.some(x => x !== at.id && S.atendimentos.find(k => k.id === x)?.status === 'concluido');
   if (parcial) { const it = situacaoVenda(S, pvC).itens.find(i => i.servicoId === at.servicoId), q = at.creditoQtd || 1;
     if (!it || it.qtd - it.usadas - it.marcadas < q) throw new Error(`A cliente já usou ou marcou ${S.servicos.find(x => x.id === at.servicoId)?.nome || 'este serviço'} desta compra. Desmarque as sessões antes de estornar.`); }
   at.status = 'estornado'; at.motivoEstorno = motivo; at.estornadoPor = a.nome; at.estornadoEm = stamp();
@@ -3143,6 +3205,36 @@ function excluirProprietario(S, a, id) {
 /* =========================================================================
    PODOLOGIA — financeiro separado do salão e ficha das pacientes com anexos
    ========================================================================= */
+/* ---------- alertas de saúde da podologia: lista pronta para pesquisar (sem digitar à mão) ---------- */
+const separarAlertas = t => String(t || '').split(/\s*[·;,\n]\s*/).map(x => x.trim()).filter(Boolean);
+/* a lista cadastrada + o que já estava escrito nas fichas (nada se perde) */
+function catalogoAlertasPodo(S) {
+  const m = new Map();
+  for (const x of (S.config && S.config.podoAlertas) || []) m.set(nomeChave(x.nome), { ...x, salvo: true, usos: 0 });
+  for (const f of S.podoFichas || []) for (const t of separarAlertas(f.alertas)) { const k = nomeChave(t); if (!m.has(k)) m.set(k, { id: '', nome: t, salvo: false, usos: 0 }); m.get(k).usos++; }
+  return [...m.values()].sort((p, q) => p.nome.localeCompare(q.nome, 'pt-BR'));
+}
+function salvarAlertaPodo(S, a, d) {
+  exigirPodologia(S, a);
+  const nome = String(d.nome || '').replace(/\s+/g, ' ').trim();
+  if (nome.length < 3) throw new Error('Escreva o nome do alerta (ex.: Diabética).');
+  if (nome.length > 60) throw new Error('Nome do alerta muito longo (até 60 letras).');
+  S.config.podoAlertas = S.config.podoAlertas || [];
+  if (S.config.podoAlertas.some(x => nomeChave(x.nome) === nomeChave(nome) && x.id !== d.id)) throw new Error('Esse alerta já existe na lista.');
+  if (d.id) { const x = S.config.podoAlertas.find(k => k.id === d.id); if (!x) throw new Error('Alerta não encontrado.');
+    const antes = x.nome; x.nome = nome;
+    // renomeia também nas fichas que já usam o alerta
+    (S.podoFichas || []).forEach(f => { const l = separarAlertas(f.alertas); if (l.some(t => nomeChave(t) === nomeChave(antes))) f.alertas = l.map(t => nomeChave(t) === nomeChave(antes) ? nome : t).join(' · '); });
+    audit(S, a, 'Alerta da podologia editado', `${antes} → ${nome}`); return x; }
+  const x = { id: uid('pa'), nome }; S.config.podoAlertas.push(x);
+  audit(S, a, 'Alerta da podologia cadastrado', nome); return x;
+}
+function excluirAlertaPodo(S, a, id) {
+  exigirPodologia(S, a);
+  const x = (S.config.podoAlertas || []).find(k => k.id === id); if (!x) throw new Error('Alerta não encontrado.');
+  S.config.podoAlertas = S.config.podoAlertas.filter(k => k.id !== id);
+  audit(S, a, 'Alerta da podologia excluído', `${x.nome} (as fichas que já usam continuam com ele)`);
+}
 function exigirPodologia(S, a) { if (isOwner(a)) return; exigirAcesso(S, a); if (!pode(S, a, 'podologia')) throw new Error('Seu usuário não acessa as fichas da podologia.'); }
 const ehPodologia = (S, servicoId) => { const sv = S.servicos.find(x => x.id === servicoId); if (!sv) return false; if (sv.podologia) return true; const c = S.categorias.find(x => x.id === sv.catId); return /podolog/i.test(c?.nome || '') || /podolog|unha encravada/i.test(sv.nome); };
 function financeiroPodologia(S, ini, fim) {
@@ -3442,39 +3534,127 @@ const pagamentosRecepcao = (S, funcId) => (S.movimentos || []).filter(m => m.pag
 function editarVendaPacote(S, a, vendaId, d) {
   exigirDono(a);
   const v = (S.pacoteVendas || []).find(x => x.id === vendaId); if (!v) throw new Error('Pacote não encontrado.');
-  if (v.cancelado) throw new Error('Este pacote foi estornado e não pode ser editado.');
-  if (v.tipo === 'credito') throw new Error('Compra de serviços sem agendar não é corrigida aqui: estorne o serviço errado e lance a compra de novo.');
-  const motivo = String(d.motivo || '').trim(); if (motivo.length < 5) throw new Error('Descreva o motivo da correção.');
-  const pc = (S.pacotes || []).find(x => x.id === (d.pacoteId || v.pacoteId)); if (!pc) throw new Error('Escolha o pacote.');
-  const valor = d.valor > 0 ? d.valor : pc.preco, sv = S.servicos.find(x => x.id === pc.servicoId);
-  const funcId = d.funcId || v.funcId, func = S.funcionarios.find(f => f.id === funcId);
-  if (!sv || !sv.funcs.includes(funcId)) throw new Error(`Escolha uma profissional que faz ${sv ? sv.nome : 'o serviço do pacote'}.`);
-  const at = S.atendimentos.find(x => x.id === v.atendimentoId);
-  const obs = at ? S.obrigacoes.filter(o => o.atendimentoId === at.id && !o.cancelada) : [], ps = obs.map(o => S.parcelas.find(p => p.id === o.parcelaId)).filter(Boolean);
-  const mudaValor = at && (valor !== at.valorFinal || funcId !== at.funcId);
+  if (v.cancelado) throw new Error('Este pacote foi desfeito e não pode ser editado.');
+  const motivo = String(d.motivo || '').trim(); if (motivo.length < 5) throw new Error('Descreva o motivo da alteração.');
+  const credito = v.tipo === 'credito';
+  // modelo: outro pacote do cardápio (troca tudo) ou o próprio pacote vendido
+  const pc = d.pacoteId && d.pacoteId !== v.pacoteId ? (S.pacotes || []).find(x => x.id === d.pacoteId) : null;
+  if (d.pacoteId && d.pacoteId !== v.pacoteId && !pc) throw new Error('Pacote não encontrado.');
+  // o que a cliente pode usar: composição livre (serviço + quantidade) ou N sessões de um serviço
+  let itens = d.itens ? normalizarItensPacote(S, d.itens) : pc ? (pc.itens || []).map(x => ({ ...x })) : (v.itens || []).map(x => ({ ...x }));
+  let sessoes = itens.length ? sum(itens.map(x => x.qtd)) : parseInt(d.sessoes ?? (pc ? pc.sessoes : v.sessoes), 10);
+  if (!(sessoes >= 1 && sessoes <= 60)) throw new Error('O pacote precisa ter de 1 a 60 sessões.');
+  const servicoId = pc ? pc.servicoId : v.servicoId, sv = S.servicos.find(x => x.id === servicoId);
+  const ats = (v.atendimentoIds || [v.atendimentoId]).map(id => S.atendimentos.find(x => x.id === id)).filter(x => x && x.status === 'concluido');
+  const at = ats.length === 1 ? ats[0] : null;
+  const valor = d.valor > 0 ? d.valor : pc ? pc.preco : v.valor;
+  const funcId = credito ? '' : d.funcId || v.funcId, func = S.funcionarios.find(f => f.id === funcId);
+  if (!credito && (!sv || !sv.funcs.includes(funcId))) throw new Error(`Escolha uma profissional que faz ${sv ? sv.nome : 'o serviço do pacote'}.`);
+  if (credito && valor !== v.valor && ats.length > 1) throw new Error('Esta compra tem vários serviços: para mudar o valor, desfaça e lance de novo.');
+  const obs = at ? S.obrigacoes.filter(o => o.atendimentoId === at.id && !o.cancelada && !o.sessaoAgId) : [], ps = at ? S.parcelas.filter(p => p.atendimentoId === at.id) : [];
+  const mudaValor = at && (valor !== at.valorFinal || (!credito && funcId !== at.funcId) || (!credito && at.servicoId !== servicoId));
   if (mudaValor && obs.some(o => o.fechado > 0)) throw new Error('A comissão desta venda já entrou em fechamento. Corrija com um ajuste no próximo fechamento.');
   if (mudaValor && ps.some(p => (p.acertado || 0) > 0)) throw new Error('O convênio desta venda já tem pagamento registrado.');
+  // não pode ficar com menos sessões do que já foram usadas ou marcadas
   const st0 = situacaoVenda(S, v), ativas = st0.ags.filter(x => USADA(x) || ABERTOS.includes(x.status));
-  if (ativas.length > pc.sessoes) throw new Error(`A cliente já tem ${ativas.length} sessões marcadas ou usadas e o pacote ${pc.nome} tem ${pc.sessoes}. Desmarque sessões antes.`);
+  if (ativas.length > sessoes) throw new Error(`A cliente já tem ${ativas.length} sessão(ões) usadas ou marcadas. Exclua sessões antes de deixar o pacote com ${sessoes}.`);
+  if (itens.length) for (const it of itens) { const n = ativas.filter(x => x.servicoId === it.servicoId && USADA(x)).length;
+    if (n > it.qtd) throw new Error(`A cliente já fez ${n}x ${S.servicos.find(x => x.id === it.servicoId)?.nome || ''}: a quantidade não pode ser menor.`); }
+  const validoAte = d.validoAte !== undefined ? d.validoAte : pc ? (pc.validadeDias ? addDays(v.data, pc.validadeDias) : '') : v.validoAte;
+  if (validoAte && !/^\d{4}-\d{2}-\d{2}$/.test(validoAte)) throw new Error('Confira a validade.');
   return transacao(S, () => {
-    const antes = `${v.nome} · ${brl(v.valor)} · ${S.funcionarios.find(f => f.id === v.funcId)?.nome || ''}`;
-    Object.assign(v, { pacoteId: pc.id, nome: pc.nome, servicoId: sv.id, sessoes: pc.sessoes, valor, funcId, validoAte: pc.validadeDias ? addDays(v.data, pc.validadeDias) : '' });
-    if (pc.itens && pc.itens.length) v.itens = pc.itens.map(x => ({ ...x })); else delete v.itens;
-    if (at && (mudaValor || at.servicoId !== sv.id)) {
-      const pct = func.pct || 0, com = Engine.comissao(valor, pct);
+    const antes = `${v.nome} · ${v.sessoes} sessões · ${brl(v.valor)}`;
+    Object.assign(v, { nome: String(d.nome || '').trim() || (pc ? pc.nome : v.nome), servicoId, sessoes, valor, funcId, validoAte: validoAte || '', alteradoEm: stamp(), alteradoPor: a.nome });
+    if (pc) v.pacoteId = pc.id;
+    if (itens.length) v.itens = itens; else delete v.itens;
+    if (at && mudaValor) {
+      const pct = credito ? 0 : func.pct || 0, com = Engine.comissao(valor, pct);
       const vals = ps.length === 1 ? [valor] : Engine.ratear(valor, ps.map(p => p.valor || 0)), coms = Engine.ratear(com, vals);
-      ps.forEach((p, i) => { const o = obs.find(x => x.parcelaId === p.id); Object.assign(p, { valor: vals[i], comissao: coms[i], parteSalao: vals[i] - coms[i], funcId }); if (p.forma === 'convenio') p.acrescimo = Engine.acrescimo(vals[i], Number(p.taxaPct || 0)); Object.assign(o, { comissao: coms[i], funcId, liberado: Engine.liberadoParcela(p, coms[i]) }); });
-      Object.assign(at, { servicoId: sv.id, funcId, valorCobrado: valor + (at.desconto || 0), valorFinal: valor, pct, comissaoTotal: com, parteSalao: valor - com, obs: `Pacote: ${pc.nome}`, corrigidoEm: stamp(), corrigidoPor: a.nome });
+      ps.forEach((p, i) => { const o = obs.find(x => x.parcelaId === p.id); Object.assign(p, { valor: vals[i], comissao: coms[i], parteSalao: vals[i] - coms[i], funcId }); if (p.forma === 'convenio') p.acrescimo = Engine.acrescimo(vals[i], Number(p.taxaPct || 0)); if (o) Object.assign(o, { comissao: coms[i], funcId, liberado: Engine.liberadoParcela(p, coms[i]) }); });
+      Object.assign(at, { ...(credito ? {} : { servicoId, funcId }), valorCobrado: valor + (at.desconto || 0), valorFinal: valor, pct, comissaoTotal: com, parteSalao: valor - com, corrigidoEm: stamp(), corrigidoPor: a.nome });
+      if (!credito) at.obs = `Pacote: ${v.nome}`;
     }
-    // sessões ainda abertas com serviço que não está no pacote novo passam para um serviço do pacote
-    const st = situacaoVenda(S, v); let n = 0;
-    st.ags.filter(x => !INATIVOS.includes(x.status)).forEach(x => { n++;
-      if (ABERTOS.includes(x.status) && !itensVenda(v).some(i => i.servicoId === x.servicoId)) { const novo = servicoDaSessao(S, v, situacaoVenda(S, v), '', x), s2 = S.servicos.find(k => k.id === novo);
-        x.servicoId = novo; x.fim = fromMin(toMin(x.inicio) + (s2?.duracao || 60)); }
-      x.obs = obsSessao(S, v, n, x.servicoId); });
-    audit(S, a, 'Venda de pacote corrigida', `${v.codigo} · ${antes} → ${v.nome} · ${brl(valor)} · ${func.nome} · ${motivo}`);
+    // sessões ainda abertas com serviço fora do pacote passam para um serviço com saldo
+    sessoesDaVenda(S, v.id).filter(x => ABERTOS.includes(x.status) && !itensVenda(v).some(i => i.servicoId === x.servicoId)).forEach(x => {
+      const novo = servicoDaSessao(S, v, situacaoVenda(S, v), '', x), s2 = S.servicos.find(k => k.id === novo); x.servicoId = novo; x.fim = fromMin(toMin(x.inicio) + (s2?.duracao || 60)); });
+    renumerarSessoes(S, v);
+    (v.historico = v.historico || []).push({ quando: stamp(), usuario: a.nome, texto: `Alterado: ${antes} → ${v.nome} · ${v.sessoes} sessões · ${brl(v.valor)} · ${motivo}` });
+    audit(S, a, 'Pacote da cliente alterado', `${v.codigo} · ${antes} → ${v.nome} · ${v.sessoes} sessões · ${brl(valor)} · ${motivo}`);
     return v;
   });
+}
+/* =========================================================================
+   PACOTE FLEXÍVEL — editar tudo, excluir sessões, desfazer o pacote, trocar um serviço já feito por pacote
+   ========================================================================= */
+/* serviço já registrado (mesmo de dias atrás) que a cliente decidiu trocar por um pacote:
+   o registro avulso é estornado e o serviço feito vira a 1ª sessão (já concluída) do pacote vendido */
+function trocarAtendimentoPorPacote(S, a, atId, d) {
+  exigirDono(a);
+  const at = S.atendimentos.find(x => x.id === atId);
+  if (!at || at.status !== 'concluido') throw new Error('Este registro não está concluído.');
+  if (at.pacoteVendaId) throw new Error('Este registro já faz parte de um pacote.');
+  return transacao(S, () => {
+    estornarAtendimento(S, a, at.id, `Trocado por pacote (${S.pacotes.find(x => x.id === d.pacoteId)?.nome || 'pacote'})`);
+    let ag = at.agendamentoId && S.agendamentos.find(x => x.id === at.agendamentoId);
+    if (!ag) {   // serviço registrado sem agendamento: cria o horário que vira a sessão feita
+      const sv = S.servicos.find(x => x.id === at.servicoId), ini = /^\d{2}:\d{2}$/.test(at.hora || '') ? at.hora : '09:00';
+      ag = { id: uid('ag'), clienteId: at.clienteId, servicoId: at.servicoId, funcId: at.funcId, data: at.data, inicio: ini, fim: fromMin(Math.min(toMin(ini) + (sv?.duracao || 60), 23 * 60 + 59)),
+        status: 'atendimento', canal: 'presencial', obs: '', preco: 0, historico: [{ quando: stamp(), usuario: a.nome, texto: `Criado a partir do registro ${at.codigo}` }] };
+      S.agendamentos.push(ag);
+    } else if (!ABERTOS.includes(ag.status)) ag.status = 'atendimento';
+    const v = venderPacote(S, a, { ...d, clienteId: at.clienteId, converter: [ag.id], concluirConvertidos: true });
+    (v.historico = v.historico || []).push({ quando: stamp(), usuario: a.nome, texto: `Criado a partir do serviço ${at.codigo} de ${dBR(at.data)} (estornado e trocado pelo pacote)` });
+    audit(S, a, 'Serviço trocado por pacote', `${at.codigo} de ${dBR(at.data)} → ${v.codigo} · ${v.nome}`);
+    return v;
+  });
+}
+/* tira uma sessão do pacote (marcada ou já feita): a sessão sai da agenda e o saldo volta */
+function excluirSessaoPacote(S, a, agId, motivo) {
+  exigirDono(a);
+  const ag = S.agendamentos.find(x => x.id === agId);
+  if (!ag || !ag.pacoteVendaId) throw new Error('Esta sessão não é de pacote.');
+  if (ag.status === 'cancelado') throw new Error('Esta sessão já foi excluída.');
+  const v = S.pacoteVendas.find(x => x.id === ag.pacoteVendaId);
+  const ob = S.obrigacoes.find(o => o.sessaoAgId === ag.id && !o.cancelada);
+  if (ob && ob.fechado > 0) throw new Error('A comissão desta sessão já entrou em fechamento. Corrija com um ajuste no próximo fechamento.');
+  return transacao(S, () => {
+    if (ob) ob.cancelada = true;
+    const era = ag.status; ag.status = 'cancelado';
+    ag.historico.push({ quando: stamp(), usuario: a.nome, texto: `Sessão excluída do pacote ${v?.codigo || ''}${era === 'concluido' ? ' (estava feita: o saldo voltou)' : ''}${motivo ? ' · ' + motivo : ''}` });
+    renumerarSessoes(S, v);
+    audit(S, a, 'Sessão de pacote excluída', `${v?.codigo} · ${dBR(ag.data)} ${ag.inicio}${era === 'concluido' ? ' (feita)' : ''}${motivo ? ' · ' + motivo : ''}`, ctxAg(S, ag));
+  });
+}
+function renumerarSessoes(S, v) { if (!v) return; let n = 0; sessoesDaVenda(S, v.id).filter(x => !INATIVOS.includes(x.status)).forEach(x => { n++; x.obs = obsSessao(S, v, n, x.servicoId); }); }
+/* desfaz o pacote: a venda é estornada (sai do faturamento) e as sessões marcadas saem da agenda.
+   As sessões já feitas podem voltar a ser serviços normais, para registrar com o valor de cada um. */
+function desfazerPacote(S, a, vendaId, d = {}) {
+  exigirDono(a);
+  const v = (S.pacoteVendas || []).find(x => x.id === vendaId); if (!v) throw new Error('Pacote não encontrado.');
+  if (v.cancelado) throw new Error('Este pacote já foi desfeito.');
+  const motivo = String(d.motivo || '').trim(); if (motivo.length < 5) throw new Error('Descreva o motivo.');
+  const ats = (v.atendimentoIds || [v.atendimentoId]).map(id => S.atendimentos.find(x => x.id === id)).filter(x => x && x.status === 'concluido');
+  return transacao(S, () => {
+    const feitas = sessoesDaVenda(S, v.id).filter(x => x.status === 'concluido');
+    ats.forEach(at => estornarAtendimento(S, a, at.id, motivo, { inteiro: true }));
+    if (!v.cancelado) v.cancelado = { por: a.nome, em: stamp(), motivo };
+    sessoesDaVenda(S, v.id).filter(x => ABERTOS.includes(x.status)).forEach(x => { x.status = 'cancelado'; x.historico.push({ quando: stamp(), usuario: a.nome, texto: `Pacote ${v.codigo} desfeito · sessão cancelada` }); });
+    const voltam = [];
+    if (d.registrarSessoes) feitas.forEach(x => { S.obrigacoes.filter(o => o.sessaoAgId === x.id).forEach(o => { o.cancelada = true; });
+      delete x.pacoteVendaId; x.status = 'atendimento'; x.preco = S.servicos.find(s => s.id === x.servicoId)?.preco || 0; x.obs = `Era sessão do pacote ${v.codigo} (desfeito)`;
+      x.historico.push({ quando: stamp(), usuario: a.nome, texto: `Pacote ${v.codigo} desfeito: volta a ser serviço para registrar` }); voltam.push(x.id); });
+    audit(S, a, 'Pacote desfeito', `${v.codigo} · ${v.nome} · ${motivo}${voltam.length ? ` · ${voltam.length} sessão(ões) feita(s) voltaram para registrar` : ''}`);
+    return { v, voltam };
+  });
+}
+/* excluir um pacote do cardápio: sem vendas, sai de vez; com vendas, fica só no histórico */
+function excluirPacoteCatalogo(S, a, id) {
+  exigirDono(a);
+  const pc = (S.pacotes || []).find(x => x.id === id); if (!pc) throw new Error('Pacote não encontrado.');
+  const usado = (S.pacoteVendas || []).some(v => v.pacoteId === id);
+  if (usado) { pc.excluido = true; pc.ativo = false; } else S.pacotes = S.pacotes.filter(x => x.id !== id);
+  audit(S, a, 'Pacote excluído', `${pc.nome}${usado ? ' (tinha vendas: fica no histórico)' : ''}`);
+  return usado;
 }
 /* sessão do pacote atendida: conclui o horário sem nova cobrança (já foi pago na venda).
    Pode trocar o serviço da sessão (ex.: era mão e a cliente fez o pé) dentro do que o pacote dá direito. */
@@ -3495,7 +3675,7 @@ function concluirSessaoPacote(S, a, agId, servicoId = '') {
   if (v?.tipo === 'credito') comissaoDaSessao(S, a, v, ag);
   if (S.estoqueMov) baixarConsumo(S, a, ag.servicoId, ag.id, v?.codigo || '', ag.data);
   const st = situacaoVenda(S, v);
-  audit(S, a, 'Sessão de pacote concluída', `${v?.codigo} · ${S.servicos.find(x => x.id === ag.servicoId)?.nome || ''} · ${st.usadas} de ${v?.sessoes} usadas`);
+  audit(S, a, 'Sessão de pacote concluída', `${v?.codigo} · ${S.servicos.find(x => x.id === ag.servicoId)?.nome || ''} · ${st.usadas} de ${v?.sessoes} usadas`, ctxAg(S, ag));
   return st;
 }
 
@@ -3667,6 +3847,52 @@ function salvarBloqueio(S, a, d) {
   if (conf) throw new Error(`Já existe agendamento das ${conf.inicio} às ${conf.fim}. Reagende antes de bloquear.`);
   const b = { id: uid('bl'), motivo: 'Indisponível', ...d }; S.bloqueios.push(b); audit(S, a, 'Indisponibilidade cadastrada', `${dBR(b.data)} ${b.inicio}–${b.fim} · ${b.motivo}`); return b.id;
 }
+/* ---------- bloqueio de horários: uma pessoa ou a equipe toda, um dia ou vários (feriado, folga, férias) ---------- */
+const TIPOS_BLOQUEIO = { indisponivel: 'Indisponível', almoco: 'Intervalo', folga: 'Folga', ferias: 'Férias', feriado: 'Feriado', fechado: 'Salão fechado', evento: 'Curso ou evento' };
+const BLOQ_DIA = ['07:00', '22:00'];   // "dia inteiro"
+const atendeNaAgenda = (S, f) => f.ativo && !f.excluido && (cargoDe(f) !== 'recepcao' || S.servicos.some(s => s.funcs.includes(f.id)));
+function salvarBloqueioColetivo(S, a, d) {
+  exigirAcesso(S, a);
+  const todos = !!d.todos, funcs = todos ? S.funcionarios.filter(f => atendeNaAgenda(S, f)) : S.funcionarios.filter(f => f.id === d.funcId);
+  if (!funcs.length) throw new Error(todos ? 'Não há profissionais ativos na agenda.' : 'Escolha o funcionário.');
+  if (todos ? !(isOwner(a) || funcs.every(f => podeBloquearPara(S, a, f.id))) : !podeBloquearPara(S, a, funcs[0].id))
+    throw new Error(todos ? 'Só a proprietária (ou quem pode bloquear a agenda da equipe) bloqueia todos.' : pode(S, a, 'bloquear') ? 'Você só pode bloquear a sua própria agenda.' : 'Seu usuário não pode bloquear horários. Peça à proprietária.');
+  const ini = d.data, fimD = d.dataFim || d.data;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ini || '') || !/^\d{4}-\d{2}-\d{2}$/.test(fimD)) throw new Error('Informe a data.');
+  if (fimD < ini) throw new Error('A data final precisa ser depois da inicial.');
+  const dias = []; for (let x = ini; x <= fimD; x = addDays(x, 1)) { dias.push(x); if (dias.length > 62) throw new Error('Bloqueie no máximo 62 dias de uma vez.'); }
+  const [hi, hf] = d.diaInteiro ? BLOQ_DIA : [d.inicio, d.fim];
+  if (!/^\d{2}:\d{2}$/.test(hi || '') || !/^\d{2}:\d{2}$/.test(hf || '')) throw new Error('Informe o horário (ou marque o dia inteiro).');
+  if (toMin(hf) <= toMin(hi)) throw new Error('O horário final precisa ser depois do inicial.');
+  const ids = new Set(funcs.map(f => f.id)), dset = new Set(dias);
+  const conf = S.agendamentos.filter(x => ids.has(x.funcId) && dset.has(x.data) && !INATIVOS.includes(x.status) && toMin(hi) < toMin(x.fim) && toMin(hf) > toMin(x.inicio))
+    .sort((p, q) => (p.data + p.inicio).localeCompare(q.data + q.inicio));
+  if (conf.length) { const nm = x => (S.clientes.find(k => k.id === x.clienteId)?.nome || '').split(' ')[0], fn = x => (S.funcionarios.find(f => f.id === x.funcId)?.nome || '').split(' ')[0];
+    throw new Error(`Já existe${conf.length > 1 ? 'm' : ''} ${conf.length} agendamento(s) nesse período: ${conf.slice(0, 3).map(x => `${dBR(x.data).slice(0, 5)} ${x.inicio} ${nm(x)} (${fn(x)})`).join(', ')}${conf.length > 3 ? '…' : ''}. Reagende ou cancele antes de bloquear.`); }
+  const tipo = TIPOS_BLOQUEIO[d.tipo] ? d.tipo : 'indisponivel', motivo = String(d.motivo || '').trim() || TIPOS_BLOQUEIO[tipo], grupo = uid('bg');
+  for (const dia of dias) for (const f of funcs) S.bloqueios.push({ id: uid('bl'), funcId: f.id, data: dia, inicio: hi, fim: hf, motivo, tipo, grupo, ...(todos ? { todos: true } : {}), ...(d.diaInteiro ? { diaInteiro: true } : {}) });
+  audit(S, a, todos ? 'Bloqueio da equipe toda' : 'Indisponibilidade cadastrada', `${dBR(ini)}${fimD !== ini ? ' a ' + dBR(fimD) : ''} · ${d.diaInteiro ? 'dia inteiro' : `${hi}–${hf}`} · ${motivo}${todos ? ` · ${funcs.length} profissional(is)` : ` · ${funcs[0].nome}`}`);
+  return grupo;
+}
+function removerGrupoBloqueio(S, a, grupo) {
+  exigirAcesso(S, a);
+  const bs = S.bloqueios.filter(b => b.grupo === grupo); if (!bs.length) throw new Error('Bloqueio não encontrado.');
+  if (!bs.every(b => podeBloquearPara(S, a, b.funcId))) throw new Error('Sem permissão para liberar estes horários.');
+  S.bloqueios = S.bloqueios.filter(b => b.grupo !== grupo);
+  const ds = bs.map(b => b.data).sort();
+  audit(S, a, 'Bloqueio removido', `${dBR(ds[0])}${ds[ds.length - 1] !== ds[0] ? ' a ' + dBR(ds[ds.length - 1]) : ''} · ${bs[0].motivo} · ${new Set(bs.map(b => b.funcId)).size} profissional(is)`);
+  return bs.length;
+}
+/* salão fechado (bloqueio da equipe toda): usado pela página da cliente, que não vê a agenda */
+function fechamentosSalao(S, hoje = TODAY, dias = 120) {
+  const m = new Map();
+  for (const b of S.bloqueios || []) { if (!b.todos || b.data < hoje || b.data > addDays(hoje, dias)) continue;
+    const k = `${b.data}|${b.inicio}|${b.fim}`; if (!m.has(k)) m.set(k, { data: b.data, inicio: b.inicio, fim: b.fim, motivo: b.motivo }); }
+  for (const x of (S.config && S.config.salaoFechado) || []) { const k = `${x.data}|${x.inicio}|${x.fim}`; if (!m.has(k) && x.data >= hoje) m.set(k, x); }
+  return [...m.values()].sort((p, q) => (p.data + p.inicio).localeCompare(q.data + q.inicio));
+}
+const salaoFechadoEm = (S, data, hora, dur = 30) => fechamentosSalao(S).find(x => x.data === data && toMin(hora) < toMin(x.fim) && toMin(hora) + dur > toMin(x.inicio)) || null;
+const salaoFechadoODia = (S, data) => { const l = fechamentosSalao(S).filter(x => x.data === data); return l.find(x => toMin(x.inicio) <= 8 * 60 && toMin(x.fim) >= 20 * 60) || null; };
 function removerBloqueio(S, a, id) {
   const b = S.bloqueios.find(x => x.id === id);
   exigirAcesso(S, a);
@@ -3838,7 +4064,7 @@ function registrarSinal(S, a, agId, d) {
   g[0].sinal = sn;
   g.forEach(x => x.historico.push({ quando: stamp(), usuario: a.nome, texto: `Sinal recebido ${brl(d.valor)} (${FORMAS[d.forma]})` }));
   if (g[0].status === 'aguardando') g.forEach(x => { if (x.status === 'aguardando') { x.status = 'confirmado'; x.historico.push({ quando: stamp(), usuario: a.nome, texto: 'Confirmado com sinal' }); } });
-  audit(S, a, 'Sinal recebido', `${sn.codigo} · ${S.clientes.find(k => k.id === ag.clienteId)?.nome || ''} · ${brl(d.valor)} · ${dBR(ag.data)} ${ag.inicio}`);
+  audit(S, a, 'Sinal recebido', `${sn.codigo} · ${S.clientes.find(k => k.id === ag.clienteId)?.nome || ''} · ${brl(d.valor)} · ${dBR(ag.data)} ${ag.inicio}`, ctxAg(S, ag));
   return sn;
 }
 function excluirSinal(S, a, agId, motivo) {
@@ -3849,7 +4075,7 @@ function excluirSinal(S, a, agId, motivo) {
   if (!motivo || String(motivo).trim().length < 3) throw new Error('Informe o motivo.');
   const sn = dono.sinal; delete dono.sinal;
   g.forEach(x => x.historico.push({ quando: stamp(), usuario: a.nome, texto: `Sinal ${sn.codigo} removido · ${motivo}` }));
-  audit(S, a, 'Sinal removido', `${sn.codigo} · ${brl(sn.valor)} · ${motivo}`);
+  audit(S, a, 'Sinal removido', `${sn.codigo} · ${brl(sn.valor)} · ${motivo}`, ctxAg(S, dono));
 }
 
 /* ---------- benefícios por nível ---------- */
@@ -4210,7 +4436,7 @@ function confirmacoesPublicas(S, hoje = TODAY) {
 function dadosPublicos(S, hoje = TODAY, comLinks = false) {
   const ags = comLinks ? S.agendamentos.filter(x => x.tk && x.data >= hoje && x.data <= addDays(hoje, 45)) : [];
   const cliIds = new Set(ags.map(x => x.clienteId));
-  const P = { versao: S.versao, config: { nome: S.config.nome, producao: true, whatsapp: { numeroSalao: S.config.whatsapp?.numeroSalao || '', endereco: S.config.whatsapp?.endereco || '' }, formularioUrl: S.config.formularioUrl || '', regras: S.config.regras }, seq: { pd: 0, av: 0 },
+  const P = { versao: S.versao, config: { nome: S.config.nome, producao: true, salaoFechado: fechamentosSalao(S, hoje), whatsapp: { numeroSalao: S.config.whatsapp?.numeroSalao || '', endereco: S.config.whatsapp?.endereco || '' }, formularioUrl: S.config.formularioUrl || '', regras: S.config.regras }, seq: { pd: 0, av: 0 },
     users: [], funcionarios: S.funcionarios.filter(f => f.ativo && !f.excluido).map(f => ({ id: f.id, nome: f.nome, ativo: true, cargo: f.cargo, perm: {}, acesso: 'ativo', dona: f.dona, simultaneos: f.simultaneos })),
     categorias: S.categorias, servicos: S.servicos.filter(s => s.ativo !== false).map(s => ({ id: s.id, nome: s.nome, catId: s.catId, duracao: s.duracao, preco: s.preco, funcs: s.funcs, ativo: true })),
     origens: (S.origens || []).filter(o => o.ativo).map(o => ({ id: o.id, codigo: o.codigo, antigos: o.antigos || [], nome: o.nome, tipo: o.tipo, ativo: true, acessos: {} })),
@@ -5164,6 +5390,51 @@ function runTests() {
     const prof = deveFalhar(() => pagarRecepcao(S8b, d8, { funcId: 'f1', valor: 100, data: TODAY, ini: TODAY, fim: TODAY }));
     return (m.tipo === 'saida' && m.categoria === 'salarios' && m.funcId === 'frx8' && pagamentosRecepcao(S8b, 'frx8').length === 1 && /recepcionista/.test(prof)) || JSON.stringify([m, prof]);
   });
+  T('Pacote flexível: serviço de dias atrás trocado por pacote, sessões excluídas, adicionadas e pacote desfeito voltando a serviço', () => {
+    const S = seedBase(), d = S.users.find(u => u.id === 'u0');
+    const pc = salvarPacote(S, d, { nome: 'Pacote 4 mãos', servicoId: 's7', sessoes: 4, preco: 10000 });
+    const [at] = registrarAtendimentoGrupo(S, d, { clienteId: 'k1', data: addDays(TODAY, -3), hora: '10:00', itens: [{ funcId: 'f2', servicoId: 's7', valorCobrado: 3000 }], parcelas: [{ forma: 'pix', valor: 3000 }] });
+    const v = trocarAtendimentoPorPacote(S, d, at.id, { pacoteId: pc.id, funcId: 'f2', parcelas: [{ forma: 'pix', valor: 10000 }] });
+    const st1 = situacaoVenda(S, v), ses1 = st1.ags[0];
+    const ok1 = at.status === 'estornado' && st1.usadas === 1 && ses1.data === addDays(TODAY, -3) && ses1.status === 'concluido' && S.atendimentos.find(x => x.id === v.atendimentoId).valorFinal === 10000;
+    const s2 = agendarSessaoPacote(S, d, v.id, { data: addDays(TODAY, 2), inicio: '10:00' });
+    excluirSessaoPacote(S, d, ses1.id, 'lançada errada');
+    const st2 = situacaoVenda(S, v), ok2 = st2.usadas === 0 && st2.marcadas === 1 && /sessão 1 de 4/.test(S.agendamentos.find(x => x.id === s2).obs);
+    editarVendaPacote(S, d, v.id, { itens: [{ servicoId: 's7', qtd: 4 }, { servicoId: 's8', qtd: 2 }], valor: 15000, motivo: 'cliente quis mais 2 pés' });
+    const ok3 = v.sessoes === 6 && situacaoVenda(S, v).livres === 5 && S.parcelas.find(p => p.atendimentoId === v.atendimentoId).valor === 15000;
+    const menos = deveFalhar(() => editarVendaPacote(S, d, v.id, { sessoes: 0, itens: [], motivo: 'teste de redução' }));
+    const ag3 = S.agendamentos.find(x => x.id === s2); ag3.status = 'chegou'; concluirSessaoPacote(S, d, ag3.id);
+    const r = desfazerPacote(S, d, v.id, { motivo: 'cliente desistiu do pacote', registrarSessoes: true });
+    const ok4 = v.cancelado && r.voltam.length === 1 && ag3.status === 'atendimento' && !ag3.pacoteVendaId && ag3.preco === 3000;
+    return (ok1 && ok2 && ok3 && /1 a 60/.test(menos) && ok4) || JSON.stringify([ok1, ok2, ok3, menos, ok4, st1, st2]);
+  });
+  T('Bloqueio da equipe toda (feriado): bloqueia todos, vários dias, avisa conflito e fecha o horário no formulário', () => {
+    const S = seedBase(), d = S.users.find(u => u.id === 'u0'), dia = addDays(TODAY, 20);
+    const g = salvarBloqueioColetivo(S, d, { todos: true, data: dia, dataFim: addDays(dia, 1), diaInteiro: true, tipo: 'feriado', motivo: 'Feriado' });
+    const bs = S.bloqueios.filter(b => b.grupo === g), nf = S.funcionarios.filter(f => atendeNaAgenda(S, f)).length;
+    const livre = horariosLivres(S, 'f1', dia).length, fech = salaoFechadoODia(S, dia), pub = dadosPublicos(S).config.salaoFechado.length;
+    salvarAgendamento(S, d, { clienteId: 'k1', servicoId: 's1', funcId: 'f1', data: addDays(dia, 5), inicio: '10:00', fim: '11:00', status: 'confirmado' });
+    const conf = deveFalhar(() => salvarBloqueioColetivo(S, d, { todos: true, data: addDays(dia, 5), inicio: '09:00', fim: '12:00', tipo: 'folga' }));
+    const n = removerGrupoBloqueio(S, d, g);
+    return (bs.length === nf * 2 && livre === 0 && fech && fech.motivo === 'Feriado' && pub === 2 && /agendamento/.test(conf) && n === bs.length && !S.bloqueios.some(b => b.grupo === g)) || JSON.stringify([bs.length, nf, livre, fech, pub, conf]);
+  });
+  T('Alertas da podologia: lista cadastrada, inclui os já escritos nas fichas, renomeia nas fichas e não duplica', () => {
+    const S = seedBase(), d = S.users.find(u => u.id === 'u0');
+    salvarFichaPodo(S, d, { nome: 'Paciente Alerta Teste', telefone: '(55) 90000-1212', alertas: 'Diabética · Alergia a látex' });
+    const a1 = salvarAlertaPodo(S, d, { nome: 'Usa anticoagulante' }), dup = deveFalhar(() => salvarAlertaPodo(S, d, { nome: 'usa  ANTICOAGULANTE' }));
+    const a2 = salvarAlertaPodo(S, d, { nome: 'Diabetica' }); salvarAlertaPodo(S, d, { id: a2.id, nome: 'Diabética tipo 2' });
+    const cat = catalogoAlertasPodo(S).map(x => x.nome), f = S.podoFichas.slice(-1)[0];
+    return (cat.includes('Usa anticoagulante') && cat.includes('Alergia a látex') && cat.includes('Diabética tipo 2') && /já existe/.test(dup) && f.alertas === 'Diabética tipo 2 · Alergia a látex') || JSON.stringify([cat, dup, f.alertas]);
+  });
+  T('Auditoria: cada registro de agendamento guarda cliente, data e horário do agendamento (também acha nos antigos)', () => {
+    const S = seedBase(), d = S.users.find(u => u.id === 'u0'), dia = addDays(TODAY, 3), cli = S.clientes.find(k => k.id === 'k1').nome;
+    const id = salvarAgendamento(S, d, { clienteId: 'k1', servicoId: 's1', funcId: 'f1', data: dia, inicio: '10:00', fim: '11:00', status: 'aguardando' });
+    const c1 = S.auditoria[0];
+    mudarStatusAgendamento(S, d, id, 'cancelado'); const c2 = S.auditoria[0];
+    const velho = { ...S.auditoria[1] }; CTX_AUD.forEach(k => delete velho[k]);   // registro antigo, sem cliente gravado
+    const inf = inferirCtxAud(S, velho);
+    return (c1.cliente === cli && c1.agId === id && c1.ref.includes(dBR(dia) + ' às 10:00') && c2.acao === 'Agendamento cancelado' && c2.cliente === cli && inf && inf.agId === id && inf.cliente === cli) || JSON.stringify([c1, c2, inf]);
+  });
   return out;
 }
 
@@ -6083,6 +6354,11 @@ function faLerData(txt) {
   if (!aa && iso(dt) < TODAY) dt.setFullYear(ano + 1);   // "05/01" em dezembro vira o ano que vem
   return iso(dt);
 }
+/* horários do formulário da cliente: tira os horários em que o salão está fechado (feriado, folga coletiva) */
+function horasFormularioHTML(data, sel) {
+  const livres = data ? FA_HORAS.filter(h => !salaoFechadoEm(DB, data, h)) : FA_HORAS;
+  return `<option value="">${data && !livres.length ? 'Estúdio fechado neste dia' : 'Toque para escolher'}</option>${opt(livres.map(h => [h, h]), livres.includes(sel) ? sel : '')}`;
+}
 function faData(valor) {
   return `<div class="fa-data"><input id="pb-d" inputmode="numeric" autocomplete="off" maxlength="10" placeholder="DD/MM/AAAA" value="${esc(faIsoBR(valor))}" aria-describedby="pb-d-aj">
     <button type="button" class="fa-cal" aria-label="Escolher no calendário" title="Escolher no calendário"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16v14H4zM4 10h16M8 3v5M16 3v5"/></svg></button>
@@ -6166,7 +6442,8 @@ function renderPublico() {
       </section>
       <section class="fa-bloco"><h2 class="fa-bh"><span class="fa-n">3</span>Dia e horário</h2>
         <div class="fa-2"><div class="fa-campo"><label for="pb-d"><span>Dia que prefere</span></label>${faData(d.data)}</div>
-          <label class="fa-campo"><span>Horário que prefere</span><select id="pb-h"><option value="">Toque para escolher</option>${opt(FA_HORAS.map(h => [h, h]), d.hora || '')}</select></label></div>
+          <label class="fa-campo"><span>Horário que prefere</span><select id="pb-h">${horasFormularioHTML(d.data, d.hora)}</select></label></div>
+        <div class="fa-erro" id="pb-fech" role="status" ${d.data && salaoFechadoODia(DB, d.data) ? '' : 'hidden'}>${d.data && salaoFechadoODia(DB, d.data) ? esc(`O estúdio estará fechado em ${dBR(d.data)} (${salaoFechadoODia(DB, d.data).motivo}). Escolha outro dia.`) : ''}</div>
         <small class="fa-ajuda">Se este horário estiver ocupado, o estúdio sugere outro pelo WhatsApp.</small>
       </section>
       <section class="fa-bloco"><h2 class="fa-bh"><span class="fa-n">4</span>Observação <span style="font-weight:400;font-size:18px">(se quiser)</span></h2>
@@ -6242,13 +6519,18 @@ function ligarPublico(cat) {
   document.querySelectorAll('[data-pub-rm]').forEach(b => b.onclick = () => { lerPublico(); UI.pubItens.splice(+b.dataset.pubRm, 1); renderPublico(); });
   const add = q('#pub-add'); if (add) add.onclick = () => { lerPublico(); UI.pubItens.push({ servicoId: '', funcId: '' }); renderPublico(); };
   ligarFaData(document.getElementById('app'));
+  // trocou o dia: refaz a lista de horários sem os horários com o salão fechado
+  const atualizaHoras = () => { const dt = faLerData(q('#pb-d')?.value || ''), h = q('#pb-h'), av = q('#pb-fech'); if (!h) return; const sel = h.value; h.innerHTML = horasFormularioHTML(dt, sel);
+    const fd = dt && salaoFechadoODia(DB, dt); if (av) { av.hidden = !fd; av.textContent = fd ? `O estúdio estará fechado em ${dBR(dt)} (${fd.motivo}). Escolha outro dia.` : ''; } };
+  q('#pb-d')?.addEventListener('change', atualizaHoras); q('#pb-d')?.addEventListener('blur', atualizaHoras); q('#pb-d')?.addEventListener('input', () => { if (faLerData(q('#pb-d').value)) atualizaHoras(); });
   document.querySelectorAll('#pub-f select[data-pk="servicoId"]').forEach(el => { try { buscaServico(document, el); } catch (e) { } });   // procurar o serviço pelo nome
   q('#pb-t').oninput = e => { const d = digits(e.target.value).slice(0, 11); if (d.length >= 10) e.target.value = formatarTel(d); };
   q('#pub-f').onsubmit = e => {
     e.preventDefault(); lerPublico();
     let r;
     const dados = { ...UI.pubDados, itens: UI.pubItens, origem: UI.publico || UI.pubDados.origem || '' };
-    try { r = transacao(DB, () => UI.pubCliente ? criarPedido(DB, dados, TODAY, null) : criarPedidoPelaEquipe(DB, ACTOR, dados)); }
+    try { const fe = dados.data && dados.hora && salaoFechadoEm(DB, dados.data, dados.hora); if (fe) throw new Error(`O estúdio estará fechado em ${dBR(fe.data)}${fe.inicio > '07:00' || fe.fim < '22:00' ? ` das ${fe.inicio} às ${fe.fim}` : ''} (${fe.motivo}). Escolha outro dia ou horário.`);
+      r = transacao(DB, () => UI.pubCliente ? criarPedido(DB, dados, TODAY, null) : criarPedidoPelaEquipe(DB, ACTOR, dados)); }
     catch (er) { UI.pubErro = er.message; const el = document.getElementById('pub-err'); el.textContent = er.message; el.hidden = false; el.scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
     save();
     if (PED_VISTOS && !UI.pubCliente) PED_VISTOS.add(r.pedido.id);   // quem preencheu não precisa do aviso de "novo pedido"
@@ -8246,14 +8528,41 @@ function modalAgDetalhe(id) {
   ov.querySelector('[data-concluir]')?.addEventListener('click', () => x.pacoteVendaId ? confirmarSessaoPacote(id) : modalRegistro({ agendamentoId: id }));
 }
 function modalBloqueio(pref = {}) {
-  const own = agendaNivel(DB, ACTOR) !== 'gerenciar';
+  const own = agendaNivel(DB, ACTOR) !== 'gerenciar', podeTodos = !own && (isOwner(ACTOR) || DB.funcionarios.filter(f => atendeNaAgenda(DB, f)).every(f => podeBloquearPara(DB, ACTOR, f.id)));
+  const funcs = DB.funcionarios.filter(f => f.ativo && (!own || f.id === ACTOR.funcId));
   const ov = openModal('Bloquear horário', `<div class="form">
-    <label class="f">Funcionário<select id="b-fn" ${own ? 'disabled' : ''}>${opt(DB.funcionarios.filter(f => f.ativo && (!own || f.id === ACTOR.funcId)).map(f => [f.id, f.nome]), own ? ACTOR.funcId : (UI.agFunc || pref.funcId))}</select></label>
-    <label class="f">Motivo<select id="b-mt">${opt([['Folga', 'Folga'], ['Intervalo de almoço', 'Intervalo de almoço'], ['Intervalo', 'Intervalo'], ['Indisponível', 'Indisponível'], ['Curso ou evento', 'Curso ou evento']], 'Folga')}</select></label>
-    <label class="f">Data<input type="date" id="b-dt" value="${UI.agDate}"></label>
-    <div class="form" style="grid-template-columns:1fr 1fr"><label class="f">De<input type="time" id="b-hi" value="12:00"></label><label class="f">Até<input type="time" id="b-hf" value="13:00"></label></div></div>`,
+    <label class="f full">Quem<select id="b-fn" ${own ? 'disabled' : ''}>${podeTodos ? '<option value="__todos">Todos os profissionais (salão fechado)</option>' : ''}${opt(funcs.map(f => [f.id, f.nome]), own ? ACTOR.funcId : (pref.todos ? '__todos' : UI.agFunc || pref.funcId))}</select></label>
+    <label class="f">Tipo<select id="b-tp">${opt(Object.entries(TIPOS_BLOQUEIO), pref.tipo || 'folga')}</select></label>
+    <label class="f">Descrição (opcional)<input id="b-mt" placeholder="Ex.: Feriado de Natal"></label>
+    <label class="f">De (dia)<input type="date" id="b-dt" value="${pref.data || UI.agDate}"></label><label class="f">Até (dia)<input type="date" id="b-df" value="${pref.data || UI.agDate}"></label>
+    <label class="chk full"><input type="checkbox" id="b-di"> Dia inteiro</label>
+    <div class="form full" id="b-hs" style="grid-template-columns:1fr 1fr"><label class="f">Das<input type="time" id="b-hi" value="12:00"></label><label class="f">Até as<input type="time" id="b-hf" value="13:00"></label></div>
+    <div class="note small full" id="b-in"></div></div>`,
     `<button class="btn" data-close>Cancelar</button><button class="btn pri" id="b-ok">Bloquear</button>`);
-  ov.querySelector('#b-ok').onclick = () => run(() => salvarBloqueio(DB, ACTOR, { funcId: val('b-fn'), motivo: val('b-mt'), data: val('b-dt'), inicio: val('b-hi'), fim: val('b-hf') }), 'Horário bloqueado').ok && closeModal();
+  const q = s => ov.querySelector(s);
+  const info = () => { const todos = q('#b-fn').value === '__todos', di = q('#b-di').checked, d1 = q('#b-dt').value, d2 = q('#b-df').value || d1;
+    if (d2 < d1) q('#b-df').value = d1;
+    q('#b-hs').hidden = di;
+    const n = d1 && d2 >= d1 ? Math.round((fromIso(d2) - fromIso(d1)) / 864e5) + 1 : 1;
+    q('#b-in').innerHTML = `${todos ? `<b>Todos os profissionais</b> ficam bloqueados` : 'A agenda fica bloqueada'}${n > 1 ? ` em <b>${n} dias</b> (${dBR(d1).slice(0, 5)} a ${dBR(d2).slice(0, 5)})` : ` em ${dBR(d1)}`}, ${di ? '<b>o dia inteiro</b>' : `das ${q('#b-hi').value} às ${q('#b-hf').value}`}.${todos ? ' No formulário de agendamento, a cliente <b>não consegue escolher</b> esses horários (salão fechado).' : ''}`; };
+  q('#b-tp').onchange = () => { const t = q('#b-tp').value; if (['feriado', 'ferias', 'fechado'].includes(t)) { q('#b-di').checked = true; if (podeTodos && t !== 'ferias') q('#b-fn').value = '__todos'; } info(); };
+  ['#b-fn', '#b-dt', '#b-df', '#b-di', '#b-hi', '#b-hf'].forEach(s => q(s).addEventListener('change', info));
+  if (pref.todos) { q('#b-tp').value = 'feriado'; q('#b-di').checked = true; }
+  info();
+  q('#b-ok').onclick = () => { const todos = q('#b-fn').value === '__todos';
+    const r = run(() => salvarBloqueioColetivo(DB, ACTOR, { todos, funcId: todos ? '' : val('b-fn'), tipo: val('b-tp'), motivo: val('b-mt'), data: val('b-dt'), dataFim: val('b-df'), diaInteiro: q('#b-di').checked, inicio: val('b-hi'), fim: val('b-hf') }), todos ? 'Bloqueado para a equipe toda' : 'Horário bloqueado');
+    if (r.ok) closeModal(); };
+}
+/* bloqueio aberto na agenda: libera só este, ou o bloqueio inteiro (todos os dias e profissionais) */
+function modalVerBloqueio(id) {
+  const b = DB.bloqueios.find(x => x.id === id); if (!b) return;
+  const grupo = b.grupo ? DB.bloqueios.filter(x => x.grupo === b.grupo) : [b], ds = [...new Set(grupo.map(x => x.data))].sort(), nf = new Set(grupo.map(x => x.funcId)).size;
+  const ov = openModal(b.todos ? 'Salão fechado' : 'Horário bloqueado', `<dl class="dl"><dt>${b.todos ? 'Quem' : 'Funcionário'}</dt><dd>${b.todos ? `Todos os profissionais (${nf})` : esc(fn(b.funcId))}</dd><dt>Motivo</dt><dd>${esc(b.motivo)}${b.tipo && TIPOS_BLOQUEIO[b.tipo] && TIPOS_BLOQUEIO[b.tipo] !== b.motivo ? ` · ${TIPOS_BLOQUEIO[b.tipo]}` : ''}</dd>
+    <dt>Quando</dt><dd>${dBR(ds[0])}${ds.length > 1 ? ` a ${dBR(ds[ds.length - 1])} (${ds.length} dias)` : ''} · ${b.diaInteiro ? 'dia inteiro' : `${b.inicio}–${b.fim}`}</dd></dl>`,
+    `<button class="btn" data-close>Fechar</button>${grupo.length > 1 ? `<button class="btn" id="bl-um">Liberar só ${b.todos ? 'esta pessoa neste dia' : 'este dia'}</button><button class="btn dng" id="bl-tudo">Liberar tudo</button>` : '<button class="btn dng" id="bl-rm">Liberar horário</button>'}`);
+  ov.querySelector('#bl-rm')?.addEventListener('click', () => run(() => removerBloqueio(DB, ACTOR, b.id), 'Horário liberado').ok && closeModal());
+  ov.querySelector('#bl-um')?.addEventListener('click', () => run(() => removerBloqueio(DB, ACTOR, b.id), 'Horário liberado').ok && closeModal());
+  ov.querySelector('#bl-tudo')?.addEventListener('click', () => run(() => removerGrupoBloqueio(DB, ACTOR, b.grupo), n => `${n} bloqueio(s) liberado(s)`).ok && closeModal());
 }
 
 /* =================== REGISTRO DE SERVIÇOS =================== */
@@ -8447,9 +8756,10 @@ function modalAtendimento(id) {
     ${at.obs ? `<div class="muted">Obs.: ${esc(at.obs)}</div>` : ''}
     ${(() => { const pv = at.pacoteVendaId && (DB.pacoteVendas || []).find(v => v.id === at.pacoteVendaId && (v.atendimentoIds || [v.atendimentoId]).includes(at.id)); if (!pv) return '';
       if (pv.tipo === 'credito') return `<div class="note small">Compra sem agendar <b>${esc(pv.codigo)}</b> · ${esc(pv.nome)}${pv.cancelado ? ' · <b>estornada</b>' : ''}. O serviço fica de saldo para a cliente agendar depois. A venda não tem profissional: a comissão vai para quem fizer cada sessão.</div>`;
-      return `<div class="note small">Venda do pacote <b>${esc(pv.codigo)}</b> · ${esc(pv.nome)}${pv.cancelado ? ' · <b>estornado</b>' : ''}.${isOwner(ACTOR) && !pv.cancelado && at.status === 'concluido' ? ` Vendeu o pacote errado? Use <b>Corrigir venda</b>: troca o pacote ou o valor sem perder o pagamento.<div class="bar" style="margin-top:6px"><button class="btn sm pri" data-pk-corrigir="${pv.id}">Corrigir venda do pacote</button></div>` : ''}</div>`; })()}
+      return `<div class="note small">Venda do pacote <b>${esc(pv.codigo)}</b> · ${esc(pv.nome)}${pv.cancelado ? ' · <b>estornado</b>' : ''}.${isOwner(ACTOR) && !pv.cancelado && at.status === 'concluido' ? ` Vendeu errado ou a cliente mudou de ideia? Em <b>Editar pacote</b> dá para trocar o pacote, o valor, os serviços e as sessões, ou desfazer o pacote.<div class="bar" style="margin-top:6px"><button class="btn sm pri" data-pk-corrigir="${pv.id}">Editar pacote</button></div>` : ''}</div>`; })()}
     ${isOwner(ACTOR) && at.custoMaterial ? `<div class="small muted">Material gasto (baixado do estoque): ${brl(at.custoMaterial)} · lucro real ${brl(at.valorFinal - at.comissaoTotal - at.custoMaterial)}</div>` : ''}
     ${produtosDoDiaHTML(at.clienteId, at.data)}
+    ${isOwner(ACTOR) && at.status === 'concluido' && !at.pacoteVendaId && (DB.pacotes || []).some(x => x.ativo !== false) ? `<div class="ag-pk"><div class="small"><b>A cliente decidiu levar um pacote?</b><div class="muted">Este serviço${at.data < TODAY ? `, mesmo sendo de ${dBR(at.data)},` : ''} vira a 1ª sessão (feita) e o valor avulso é trocado pelo valor do pacote.</div></div><button class="btn sm" data-trocar-pk="${at.id}">Trocar por pacote</button></div>` : ''}
     ${at.status === 'concluido' ? `<div class="bar">${ps.some(p => p.status === 'pendente') ? waBtn(`data-wa-at="${at.id}" data-wa-m="cobranca"`, 'Cobrar no WhatsApp', 'cobranca') : waBtn(`data-wa-at="${at.id}" data-wa-m="agradecimento"`, 'Agradecer no WhatsApp', 'agradecimento')}</div>` : ''}
     ${isOwner(ACTOR) && at.status === 'concluido' ? `<details><summary class="small b" style="cursor:pointer">Estornar este registro</summary><div class="stack" style="gap:8px;margin-top:10px"><div class="note warn">O estorno preserva o histórico. Só é permitido antes do serviço entrar em fechamento ou ter acerto de convênio.${at.pacoteVendaId && (DB.pacoteVendas || []).some(v => v.id === at.pacoteVendaId && (v.atendimentoIds || [v.atendimentoId]).includes(at.id)) ? ' <b>Este registro é a venda de um pacote:</b> o estorno cancela o pacote, as sessões marcadas saem da agenda e o valor sai do faturamento. Use só se a cliente desistiu e o dinheiro foi devolvido.' : ''}</div><label class="f">Justificativa<textarea id="es-m"></textarea></label><div><button class="btn dng" id="es-ok">Estornar registro</button></div></div></details>` : ''}`,
     '', true);
@@ -8939,13 +9249,13 @@ async function apagarArquivo(ax) {
 /* =================== PODOLOGIA =================== */
 function pgPodologia() {
   // financeiro da podologia: só proprietários. A recepção vê só pacientes e exames.
-  const dono = isOwner(ACTOR), aba = dono ? (UI.podoAba || 'fin') : 'pac';
+  const dono = isOwner(ACTOR), aba = dono ? (UI.podoAba || 'fin') : (UI.podoAba === 'alertas' ? 'alertas' : 'pac');
   return `
   <div class="ph"><div><h1>Podologia</h1><p>${dono ? 'Financeiro da podologia separado do salão, os serviços que a Claudia realizou, como foram pagos, e o cadastro das pacientes com os exames anexados.' : 'Cadastro das pacientes da podologia, fichas e exames anexados.'}</p></div>
     <div class="act">${aba === 'fin' ? `<button class="btn" id="po-csv">Baixar CSV</button><button class="btn" data-pdf="podo">${icon('pdf')}<span>Gerar PDF</span></button><button class="btn" data-mov="saida" data-mov-centro="podologia">− Saída da podologia</button>` : ''}<button class="btn pri" data-podo-nova>+ Nova paciente</button></div></div>
   <div class="stack">
-    ${!dono ? '' : `<div class="seg po-abas">${[['fin', 'Financeiro'], ['pac', 'Pacientes e exames']].map(([k, t]) => `<button data-podo-aba="${k}" class="${aba === k ? 'on' : ''}">${t}</button>`).join('')}</div>`}
-    ${aba === 'fin' ? podoFinanceiroHTML() : podoPacientesHTML()}
+    <div class="seg po-abas">${(dono ? [['fin', 'Financeiro'], ['pac', 'Pacientes e exames'], ['alertas', 'Alertas']] : [['pac', 'Pacientes e exames'], ['alertas', 'Alertas']]).map(([k, t]) => `<button data-podo-aba="${k}" class="${aba === k ? 'on' : ''}">${t}</button>`).join('')}</div>
+    ${aba === 'fin' ? podoFinanceiroHTML() : aba === 'alertas' ? podoAlertasHTML() : podoPacientesHTML()}
   </div>`;
 }
 function podoFinanceiroHTML() {
@@ -9020,14 +9330,61 @@ function podoPacientesHTML() {
         <span class="po-num"><b>${meus.length}</b><span>atend.</span></span><span class="po-num"><b>${(f?.anexos || []).length}</b><span>exames</span></span><span class="po-ult muted small">${ult ? 'Último ' + dBR(ult.data) : 'Sem atendimento'}</span></button>`; }).join('')}</div>`
       : `<div class="panel">${empty(b ? 'Nenhuma paciente com essa busca' : 'Nenhuma paciente ainda', 'Toque em "Nova paciente" ou registre um atendimento de podologia.')}</div>`}`;
 }
+/* ---------- alertas da podologia: escolher da lista (pesquisa), sem escrever ---------- */
+function alertasPickerHTML(id, valor) {
+  const sel = separarAlertas(valor);
+  return `<div class="pa-pick" id="${id}-w"><input type="hidden" id="${id}" value="${esc(sel.join(' · '))}">
+    <div class="pa-chips" id="${id}-c"></div>
+    <div class="po-busca-c pa-busca">${icon('lupa')}<input id="${id}-q" type="text" autocomplete="off" enterkeyhint="search" placeholder="Pesquisar alerta (ex.: diabét, látex)" aria-label="Pesquisar alerta"></div>
+    <div class="pa-res" id="${id}-r" role="listbox"></div></div>`;
+}
+function montarAlertasPicker(ov, id) {
+  const q = s => ov.querySelector(s), hid = q('#' + id), inp = q(`#${id}-q`), box = q(`#${id}-r`);
+  let sel = separarAlertas(hid.value);
+  const chips = () => { hid.value = sel.join(' · ');
+    q(`#${id}-c`).innerHTML = sel.length ? sel.map((t, i) => `<span class="pa-chip">${icon('sino')}${esc(t)}<button type="button" data-pa-rm="${i}" aria-label="Tirar ${esc(t)}">×</button></span>`).join('') : '<span class="muted small">Nenhum alerta. Pesquise abaixo para adicionar.</span>';
+    q(`#${id}-c`).querySelectorAll('[data-pa-rm]').forEach(b => b.onclick = () => { sel.splice(+b.dataset.paRm, 1); chips(); lista(); }); };
+  const lista = () => { const t = nomeChave(inp.value), ja = new Set(sel.map(nomeChave));
+    const l = catalogoAlertasPodo(DB).filter(x => !ja.has(nomeChave(x.nome)) && (!t || nomeChave(x.nome).includes(t))).slice(0, t ? 12 : 8);
+    const novo = inp.value.trim().length >= 3 && !catalogoAlertasPodo(DB).some(x => nomeChave(x.nome) === t);
+    box.innerHTML = l.map(x => `<button type="button" class="pa-op" data-pa-add="${esc(x.nome)}">${esc(x.nome)}</button>`).join('')
+      + (novo ? `<button type="button" class="pa-op pa-novo" data-pa-novo="1">+ Cadastrar "${esc(inp.value.trim())}" na lista de alertas</button>` : '')
+      + (!l.length && !novo ? `<span class="muted small">${t ? 'Nenhum alerta com esse nome.' : 'Todos os alertas da lista já foram escolhidos.'}</span>` : '');
+    box.querySelectorAll('[data-pa-add]').forEach(b => b.onclick = () => { sel.push(b.dataset.paAdd); inp.value = ''; chips(); lista(); inp.focus(); });
+    box.querySelector('[data-pa-novo]')?.addEventListener('click', () => { const r = run(() => salvarAlertaPodo(DB, ACTOR, { nome: inp.value }), x => `Alerta "${x.nome}" cadastrado`); if (r.ok) { sel.push(r.r.nome); inp.value = ''; chips(); lista(); } }); };
+  inp.oninput = lista; inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); box.querySelector('.pa-op')?.click(); } };
+  chips(); lista();
+}
+function podoAlertasHTML() {
+  const b = nomeChave(UI.paBusca || ''), cat = catalogoAlertasPodo(DB), l = cat.filter(x => !b || nomeChave(x.nome).includes(b));
+  return `<div class="pa-top"><div class="po-busca-c">${icon('lupa')}<input id="pa-b" type="text" enterkeyhint="search" autocomplete="off" placeholder="Pesquisar alerta" value="${esc(UI.paBusca || '')}" aria-label="Pesquisar alerta"></div>
+      <div class="pa-nv"><input id="pa-n" placeholder="Novo alerta (ex.: Usa anticoagulante)" maxlength="60" aria-label="Nome do novo alerta"><button class="btn pri" data-pa-salvar>Cadastrar</button></div></div>
+    <p class="muted small">A lista de alertas que a recepção pesquisa na ficha da paciente (sem precisar escrever). Alertas que já estavam escritos nas fichas aparecem aqui também: toque em <b>Salvar na lista</b> para fixar.</p>
+    ${l.length ? `<div class="pa-lista">${l.map(x => `<div class="pa-it"><div class="pa-it-t"><span class="po-alerta">${icon('sino')}${esc(x.nome)}</span><span class="muted small">${x.usos} paciente(s)${x.salvo ? '' : ' · só nas fichas'}</span></div>
+      <div class="bar">${x.salvo ? `<button class="btn sm" data-pa-edit="${x.id}">Renomear</button><button class="btn sm ghost" data-pa-del="${x.id}">Excluir</button>` : `<button class="btn sm pri" data-pa-fixar="${esc(x.nome)}">Salvar na lista</button>`}</div></div>`).join('')}</div>`
+      : `<div class="panel">${empty(b ? 'Nenhum alerta com essa pesquisa' : 'Nenhum alerta cadastrado', 'Cadastre os alertas de saúde mais comuns: diabética, alergia a látex, usa anticoagulante…')}</div>`}`;
+}
+function ligarPodoAlertas() {
+  const r = document.getElementById('pa-b'); if (!r) return;
+  r.oninput = () => { UI.paBusca = r.value; const pos = r.selectionStart; render(); const n = document.getElementById('pa-b'); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) { } } };
+  const n = document.getElementById('pa-n'); n.onkeydown = e => { if (e.key === 'Enter') document.querySelector('[data-pa-salvar]').click(); };
+  document.querySelector('[data-pa-salvar]').onclick = () => run(() => salvarAlertaPodo(DB, ACTOR, { nome: n.value }), x => `Alerta "${x.nome}" cadastrado`).ok && render();
+  document.querySelectorAll('[data-pa-fixar]').forEach(b => b.onclick = () => run(() => salvarAlertaPodo(DB, ACTOR, { nome: b.dataset.paFixar }), 'Alerta salvo na lista').ok && render());
+  document.querySelectorAll('[data-pa-del]').forEach(b => b.onclick = () => { const x = (DB.config.podoAlertas || []).find(k => k.id === b.dataset.paDel);
+    const ov = openModal('Excluir alerta', `<p>Excluir <b>${esc(x.nome)}</b> da lista? As fichas que já usam esse alerta continuam com ele.</p>`, `<button class="btn" data-close>Cancelar</button><button class="btn dng" id="pa-x">Excluir</button>`);
+    ov.querySelector('#pa-x').onclick = () => run(() => excluirAlertaPodo(DB, ACTOR, x.id), 'Alerta excluído').ok && (closeModal(), render()); });
+  document.querySelectorAll('[data-pa-edit]').forEach(b => b.onclick = () => { const x = (DB.config.podoAlertas || []).find(k => k.id === b.dataset.paEdit);
+    const ov = openModal('Renomear alerta', `<div class="form"><label class="f full">Nome do alerta<input id="pa-rn" value="${esc(x.nome)}" maxlength="60"></label></div><p class="muted small">As fichas que já usam o alerta passam para o nome novo.</p>`, `<button class="btn" data-close>Cancelar</button><button class="btn pri" id="pa-ok">Salvar</button>`);
+    ov.querySelector('#pa-ok').onclick = () => run(() => salvarAlertaPodo(DB, ACTOR, { id: x.id, nome: val('pa-rn') }), 'Alerta renomeado').ok && (closeModal(), render()); });
+}
 function modalNovaPaciente() {
   const ov = openModal('Nova paciente da podologia', `<div class="note small">A paciente entra no cadastro da podologia, separado do cadastro do salão. Se ela já é cliente do salão, busque o nome para usar o mesmo cadastro.</div>
     <div><div class="sec" style="margin:0 0 6px">Paciente</div>${clientePickerHTML('pp', '')}</div>
     <div class="form"><label class="f">CPF (opcional)<input id="pp-cpf" inputmode="numeric" maxlength="14" placeholder="000.000.000-00"></label><label class="f">Nascimento (opcional)<input id="pp-na" inputmode="numeric" maxlength="10" placeholder="DD/MM/AAAA"></label>
-      <label class="f full">Alertas de saúde (aparece em destaque)<input id="pp-al" placeholder="Ex.: diabética, alergia a látex, usa anticoagulante"></label>
+      <div class="f full"><span>Alertas de saúde (aparece em destaque)</span>${alertasPickerHTML('pp-al', '')}</div>
       <label class="f full">Anamnese e observações<textarea id="pp-an" placeholder="Queixa principal, histórico, calçados, cuidados…"></textarea></label></div>`,
     `<button class="btn" data-close>Cancelar</button><button class="btn pri" id="pp-ok">Criar ficha</button>`, true);
-  montarClientePicker(ov, 'pp'); mascaraCpf(ov.querySelector('#pp-cpf')); mascaraData(ov.querySelector('#pp-na'));
+  montarClientePicker(ov, 'pp'); montarAlertasPicker(ov, 'pp-al'); mascaraCpf(ov.querySelector('#pp-cpf')); mascaraData(ov.querySelector('#pp-na'));
   ov.querySelector('#pp-ok').onclick = () => { const r = run(() => { const v = val('pp-cl');
       if (!v) throw new Error('Busque a paciente ou cadastre uma nova.');
       const base = { cpf: val('pp-cpf'), aniversario: val('pp-na'), alertas: val('pp-al'), anamnese: val('pp-an') };
@@ -9047,7 +9404,7 @@ function modalFichaPodo(clienteId) {
     <section data-ps="dados"><div class="form">
       <label class="f">Nome<input id="pf-n" value="${esc(c.nome)}"></label><label class="f">Telefone<input id="pf-t" value="${esc(c.telefone)}"></label>
       <label class="f">CPF<input id="pf-cpf" inputmode="numeric" maxlength="14" value="${esc(c.cpf || '')}" placeholder="000.000.000-00"></label><label class="f">Nascimento<input id="pf-na" inputmode="numeric" maxlength="10" value="${esc(c.aniversario || '')}" placeholder="DD/MM/AAAA"></label>
-      <label class="f full">Alertas de saúde<input id="pf-al" value="${esc(f.alertas || '')}" placeholder="Ex.: diabética, alergia a látex"></label>
+      <div class="f full"><span>Alertas de saúde</span>${alertasPickerHTML('pf-al', f.alertas || '')}</div>
       <label class="f full">Anamnese e observações<textarea id="pf-an" rows="5">${esc(f.anamnese || '')}</textarea></label></div>
       <div class="bar" style="justify-content:flex-end;margin-top:10px"><button class="btn pri" id="pf-ok">Salvar ficha</button></div>
       <div class="sec" style="margin:16px 0 6px">Anotações de atendimento</div>
@@ -9067,7 +9424,7 @@ function modalFichaPodo(clienteId) {
       ${ats.length ? `<div class="tw"><table><thead><tr><th>Data</th><th>Procedimento</th><th>Pagamento</th><th class="r">Valor</th></tr></thead><tbody>${ats.map(x => `<tr class="click" data-at-open="${x.id}"><td>${dBR(x.data)}</td><td>${esc(SV(x.servicoId)?.nome)}</td><td class="small">${esc([...new Set(DB.parcelas.filter(p => p.atendimentoId === x.id).map(p => FORMAS[p.forma]))].join(' + '))}</td><td class="r b">${brl(x.valorFinal)}</td></tr>`).join('')}</tbody><tfoot><tr><td>Total</td><td></td><td></td><td class="r">${brl(sum(ats.map(x => x.valorFinal)))}</td></tr></tfoot></table></div>` : `<div class="panel">${empty('Nenhum procedimento registrado', 'Os atendimentos de podologia aparecem aqui.')}</div>`}
     </section>`, `<button class="btn" data-close>Fechar</button>${pode(DB, ACTOR, 'agendar') ? `<button class="btn pri" data-cli-acao="agendar|${clienteId}">${icon('agenda')}<span>Agendar</span></button>` : ''}`, true);
   const q = s => ov.querySelector(s);
-  mascaraCpf(q('#pf-cpf')); mascaraData(q('#pf-na'));
+  mascaraCpf(q('#pf-cpf')); mascaraData(q('#pf-na')); montarAlertasPicker(ov, 'pf-al');
   ov.querySelectorAll('[data-pt]').forEach(b => b.onclick = () => { ov.querySelectorAll('[data-pt]').forEach(x => x.classList.toggle('on', x === b)); ov.querySelectorAll('[data-ps]').forEach(s => { s.hidden = s.dataset.ps !== b.dataset.pt; }); UI.podoFichaAba = b.dataset.pt; });
   if (UI.podoFichaAba && UI.podoFichaAba !== 'dados') ov.querySelector(`[data-pt="${UI.podoFichaAba}"]`)?.click();
   const reabrir = () => { closeModal(); modalFichaPodo(clienteId); };
@@ -9180,6 +9537,7 @@ function modalAvQr() {
 async function copiarLinkAvaliacao() { try { await navigator.clipboard.writeText(linkAvaliacao()); toast('Link copiado.'); } catch (e) { toast('Selecione o link e copie pelo seu aparelho.', 'aviso'); } }
 
 /* =================== PACOTES DE SERVIÇOS =================== */
+const pacotesCat = () => (DB.pacotes || []).filter(pc => !pc.excluido);
 function pgPacotes() {
   const dono = isOwner(ACTOR), vendas = (DB.pacoteVendas || []).slice().reverse();
   const filtro = UI.pkFiltro || 'ativos';
@@ -9195,10 +9553,10 @@ function pgPacotes() {
     <div class="act">${dono ? '<button class="btn" data-pk-novo>Novo pacote</button>' : ''}${pode(DB, ACTOR, 'registrar') ? '<button class="btn" data-vender-sv="">Vender sem agendar</button><button class="btn pri" data-pk-vender="">Vender pacote</button>' : ''}</div></div>
   <div class="stack">
     <div class="grid g4">${kpi('Pacotes ativos', ativos.length)}${kpi('Sessões a marcar', sum(ativos.map(v => situacaoVenda(DB, v).livres)), 'ainda sem data', 'warn')}${kpi('Sessões marcadas', sum(ativos.map(v => situacaoVenda(DB, v).marcadas)), '', 'info')}${kpi('Vendido no total', brl(sum(vendas.filter(v => !v.cancelado).map(v => v.valor))), `${vendas.filter(v => !v.cancelado).length} pacote(s)${vendas.some(v => v.cancelado) ? ` · ${vendas.filter(v => v.cancelado).length} estornado(s)` : ''}`, 'ok')}</div>
-    ${(() => { const q = (UI.pkvBusca || '').trim(); return `<div class="pk-tit"><div class="sec" style="margin:0">Pacotes à venda</div>${(DB.pacotes || []).length ? `<div class="po-busca-c pk-tb">${icon('lupa')}<input id="pkv-b" type="text" enterkeyhint="search" autocomplete="off" placeholder="Pesquisar pacote ou serviço" aria-label="Pesquisar pacotes à venda" value="${esc(q)}">${q ? '<button type="button" class="btn sm ghost" data-pkv-limpa aria-label="Limpar pesquisa">Limpar</button>' : ''}</div>` : ''}</div>`; })()}
-    ${(() => { const qn = nomeChave(UI.pkvBusca || ''), lv = (DB.pacotes || []).filter(pc => !qn || nomeChave(`${pc.nome} ${SV(pc.servicoId)?.nome || ''} ${pc.descricao || ''}`).includes(qn));
-      return (DB.pacotes || []).length && !lv.length ? `<div class="panel">${empty('Nenhum pacote com essa pesquisa', 'Confira o nome do pacote ou do serviço.')}</div>` : ''; })()}
-    ${(DB.pacotes || []).length ? `<div class="pk-cat">${DB.pacotes.filter(pc => { const qn = nomeChave(UI.pkvBusca || ''); return !qn || nomeChave(`${pc.nome} ${SV(pc.servicoId)?.nome || ''} ${pc.descricao || ''}`).includes(qn); }).map(pc => { const sv = SV(pc.servicoId), avulso = pc.itens && pc.itens.length ? sum(pc.itens.map(i => (SV(i.servicoId)?.preco || 0) * i.qtd)) : (sv?.preco || 0) * pc.sessoes;
+    ${(() => { const q = (UI.pkvBusca || '').trim(); return `<div class="pk-tit"><div class="sec" style="margin:0">Pacotes à venda</div>${pacotesCat().length ? `<div class="po-busca-c pk-tb">${icon('lupa')}<input id="pkv-b" type="text" enterkeyhint="search" autocomplete="off" placeholder="Pesquisar pacote ou serviço" aria-label="Pesquisar pacotes à venda" value="${esc(q)}">${q ? '<button type="button" class="btn sm ghost" data-pkv-limpa aria-label="Limpar pesquisa">Limpar</button>' : ''}</div>` : ''}</div>`; })()}
+    ${(() => { const qn = nomeChave(UI.pkvBusca || ''), lv = pacotesCat().filter(pc => !qn || nomeChave(`${pc.nome} ${SV(pc.servicoId)?.nome || ''} ${pc.descricao || ''}`).includes(qn));
+      return pacotesCat().length && !lv.length ? `<div class="panel">${empty('Nenhum pacote com essa pesquisa', 'Confira o nome do pacote ou do serviço.')}</div>` : ''; })()}
+    ${pacotesCat().length ? `<div class="pk-cat">${pacotesCat().filter(pc => { const qn = nomeChave(UI.pkvBusca || ''); return !qn || nomeChave(`${pc.nome} ${SV(pc.servicoId)?.nome || ''} ${pc.descricao || ''}`).includes(qn); }).map(pc => { const sv = SV(pc.servicoId), avulso = pc.itens && pc.itens.length ? sum(pc.itens.map(i => (SV(i.servicoId)?.preco || 0) * i.qtd)) : (sv?.preco || 0) * pc.sessoes;
       return `<div class="pk-item ${pc.ativo === false ? 'off' : ''}"><div><b>${esc(pc.nome)}</b><span class="muted small">${esc(composicaoTxt(pc))}${pc.validadeDias ? ` · vale ${pc.validadeDias} dias` : ''}${pc.ativo === false ? ' · inativo' : ''}</span></div>
         <div class="pk-preco"><b>${brl(pc.preco)}</b>${avulso > pc.preco ? `<span class="muted small">avulso ${brl(avulso)}</span>` : ''}</div>
         <div class="bar" style="flex-wrap:nowrap">${dono ? `<button class="btn sm" data-pk-edit="${pc.id}">Editar</button>` : ''}${pc.ativo !== false && pode(DB, ACTOR, 'registrar') ? `<button class="btn sm pri" data-pk-vender="${pc.id}">Vender</button>` : ''}</div></div>`; }).join('')}</div>`
@@ -9216,7 +9574,7 @@ function pgPacotes() {
         return x ? `<button class="pk-s s-${x.status}" data-ag="${x.id}"><b>${i + 1}${v.itens && v.itens.length ? ` · ${esc(svCurto(x.servicoId))}` : ''}</b><span>${dataCurta(x.data)} · ${x.inicio}</span><em>${x.status === 'concluido' ? 'Feita' : x.status === 'faltou' ? 'Faltou' : 'Marcada'}</em></button>`
           : `<button class="pk-s livre" ${!st.encerrado && pode(DB, ACTOR, 'agendar') ? `data-pk-sessao="${v.id}"` : 'disabled'}><b>${i + 1}</b><span>Sem data</span><em>${pode(DB, ACTOR, 'agendar') ? '+ Marcar' : 'A marcar'}</em></button>`; }).join('')}</div>
       ${st.vencido ? '<div class="note warn small">Pacote vencido com sessões ainda sem uso.</div>' : ''}
-      ${v.cancelado ? '' : pkAvisoHTML(v, st)}${dono && !v.cancelado && v.tipo !== 'credito' ? `<div class="bar"><button class="btn sm ghost" data-pk-corrigir="${v.id}">Corrigir venda</button></div>` : ''}</article>`).join('')}</div>`
+      ${v.cancelado ? '' : pkAvisoHTML(v, st)}${dono && !v.cancelado ? `<div class="bar"><button class="btn sm" data-pk-corrigir="${v.id}">Editar pacote</button></div>` : ''}</article>`).join('')}</div>`
       : `<div class="panel">${empty(pb ? 'Nenhum pacote encontrado' : filtro === 'encerrados' ? 'Nenhum pacote encerrado' : 'Nenhum pacote em uso', pb ? 'Confira o nome, telefone ou CPF, ou troque o filtro (Em uso, Encerrados, Todos).' : 'Os pacotes vendidos aparecem aqui com as sessões.')}</div>`}
   </div>`;
 }
@@ -9242,7 +9600,7 @@ function modalPacote(id) {
     <div class="full" id="pk-info"></div>
     <label class="f full">Descrição (opcional)<input id="pk-o" value="${esc(pc.descricao || '')}" placeholder="Ex.: uma sessão por semana"></label>
     ${id ? `<label class="chk full"><input type="checkbox" id="pk-a" ${pc.ativo !== false ? 'checked' : ''}> Pacote à venda</label>` : ''}</div>`,
-    `<button class="btn" data-close>Cancelar</button><button class="btn pri" id="pk-ok">Salvar pacote</button>`);
+    `${id ? '<button class="btn dng" id="pk-del">Excluir</button>' : ''}<button class="btn" data-close>Cancelar</button><button class="btn pri" id="pk-ok">Salvar pacote</button>`);
   const q = s => ov.querySelector(s);
   const info = () => { const v = toCents(val('pk-v')) || 0;
     const linhas = comp.filter(x => x.servicoId && x.qtd > 0), qtd = linhas.length ? sum(linhas.map(x => +x.qtd)) : parseInt(val('pk-q'), 10) || 0;
@@ -9258,6 +9616,8 @@ function modalPacote(id) {
   q('#pk-ca').onclick = () => { comp.push({ servicoId: '', qtd: 1 }); drawComp(); };
   ['pk-s', 'pk-q', 'pk-v'].forEach(k => q('#' + k).addEventListener('input', info)); q('#pk-s').onchange = info;
   buscaServico(ov, 'pk-s'); drawComp();
+  q('#pk-del')?.addEventListener('click', () => confirmarAcao(`Excluir o pacote "${pc.nome}" do cardápio?${(DB.pacoteVendas || []).some(v => v.pacoteId === id) ? ' Os pacotes já vendidos continuam com as clientes.' : ''}`,
+    () => { const r = run(() => excluirPacoteCatalogo(DB, ACTOR, id), 'Pacote excluído'); if (r.ok) render(); return r; }));
   q('#pk-ok').onclick = () => run(() => salvarPacote(DB, ACTOR, { id, nome: val('pk-n'), servicoId: val('pk-s'), sessoes: val('pk-q'), itens: comp.filter(x => x.servicoId), preco: toCents(val('pk-v')), validadeDias: val('pk-d'), descricao: val('pk-o'), ativo: id ? q('#pk-a').checked : true }), 'Pacote salvo').ok && closeModal();
 }
 /* sugestão de datas: uma por semana, no mesmo dia da semana (pula domingo) */
@@ -9268,11 +9628,13 @@ const horasCom = h => h && !FA_HORAS.includes(h) ? [...FA_HORAS, h].sort() : FA_
 function modalVenderPacote(pacoteId = '', clienteId = '', opts = {}) {
   const pcs = (DB.pacotes || []).filter(x => x.ativo !== false);
   if (!pcs.length) return toast('Cadastre um pacote primeiro (só a proprietária).', 'bad');
-  const conv = (opts.converter || []).map(id => DB.agendamentos.find(x => x.id === id)).filter(x => x && ABERTOS.includes(x.status) && !x.pacoteVendaId);
+  // serviço já registrado (mesmo de outro dia) que vira pacote: o registro avulso é estornado e vira a 1ª sessão feita
+  const trAt = opts.trocarAt && DB.atendimentos.find(x => x.id === opts.trocarAt && x.status === 'concluido');
+  const conv = trAt ? [{ id: '__at', servicoId: trAt.servicoId, funcId: trAt.funcId, data: trAt.data, inicio: trAt.hora || '' }] : (opts.converter || []).map(id => DB.agendamentos.find(x => x.id === id)).filter(x => x && ABERTOS.includes(x.status) && !x.pacoteVendaId);
   const temSv = (x, id) => x.servicoId === id || (x.itens || []).some(i => i.servicoId === id);
   let pc = pcs.find(x => x.id === pacoteId) || (conv[0] && pcs.find(x => temSv(x, conv[0].servicoId))) || pcs[0], ses = [];
   const ov = openModal(conv.length ? 'Trocar por pacote' : 'Vender pacote', `<div class="stack" style="gap:14px">
-    ${conv.length ? `<div class="note small">${conv.map(x => `<b>${dBR(x.data).slice(0, 5)} às ${x.inicio}</b> · ${esc(SV(x.servicoId)?.nome || '')}`).join('<br>')}<br>${opts.concluir ? 'Este atendimento vira a 1ª sessão do pacote e já fica <b>concluído</b>, sem cobrar de novo.' : 'Este horário vira a 1ª sessão do pacote (sem cobrança separada).'}</div>` : ''}
+    ${conv.length ? `<div class="note small">${conv.map(x => `<b>${dBR(x.data).slice(0, 5)} às ${x.inicio}</b> · ${esc(SV(x.servicoId)?.nome || '')}`).join('<br>')}<br>${trAt ? `O registro <b>${esc(trAt.codigo)}</b> (${brl(trAt.valorFinal)}) é <b>estornado</b> e o serviço feito vira a 1ª sessão do pacote, já <b>concluída</b>. Lance abaixo o valor total pago pelo pacote.` : opts.concluir ? 'Este atendimento vira a 1ª sessão do pacote e já fica <b>concluído</b>, sem cobrar de novo.' : 'Este horário vira a 1ª sessão do pacote (sem cobrança separada).'}</div>` : ''}
     <div><div class="sec" style="margin:0 0 6px">Cliente</div>${clientePickerHTML('pv', clienteId, !!conv.length)}</div>
     <div class="form"><label class="f">Pacote<select id="pv-p">${opt(pcs.map(x => [x.id, `${x.nome} · ${brl(x.preco)}`]), pc.id)}</select></label><label class="f">Profissional<select id="pv-f"></select></label>
       <label class="f">Valor cobrado (R$)<input id="pv-v" inputmode="decimal"></label><label class="f">Forma de pagamento<select id="pv-fp">${opt([['pix', 'Pix'], ['debito', 'Cartão de débito'], ['credito', 'Cartão de crédito'], ['dinheiro', 'Dinheiro']], 'pix')}</select></label>
@@ -9298,7 +9660,7 @@ function modalVenderPacote(pacoteId = '', clienteId = '', opts = {}) {
     ses = Array.from({ length: n }, (_, i) => ses[i] && !ses[i].auto ? ses[i] : { data: i === 0 && opts.primeira ? opts.primeira.data : sug[i], inicio: i === 0 && opts.primeira ? opts.primeira.inicio : '', servicoId: fila[i], auto: true });
     ses.forEach((x, i) => { if (!x.servicoId) x.servicoId = fila[i]; if (x.auto && x.data && !(i === 0 && opts.primeira)) { const ant = ses.slice(0, i).reverse().find(y => y.data === x.data && y.inicio); x.inicio = livre(x.data, x.servicoId, ant ? fromMin(toMin(ant.inicio) + (SV(ant.servicoId)?.duracao || 60)) : '10:00'); } });
     const opSv = misto() ? pc.itens.map(i => [i.servicoId, SV(i.servicoId)?.nome || '']) : null;
-    q('#pv-ses').innerHTML = ses.map((x, i) => `<div class="pv-s ${misto() ? 'pv-s5' : ''}"><span class="pv-n">${i + 1 + conv.length}</span>${opSv ? `<select data-sv="${i}" aria-label="Serviço da sessão ${i + 1 + conv.length}">${opt(opSv, x.servicoId)}</select>` : ''}<input type="date" data-sd="${i}" value="${x.data}" min="${TODAY}" aria-label="Data da sessão ${i + 1 + conv.length}"><select data-sh="${i}" aria-label="Horário da sessão ${i + 1 + conv.length}"><option value="">Sem horário</option>${opt(horasCom(x.inicio).map(h => [h, h]), x.inicio)}</select><button class="btn sm ghost" type="button" data-sx="${i}" aria-label="Deixar sessão ${i + 1 + conv.length} para depois">Depois</button></div>`).join('') || '<div class="muted small">Todas as sessões já estão marcadas.</div>';
+    q('#pv-ses').innerHTML = ses.map((x, i) => `<div class="pv-s ${misto() ? 'pv-s5' : ''}"><span class="pv-n">${i + 1 + conv.length}</span>${opSv ? `<select data-sv="${i}" aria-label="Serviço da sessão ${i + 1 + conv.length}">${opt(opSv, x.servicoId)}</select>` : ''}<input type="date" data-sd="${i}" value="${x.data}" aria-label="Data da sessão ${i + 1 + conv.length}"><select data-sh="${i}" aria-label="Horário da sessão ${i + 1 + conv.length}"><option value="">Sem horário</option>${opt(horasCom(x.inicio).map(h => [h, h]), x.inicio)}</select><button class="btn sm ghost" type="button" data-sx="${i}" aria-label="Deixar sessão ${i + 1 + conv.length} para depois">Depois</button></div>`).join('') || '<div class="muted small">Todas as sessões já estão marcadas.</div>';
     q('#pv-ses').querySelectorAll('[data-sv]').forEach(el => el.onchange = () => { const x = ses[+el.dataset.sv]; x.servicoId = el.value; x.auto = false; resumo(); });
     q('#pv-ses').querySelectorAll('[data-sd]').forEach(el => el.onchange = () => { const i = +el.dataset.sd, x = ses[i]; x.data = el.value; x.auto = false;
       if (el.value) { const ant = ses.slice(0, i).reverse().find(y => y.data === el.value && y.inicio); x.inicio = livre(el.value, x.servicoId, ant ? fromMin(toMin(ant.inicio) + (SV(ant.servicoId)?.duracao || 60)) : x.inicio || '10:00'); } desenhar(); });
@@ -9313,8 +9675,10 @@ function modalVenderPacote(pacoteId = '', clienteId = '', opts = {}) {
   q('#pv-v').oninput = resumo;
   desenhar();
   q('#pv-ok').onclick = () => { const r = run(() => { const cid = lerCliente(ov, 'pv'), v = toCents(q('#pv-v').value) || 0;
-      return venderPacote(DB, ACTOR, { pacoteId: pc.id, clienteId: cid, funcId: q('#pv-f').value, valor: v, data: q('#pv-d').value, parcelas: [{ forma: q('#pv-fp').value, valor: v, status: q('#pv-st').value }],
-        sessoes: ses.filter(x => x.data && x.inicio).map(x => ({ data: x.data, inicio: x.inicio, servicoId: x.servicoId })), converter: conv.map(x => x.id), concluirConvertidos: !!opts.concluir }); },
+      const base = { pacoteId: pc.id, funcId: q('#pv-f').value, valor: v, data: q('#pv-d').value, parcelas: [{ forma: q('#pv-fp').value, valor: v, status: q('#pv-st').value }],
+        sessoes: ses.filter(x => x.data && x.inicio).map(x => ({ data: x.data, inicio: x.inicio, servicoId: x.servicoId })) };
+      if (trAt) return trocarAtendimentoPorPacote(DB, ACTOR, trAt.id, base);
+      return venderPacote(DB, ACTOR, { ...base, clienteId: cid, converter: conv.map(x => x.id), concluirConvertidos: !!opts.concluir }); },
     v => `Pacote ${v.codigo} vendido`); if (r.ok) { closeModal(); UI.route = 'pacotes'; render(); } };
 }
 /* compra de serviços sem agendar (lives, combos, avulsos): a cliente paga e fica com o saldo para agendar depois */
@@ -9389,21 +9753,58 @@ function recepcaoPagamentosHTML(own) {
     ${lista.length ? `<div class="tw"><table><thead><tr><th>Data</th><th>Recepcionista</th><th>Semana</th><th>Forma</th><th class="r">Valor</th><th>Lançamento</th></tr></thead><tbody>${lista.slice(0, 30).map(m => `<tr><td>${dataHora(m.data, m.hora)}</td><td>${esc(F(m.funcId)?.nome || '')}</td><td class="small">${dBR(m.pagRecepcao.ini).slice(0, 5)} a ${dBR(m.pagRecepcao.fim).slice(0, 5)}</td><td>${esc(CAIXA_FORMAS[m.forma] || m.forma)}</td><td class="r b">${brl(m.valor)}</td><td class="code">${esc(m.codigo)}</td></tr>`).join('')}</tbody></table></div>` : ''}`;
 }
 /* venda de pacote lançada errado: troca o pacote, o valor ou a profissional (sem estornar) */
+/* pacote da cliente totalmente editável: pacote, valor, serviços e quantidades, validade, sessões (excluir/adicionar) e desfazer */
 function modalEditarVendaPacote(vendaId) {
   const v = DB.pacoteVendas.find(x => x.id === vendaId); if (!v) return;
-  const pcs = (DB.pacotes || []).filter(x => x.ativo !== false || x.id === v.pacoteId), st = situacaoVenda(DB, v), at = DB.atendimentos.find(x => x.id === v.atendimentoId);
-  const ov = openModal(`Corrigir venda ${v.codigo}`, `<div class="note small"><b>${cliNome(v.clienteId)}</b> · vendido em ${dBR(v.data)} por ${esc(v.vendidoPor || '')} · ${esc(v.nome)} · ${brl(v.valor)}${at ? ` · registro ${at.codigo}` : ''}. ${st.usadas + st.marcadas} sessão(ões) usadas ou marcadas.</div>
-    <div class="form"><label class="f">Pacote certo<select id="ev-p">${opt(pcs.map(x => [x.id, `${x.nome} · ${brl(x.preco)}`]), v.pacoteId)}</select></label><label class="f">Profissional<select id="ev-f"></select></label>
-    <label class="f">Valor cobrado (R$)<input id="ev-v" inputmode="decimal" value="${centsInput(v.valor)}"></label><label class="f">Motivo da correção<input id="ev-m" placeholder="Ex.: vendido o pacote errado"></label></div>
-    <div class="note small" id="ev-i"></div>`,
-    `<button class="btn" data-close>Cancelar</button><button class="btn pri" id="ev-ok">Salvar correção</button>`);
+  const credito = v.tipo === 'credito', st = situacaoVenda(DB, v), pcs = (DB.pacotes || []).filter(x => !x.excluido && (x.ativo !== false || x.id === v.pacoteId));
+  const ats = (v.atendimentoIds || [v.atendimentoId]).map(id => DB.atendimentos.find(x => x.id === id)).filter(x => x && x.status === 'concluido');
+  let comp = (v.itens && v.itens.length ? v.itens : [{ servicoId: v.servicoId, qtd: v.sessoes }]).map(x => ({ ...x }));
+  const STS = { concluido: 'Feita', faltou: 'Faltou (contou)', cancelado: 'Excluída' };
+  const sesHTML = () => { const l = sessoesDaVenda(DB, v.id);
+    return l.length ? l.map(x => `<div class="pk-er ${x.status === 'cancelado' ? 'off' : ''}"><span><b>${dBR(x.data)} ${x.inicio}</b> · ${esc(SV(x.servicoId)?.nome || '')}<span class="muted small"> · ${STS[x.status] || 'Marcada'}</span></span>${x.status !== 'cancelado' ? `<button class="btn sm ghost" type="button" data-pk-sx="${x.id}">${x.status === 'concluido' ? 'Excluir (devolve o saldo)' : 'Excluir'}</button>` : ''}</div>`).join('') : '<div class="muted small">Nenhuma sessão marcada ainda.</div>'; };
+  const ov = openModal(`Editar pacote ${v.codigo}`, `<div class="stack" style="gap:14px">
+    <div class="note small"><b>${cliNome(v.clienteId)}</b> · ${credito ? 'comprado sem agendar' : `vendido em ${dBR(v.data)} por ${esc(v.vendidoPor || '')}`} · ${esc(v.nome)} · ${brl(v.valor)} · ${st.usadas} usada(s), ${st.marcadas} marcada(s), ${st.livres} sem data.</div>
+    <div class="form">
+      ${credito ? '' : `<label class="f">Trocar pelo pacote do cardápio<select id="ev-p"><option value="">Manter (editar abaixo)</option>${opt(pcs.filter(x => x.id !== v.pacoteId).map(x => [x.id, `${x.nome} · ${brl(x.preco)}`]), '')}</select></label>`}
+      <label class="f">Nome<input id="ev-n" value="${esc(v.nome)}"></label>
+      <label class="f">Valor pago (R$)<input id="ev-v" inputmode="decimal" value="${centsInput(v.valor)}" ${credito && ats.length > 1 ? 'disabled title="Compra com vários serviços: desfaça e lance de novo para mudar o valor"' : ''}></label>
+      ${credito ? '' : '<label class="f">Profissional da venda (comissão)<select id="ev-f"></select></label>'}
+      <label class="f">Válido até<input type="date" id="ev-va" value="${v.validoAte || ''}"><small class="muted">Vazio = sem validade</small></label></div>
+    <div class="pk-comp"><b>Serviços e quantidades do pacote</b><div class="muted small">Aumente para adicionar sessões, diminua para tirar (não pode ficar menor do que já foi feito).</div><div id="ev-cl" class="stack" style="gap:8px;margin-top:8px"></div><button class="btn sm" type="button" id="ev-ca" style="margin-top:8px">+ Adicionar serviço</button><div class="muted small" id="ev-tot" style="margin-top:6px"></div></div>
+    <div><div class="sec" style="margin:0 0 6px">Sessões</div><div id="ev-ses" class="stack" style="gap:6px">${sesHTML()}</div></div>
+    <label class="f">Motivo da alteração<input id="ev-m" placeholder="Ex.: cliente pediu mais 2 sessões"></label>
+    <details class="pk-desf"><summary class="small b">Desfazer o pacote</summary><div class="stack" style="gap:8px;margin-top:8px">
+      <div class="note warn small">A venda é estornada (sai do faturamento) e as sessões marcadas saem da agenda. Use quando a cliente desistiu do pacote.</div>
+      ${st.usadas ? `<label class="chk"><input type="checkbox" id="ev-reg" checked> As ${st.concluidas} sessão(ões) já feita(s) voltam a ser serviços normais, para registrar com o valor de cada um</label>` : ''}
+      <label class="f">Motivo<input id="ev-dm" placeholder="Ex.: cliente preferiu pagar só o serviço"></label>
+      <button class="btn dng" type="button" id="ev-desf">Desfazer pacote</button></div></details></div>`,
+    `<button class="btn" data-close>Fechar</button><button class="btn pri" id="ev-ok">Salvar alterações</button>`, true);
   const q = s => ov.querySelector(s);
-  const upd = mudouPacote => { const pc = pcs.find(x => x.id === val('ev-p')), sv = SV(pc.servicoId), fs = DB.funcionarios.filter(f => f.ativo && sv?.funcs.includes(f.id));
-    q('#ev-f').innerHTML = opt(fs.map(f => [f.id, f.nome]), fs.some(f => f.id === v.funcId) ? v.funcId : fs[0]?.id);
-    if (mudouPacote) q('#ev-v').value = centsInput(pc.preco);
-    q('#ev-i').innerHTML = `Fica: <b>${esc(pc.nome)}</b> (${esc(composicaoTxt(pc))}) por <b>${brl(toCents(val('ev-v')) || 0)}</b>. O registro da venda, o pagamento, o faturamento e a comissão são corrigidos juntos; as sessões já marcadas continuam.`; };
-  q('#ev-p').onchange = () => upd(true); q('#ev-v').oninput = () => upd(false); upd(false);
-  q('#ev-ok').onclick = () => run(() => editarVendaPacote(DB, ACTOR, vendaId, { pacoteId: val('ev-p'), funcId: val('ev-f'), valor: toCents(val('ev-v')), motivo: val('ev-m') }), x => `Venda ${x.codigo} corrigida`).ok && closeModal();
+  const funcs = () => { const pc = pcs.find(x => x.id === q('#ev-p')?.value), sv = SV(pc ? pc.servicoId : v.servicoId), fs = DB.funcionarios.filter(f => f.ativo && sv?.funcs.includes(f.id));
+    if (q('#ev-f')) q('#ev-f').innerHTML = opt(fs.map(f => [f.id, f.nome]), fs.some(f => f.id === v.funcId) ? v.funcId : fs[0]?.id); };
+  const drawComp = () => {
+    q('#ev-cl').innerHTML = comp.map((x, i) => `<div class="pk-cr"><select data-ei="${i}">${servOpts(x.servicoId)}</select><input type="number" min="1" max="60" data-eq="${i}" value="${x.qtd || 1}" aria-label="Quantidade"><button class="btn sm ghost" type="button" data-er="${i}" ${comp.length < 2 ? 'disabled' : ''}>Remover</button></div>`).join('');
+    q('#ev-cl').querySelectorAll('[data-ei]').forEach(s => { s.onchange = () => { comp[+s.dataset.ei].servicoId = s.value; tot(); }; buscaServico(ov, s); });
+    q('#ev-cl').querySelectorAll('[data-eq]').forEach(s => s.oninput = () => { comp[+s.dataset.eq].qtd = parseInt(s.value, 10) || 0; tot(); });
+    q('#ev-cl').querySelectorAll('[data-er]').forEach(b => b.onclick = () => { comp.splice(+b.dataset.er, 1); drawComp(); });
+    tot(); };
+  const tot = () => { const n = sum(comp.map(x => +x.qtd || 0)); q('#ev-tot').innerHTML = `Total: <b>${n} sessão(ões)</b>${n !== v.sessoes ? ` (antes ${v.sessoes})` : ''}.`; };
+  q('#ev-ca').onclick = () => { comp.push({ servicoId: '', qtd: 1 }); drawComp(); };
+  q('#ev-p')?.addEventListener('change', () => { const pc = pcs.find(x => x.id === q('#ev-p').value); if (pc) { comp = (pc.itens && pc.itens.length ? pc.itens : [{ servicoId: pc.servicoId, qtd: pc.sessoes }]).map(x => ({ ...x })); q('#ev-v').value = centsInput(pc.preco); q('#ev-n').value = pc.nome; q('#ev-va').value = pc.validadeDias ? addDays(v.data, pc.validadeDias) : ''; drawComp(); } funcs(); });
+  funcs(); drawComp();
+  const ligarSes = () => q('#ev-ses').querySelectorAll('[data-pk-sx]').forEach(b => b.onclick = e => { e.stopPropagation(); const ag = DB.agendamentos.find(x => x.id === b.dataset.pkSx);
+    confirmar(ov, `Excluir a sessão de <b>${dBR(ag.data)} às ${ag.inicio}</b>${ag.status === 'concluido' ? ' que já estava <b>feita</b>? O saldo volta para a cliente' : '? Ela sai da agenda'}.`, () => {
+      const r = run(() => excluirSessaoPacote(DB, ACTOR, ag.id, val('ev-m')), 'Sessão excluída'); if (r.ok) modalEditarVendaPacote(vendaId); }, 'Excluir sessão'); });
+  ligarSes(); rebindFns.set(ov, () => { bind(); ligarSes(); });
+  const bind = () => {
+    q('#ev-ok').onclick = () => { const svs = comp.filter(x => x.servicoId), mistos = svs.length > 1 || (svs[0] && svs[0].servicoId !== (pcs.find(x => x.id === q('#ev-p')?.value)?.servicoId || v.servicoId));
+      const r = run(() => editarVendaPacote(DB, ACTOR, vendaId, { pacoteId: q('#ev-p')?.value || '', nome: val('ev-n'), valor: toCents(val('ev-v')), funcId: q('#ev-f')?.value, validoAte: val('ev-va'), motivo: val('ev-m'),
+        ...(mistos || (v.itens && v.itens.length) || credito ? { itens: svs } : { itens: [], sessoes: svs[0] ? svs[0].qtd : v.sessoes }) }), x => `Pacote ${x.codigo} atualizado`);
+      if (r.ok) { closeModal(); render(); } };
+    q('#ev-desf').onclick = () => confirmar(ov, `Desfazer o pacote <b>${esc(v.codigo)}</b> de ${cliNome(v.clienteId)}? A venda de ${brl(v.valor)} é estornada.`, () => {
+      const r = run(() => desfazerPacote(DB, ACTOR, vendaId, { motivo: val('ev-dm'), registrarSessoes: !!q('#ev-reg')?.checked }), x => `Pacote desfeito${x.voltam.length ? ` · ${x.voltam.length} serviço(s) para registrar na agenda` : ''}`);
+      if (r.ok) { closeModal(); if (r.r.voltam.length) { UI.route = 'agenda'; UI.agDate = DB.agendamentos.find(x => x.id === r.r.voltam[0]).data; } render(); if (r.r.voltam.length) modalRegistro({ agendamentoId: r.r.voltam[0] }); } }, 'Desfazer pacote'); };
+  bind();
 }
 function modalSessaoPacote(vendaId) {
   const v = DB.pacoteVendas.find(x => x.id === vendaId), st = situacaoVenda(DB, v), sv = SV(v.servicoId), misto = !!(v.itens && v.itens.length);
@@ -9411,7 +9812,7 @@ function modalSessaoPacote(vendaId) {
   const sug = ult ? addDays(ult.data, 7) : addDays(TODAY, 1), comSaldo = st.itens.filter(i => i.livres > 0);
   const ov = openModal(v.tipo === 'credito' ? 'Agendar pelo saldo' : 'Marcar sessão do pacote', `<div class="note small"><b>${esc(CL(v.clienteId)?.nome)}</b> · ${esc(v.nome)} · ${st.usadas + st.marcadas} de ${v.sessoes} sessões usadas ou marcadas${v.validoAte ? ` · vale até ${dBR(v.validoAte)}` : ''}</div>
     ${misto ? `<div><div class="sec" style="margin:0 0 6px">Qual serviço do pacote?</div><div class="pk-esc">${comSaldo.map((i, k) => `<label class="chk"><input type="checkbox" data-ps-sv="${i.servicoId}" ${k === 0 ? 'checked' : ''}> <span>${esc(SV(i.servicoId)?.nome || '')} <small class="muted">· resta(m) ${i.livres}</small></span></label>`).join('')}</div><div class="muted small" style="margin-top:4px">Marque mais de um para fazer no mesmo dia (ex.: a mão e o pé): ficam um depois do outro.</div></div>` : ''}
-    <div class="form"><label class="f">Dia<input type="date" id="ps-d" value="${sug < TODAY ? TODAY : sug}" min="${TODAY}"${v.validoAte ? ` max="${v.validoAte}"` : ''}></label><label class="f">Horário<select id="ps-h">${opt(horasCom(ult?.inicio).map(h => [h, h]), ult?.inicio || '10:00')}</select></label>
+    <div class="form"><label class="f">Dia<input type="date" id="ps-d" value="${sug < TODAY ? TODAY : sug}"${v.validoAte ? ` max="${v.validoAte}"` : ''}></label><label class="f">Horário<select id="ps-h">${opt(horasCom(ult?.inicio).map(h => [h, h]), ult?.inicio || '10:00')}</select></label>
     <label class="f full">Profissional<select id="ps-f">${opt(fs.map(f => [f.id, f.nome]), v.funcId)}</select></label></div>`,
     `<button class="btn" data-close>Cancelar</button><button class="btn pri" id="ps-ok">Marcar na agenda</button>`);
   ov.querySelector('#ps-ok').onclick = () => run(() => { const ids = [...ov.querySelectorAll('[data-ps-sv]:checked')].map(x => x.dataset.psSv);
@@ -10060,10 +10461,40 @@ function modalCategoria() {
 }
 
 /* =================== SISTEMA =================== */
+const AUD_TIPOS = { '': 'Todas', ag: 'Agendamentos', at: 'Serviços e estornos', pk: 'Pacotes', fin: 'Pagamentos e caixa', cli: 'Clientes', sis: 'Sistema e acessos' };
+function tipoAud(l) {
+  const a = l.acao || '';
+  if (/agendamento|reagendamento|vários serviços|sinal|pedido|bloqueio|indisponibilidade/i.test(a)) return 'ag';
+  if (/pacote/i.test(a)) return 'pk';
+  if (/serviço registrado|estorno|servi[cç]os vendidos|recebimento|parcela/i.test(a) && !/serviço (editado|cadastrado|excluído)/i.test(a)) return 'at';
+  if (/caixa|pagamento|fechamento|adiantamento|abatimento|convênio|repasse|comiss/i.test(a)) return 'fin';
+  if (/cliente|whatsapp|mensagem|conveniada|cpf/i.test(a)) return 'cli';
+  return 'sis';
+}
 function pgAuditoria() {
-  return `<div class="ph"><div><h1>Histórico de auditoria</h1><p>Toda operação financeira e administrativa fica registrada com usuário e horário. Não há exclusão de registros financeiros.</p></div></div>
-  <div class="tw"><table><thead><tr><th>Quando</th><th>Usuário</th><th>Operação</th><th>Detalhe</th></tr></thead><tbody>${DB.auditoria.slice(0, LIM('audMax', 150)).map(l => `<tr><td class="small" style="white-space:nowrap">${esc(l.quando)}</td><td>${esc(l.usuario)}</td><td class="b">${esc(l.acao)}</td><td class="small">${esc(l.detalhe)}</td></tr>`).join('')}</tbody></table></div>
-  ${DB.auditoria.length > (LIM('audMax', 150)) ? `<div class="mais-linhas" style="margin-top:12px"><span class="muted small">Mostrando ${LIM('audMax', 150)} de ${DB.auditoria.length} registros</span><button class="btn" data-mais="audMax">Mostrar mais</button></div>` : ''}`;
+  const b = nomeChave(UI.audBusca || ''), dia = UI.audDia || '', us = UI.audUser || '', tp = UI.audTipo || '';
+  const diaBR = dia ? dBR(dia) : '';
+  const todos = DB.auditoria.map(l => ({ l, c: inferirCtxAud(DB, l) || {} }));
+  const L = todos.filter(({ l, c }) => (!diaBR || String(l.quando).startsWith(diaBR)) && (!us || l.usuario === us) && (!tp || tipoAud(l) === tp)
+    && (!b || nomeChave([l.acao, l.detalhe, l.usuario, c.cliente, c.ref].join(' ')).includes(b)));
+  const usuarios = [...new Set(DB.auditoria.map(l => l.usuario).filter(Boolean))].sort();
+  const max = LIM('audMax', 150);
+  const card = ({ l, c }) => { const [dt, hr] = String(l.quando || '').split(/,\s*/);
+    const abrir = c.agId && DB.agendamentos.some(x => x.id === c.agId) ? `data-ag="${c.agId}"` : c.atId && DB.atendimentos.some(x => x.id === c.atId) ? `data-at-open="${c.atId}"` : '';
+    return `<div class="au-it"><div class="au-q"><b>${esc(dt || '')}</b>${hr ? `<span>às ${esc(hr)}</span>` : ''}<em>${esc(l.usuario || '')}</em></div>
+      <div class="au-c"><div class="au-a">${esc(l.acao)}</div>
+        ${c.cliente ? `<div class="au-cli">${icon('clientes')}${c.clienteId && DB.clientes.some(k => k.id === c.clienteId) ? `<button class="lk" data-cli="${c.clienteId}">${esc(c.cliente)}</button>` : esc(c.cliente)}</div>` : ''}
+        ${c.ref ? `<div class="au-ref">${esc(c.ref)}${abrir ? ` <button class="btn sm ghost" ${abrir}>Abrir</button>` : ''}</div>` : ''}
+        ${l.detalhe ? `<div class="au-d">${esc(l.detalhe)}</div>` : ''}</div></div>`; };
+  return `<div class="ph"><div><h1>Histórico de auditoria</h1><p>Toda operação fica registrada com o dia e o horário em que foi feita, quem fez, a cliente e o agendamento envolvido. Não há exclusão de registros financeiros.</p></div></div>
+  <div class="au-f"><div class="po-busca-c au-b">${icon('lupa')}<input id="au-b" type="text" enterkeyhint="search" autocomplete="off" placeholder="Buscar cliente, operação ou código (ex.: AT-1352)" value="${esc(UI.audBusca || '')}" aria-label="Buscar na auditoria"></div>
+    <label class="f">Dia do registro<input type="date" id="au-d" value="${esc(dia)}" max="${TODAY}"></label>
+    <label class="f">Quem fez<select id="au-u"><option value="">Todos</option>${usuarios.map(u => `<option ${u === us ? 'selected' : ''}>${esc(u)}</option>`).join('')}</select></label>
+    <label class="f">Tipo<select id="au-t">${Object.entries(AUD_TIPOS).map(([k, t]) => `<option value="${k}" ${k === tp ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+    ${b || dia || us || tp ? `<button class="btn sm ghost" id="au-x">Limpar filtros</button>` : ''}</div>
+  <p class="muted small" style="margin:4px 0 10px">${L.length} registro(s)${b || dia || us || tp ? ' encontrados' : ''}. Toque no nome da cliente para abrir o cadastro, ou em <b>Abrir</b> para ver o agendamento.</p>
+  ${L.length ? `<div class="au-lista">${L.slice(0, max).map(card).join('')}</div>` : `<div class="panel">${empty('Nenhum registro encontrado', 'Mude a busca ou os filtros.')}</div>`}
+  ${L.length > max ? `<div class="mais-linhas" style="margin-top:12px"><span class="muted small">Mostrando ${max} de ${L.length} registros</span><button class="btn" data-mais="audMax">Mostrar mais</button></div>` : ''}`;
 }
 let TESTES = null;
 function pgTestes() {
@@ -10202,7 +10633,14 @@ const AFTER = {
     const bv = document.getElementById('pkv-b'); if (bv) bv.oninput = () => { clearTimeout(bv._t); bv._t = setTimeout(() => { UI.pkvBusca = bv.value; render(); const nb = document.getElementById('pkv-b'); nb.focus(); nb.setSelectionRange(nb.value.length, nb.value.length); }, 200); };
     const b = document.getElementById('pk-b'); if (b) b.oninput = () => { clearTimeout(b._t); b._t = setTimeout(() => { UI.pkBusca = b.value; render(); const nb = document.getElementById('pk-b'); nb.focus(); nb.setSelectionRange(nb.value.length, nb.value.length); }, 200); };
   },
+  auditoria() {
+    const b = document.getElementById('au-b'); if (b) b.oninput = () => { clearTimeout(b._t); b._t = setTimeout(() => { UI.audBusca = b.value; UI.audMax = 0; render(); const nb = document.getElementById('au-b'); nb.focus(); nb.setSelectionRange(nb.value.length, nb.value.length); }, 250); };
+    const dd = document.getElementById('au-d'); if (dd) dd.onchange = () => { UI.audDia = dd.value; UI.audMax = 0; render(); };
+    bindSel('au-u', 'audUser'); bindSel('au-t', 'audTipo');
+    document.getElementById('au-x')?.addEventListener('click', () => { UI.audBusca = UI.audDia = UI.audUser = UI.audTipo = ''; render(); });
+  },
   podologia() {
+    ligarPodoAlertas();
     document.getElementById('po-csv')?.addEventListener('click', () => { const [i, f] = periodo(); csvBaixar('CSV · Podologia', linhasPodoCSV(), `podologia-${i}-a-${f}.csv`); });
     const b = document.getElementById('po-b'); if (b) b.oninput = () => { clearTimeout(b._t); b._t = setTimeout(() => { UI.podoBusca = b.value; render(); const nb = document.getElementById('po-b'); nb.focus(); nb.setSelectionRange(nb.value.length, nb.value.length); }, 200); };
   },
@@ -10226,7 +10664,7 @@ const AFTER = {
 
 /* ---------- eventos globais (delegação) ---------- */
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-al-todos],[data-pkv-limpa],[data-online],[data-pg-dup],[data-wa-pk],[data-pk-limpa],[data-sv-limpa],[data-del-cat],[data-po-limpa],[data-ct-todos],[data-del],[data-dono-novo],[data-dono-edit],[data-podo-aba],[data-podo-nova],[data-podo-ficha],[data-cxcentro],[data-comanda],[data-av-teste],[data-av-qr],[data-av-copiar],[data-av-dl],[data-av-nota],[data-pk-novo],[data-pk-corrigir],[data-vender-sv],[data-pg-rec],[data-usar-saldo],[data-pk-edit],[data-pk-vender],[data-pk-filtro],[data-pk-sessao],[data-cli-nivel],[data-dona-serv],[data-mov],[data-mov-ed],[data-mov-ex],[data-cxper],[data-cxnav],[data-cxtipo],[data-cli-acao],[data-conv-membros],[data-conv-pagar],[data-receb-com],[data-conf-com],[data-acerto-com],[data-pagar-cli],[data-cvst],[data-liberar],[data-conta],[data-sair],[data-codigo],[data-repasse],[data-adiant],[data-extrato],[data-abater],[data-conv-novo],[data-conv-edit],[data-conv-filtro],[data-alertas],[data-fechar],[data-faltou],[data-chegou],[data-tema],[data-pdf],[data-wa-ag],[data-wa-cli],[data-wa-cob],[data-wa-at],[data-fab],[data-go],[data-menu],[data-per],[data-agv],[data-agnav],[data-ag],[data-bl],[data-slot],[data-goday],[data-new-ag],[data-new-bl],[data-new-reg],[data-at-open],[data-receb],[data-conf],[data-acerto],[data-fesem],[data-fe-ver],[data-pagar],[data-new-cli],[data-cli],[data-new-func],[data-func],[data-new-serv],[data-serv],[data-new-cat],[data-mais],[data-pub-abrir],[data-pub-cliente],[data-origem-nova],[data-origem],[data-ped-agendar],[data-ped-recusar],[data-qr-copiar],[data-qr-dl],[data-qr-ver],[data-ped-dia]');
+  const t = e.target.closest('[data-al-todos],[data-pkv-limpa],[data-online],[data-pg-dup],[data-wa-pk],[data-pk-limpa],[data-sv-limpa],[data-del-cat],[data-po-limpa],[data-ct-todos],[data-del],[data-dono-novo],[data-dono-edit],[data-podo-aba],[data-podo-nova],[data-podo-ficha],[data-cxcentro],[data-comanda],[data-av-teste],[data-av-qr],[data-av-copiar],[data-av-dl],[data-av-nota],[data-pk-novo],[data-pk-corrigir],[data-trocar-pk],[data-vender-sv],[data-pg-rec],[data-usar-saldo],[data-pk-edit],[data-pk-vender],[data-pk-filtro],[data-pk-sessao],[data-cli-nivel],[data-dona-serv],[data-mov],[data-mov-ed],[data-mov-ex],[data-cxper],[data-cxnav],[data-cxtipo],[data-cli-acao],[data-conv-membros],[data-conv-pagar],[data-receb-com],[data-conf-com],[data-acerto-com],[data-pagar-cli],[data-cvst],[data-liberar],[data-conta],[data-sair],[data-codigo],[data-repasse],[data-adiant],[data-extrato],[data-abater],[data-conv-novo],[data-conv-edit],[data-conv-filtro],[data-alertas],[data-fechar],[data-faltou],[data-chegou],[data-tema],[data-pdf],[data-wa-ag],[data-wa-cli],[data-wa-cob],[data-wa-at],[data-fab],[data-go],[data-menu],[data-per],[data-agv],[data-agnav],[data-ag],[data-bl],[data-slot],[data-goday],[data-new-ag],[data-new-bl],[data-new-reg],[data-at-open],[data-receb],[data-conf],[data-acerto],[data-fesem],[data-fe-ver],[data-pagar],[data-new-cli],[data-cli],[data-new-func],[data-func],[data-new-serv],[data-serv],[data-new-cat],[data-mais],[data-pub-abrir],[data-pub-cliente],[data-origem-nova],[data-origem],[data-ped-agendar],[data-ped-recusar],[data-qr-copiar],[data-qr-dl],[data-qr-ver],[data-ped-dia]');
   if (!t) return;
   const ds = t.dataset;
   if ('waAg' in ds) { e.stopPropagation(); const x = DB.agendamentos.find(a => a.id === ds.waAg); return modalWhatsApp({ agendamentoId: ds.waAg }, ds.waM || waModeloPadrao(x)); }
@@ -10250,6 +10688,7 @@ document.addEventListener('click', e => {
   if ('pkFiltro' in ds) { UI.pkFiltro = ds.pkFiltro; render(); return; }
   if ('pkSessao' in ds) return modalSessaoPacote(ds.pkSessao);
   if ('pkCorrigir' in ds) return modalEditarVendaPacote(ds.pkCorrigir);
+  if ('trocarPk' in ds) { const at = DB.atendimentos.find(x => x.id === ds.trocarPk); closeModal(); return modalVenderPacote('', at.clienteId, { trocarAt: at.id }); }
   if ('venderSv' in ds) return modalVenderServicos(ds.venderSv);
   if ('pgRec' in ds) return modalPagarRecepcao(ds.pgRec);
   if ('usarSaldo' in ds) { closeModal(); return modalSessaoPacote(ds.usarSaldo); }
@@ -10306,7 +10745,7 @@ document.addEventListener('click', e => {
   if ('qrCopiar' in ds) { copiarLinkOrigem(ds.qrCopiar); return; }
   if ('goday' in ds) { UI.agDate = ds.goday; UI.agView = 'dia'; render(); return; }
   if ('ag' in ds) return modalAgDetalhe(ds.ag);
-  if ('bl' in ds) { const b = DB.bloqueios.find(x => x.id === ds.bl); const ov = openModal('Horário bloqueado', `<dl class="dl"><dt>Funcionário</dt><dd>${esc(fn(b.funcId))}</dd><dt>Motivo</dt><dd>${esc(b.motivo)}</dd><dt>Data</dt><dd>${dBR(b.data)} · ${b.inicio}–${b.fim}</dd></dl>`, `<button class="btn" data-close>Fechar</button><button class="btn dng" id="bl-rm">Liberar horário</button>`); ov.querySelector('#bl-rm').onclick = () => run(() => removerBloqueio(DB, ACTOR, b.id), 'Horário liberado').ok && closeModal(); return; }
+  if ('bl' in ds) return modalVerBloqueio(ds.bl);
   if ('slot' in ds) { const [funcId, inicio] = ds.slot.split('|'); return modalAgendamento({ funcId, inicio, data: UI.agDate }); }
   if ('newAg' in ds) return modalAgendamento();
   if ('newBl' in ds) return modalBloqueio();
