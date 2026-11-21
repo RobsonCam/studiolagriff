@@ -81,7 +81,20 @@
 .fa-data #pb-d,.fa-data #d{flex:1}
 .fa-cal{flex:none;width:62px;min-height:62px;border:2px solid var(--fa-brown);border-radius:14px;background:var(--fa-brown);color:var(--fa-gold);display:flex;align-items:center;justify-content:center;cursor:pointer}
 .fa-cal svg{width:28px;height:28px}
-.fa-nativo{position:absolute;right:0;bottom:0;width:62px!important;height:62px!important;min-height:0!important;opacity:0;pointer-events:none;border:0!important;padding:0!important}
+.fa-nativo{position:absolute;right:0;top:0;width:62px!important;height:62px!important;min-height:0!important;opacity:0;pointer-events:auto;cursor:pointer;z-index:2;border:0!important;padding:0!important;margin:0;color-scheme:light}
+.fa-nativo::-webkit-calendar-picker-indicator{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;opacity:0;cursor:pointer}
+/* formulário da cliente: sempre claro (campo branco, letra marrom), mesmo com o celular no modo escuro */
+.fa{color-scheme:light;--surface:#FFFFFF;--sunk:#F7F3EC;--ink:#1F1712;--muted:#5E534B;--line:#8C8175;--accent:#8A6416;--accent-soft:#FFF0CF;--gold:#FFDC8F}
+.fa .svb .svb-c{background:#FFFFFF!important;border:2px solid var(--fa-line);border-radius:14px;min-height:62px;padding:0 8px 0 16px;color:var(--fa-ink);font-size:20px}
+.fa .svb .svb-c:focus-within{outline:4px solid #E9B949;outline-offset:1px;border-color:var(--fa-brown)}
+.fa .svb .svb-in{font-size:20px!important;color:var(--fa-ink)!important}
+.fa .svb .svb-in::placeholder{color:#6B6058}
+.fa .svb-c svg{width:22px;height:22px;color:var(--fa-brown)}
+.fa .svb-l{background:#FFFFFF;border:2px solid var(--fa-line);max-height:340px}
+.fa .svb-o{color:var(--fa-ink);padding:12px 14px}.fa .svb-o b{font-size:19px}.fa .svb-o .muted{color:#6B6058;font-size:15px}
+.fa .svb-o:hover,.fa .svb-o.on{background:#FFF0CF}.fa .svb-o.sel b{color:#8A6416}
+.svb-tg{flex:none;display:flex;align-items:center;gap:4px;border:0;background:transparent;color:inherit;font:inherit;font-size:14px;font-weight:700;cursor:pointer;padding:6px 8px;border-radius:10px;white-space:nowrap}
+.svb-tg svg{width:18px;height:18px}.fa .svb-tg{font-size:15px;color:var(--fa-brown);background:#F7F3EC}
 .fa{position:relative}
 .fa-equipe{position:absolute;top:14px;right:14px;z-index:2;min-height:40px;padding:8px 14px;border-radius:999px;border:1px solid rgba(255,220,143,.45);background:rgba(48,36,28,.35);color:#FFDC8F;font:inherit;font-size:14px;font-weight:700;cursor:pointer}
 
@@ -6472,7 +6485,10 @@ function ligarFaData(raiz) {
     txt.value = d.length > 4 ? `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}` : d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d;
   };
   txt.onblur = () => { const i = faLerData(txt.value); if (i) { txt.value = faIsoBR(i); nat.value = i; } };
-  bt.onclick = () => { const i = faLerData(txt.value); if (i) nat.value = i; try { nat.showPicker(); } catch (e) { nat.focus(); nat.click(); } };
+  // o calendário do aparelho fica por cima do botão: o toque cai direto nele (funciona no iPhone e no Android)
+  const abrir = () => { const i = faLerData(txt.value); if (i) nat.value = i; try { nat.showPicker(); } catch (e) { } };
+  bt.onclick = () => { abrir(); nat.focus(); };
+  nat.onclick = () => abrir();
   nat.onchange = () => { if (nat.value) { txt.value = faIsoBR(nat.value); txt.dispatchEvent(new Event('change', { bubbles: true })); } };
 }
 /* página de avaliação do cliente: nota de 1 a 5, comentário, nome e telefone */
@@ -8455,7 +8471,7 @@ function buscaServico(root, selId) {
   const sel = typeof selId === 'string' ? root.querySelector('#' + selId) : selId; if (!sel || sel.dataset.busca) return; sel.dataset.busca = '1';
   const opts = [...sel.querySelectorAll('option')].filter(o => o.value).map(o => { const sv = SV(o.value); return { id: o.value, nome: sv ? sv.nome : o.textContent, txt: o.textContent, cat: o.parentElement && o.parentElement.tagName === 'OPTGROUP' ? o.parentElement.label : '' }; });
   const box = document.createElement('div'); box.className = 'svb';
-  box.innerHTML = `<div class="po-busca-c svb-c">${icon('lupa')}<input type="text" class="svb-in" autocomplete="off" enterkeyhint="search" placeholder="Pesquisar serviço pelo nome…" aria-label="Pesquisar serviço" role="combobox" aria-expanded="false"></div><div class="svb-l" role="listbox" hidden></div>`;
+  box.innerHTML = `<div class="po-busca-c svb-c">${icon('lupa')}<input type="text" class="svb-in" autocomplete="off" enterkeyhint="search" placeholder="Digite ou escolha…" aria-label="Escolher ou pesquisar serviço" role="combobox" aria-expanded="false"><button type="button" class="svb-tg" aria-label="Ver todos os serviços"><span>Ver todos</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button></div><div class="svb-l" role="listbox" hidden></div>`;
   sel.style.display = 'none'; sel.after(box);
   const inp = box.querySelector('.svb-in'), lst = box.querySelector('.svb-l');
   let res = [], ativo = 0;
@@ -8481,6 +8497,9 @@ function buscaServico(root, selId) {
     else if (e.key === 'Escape' && !lst.hidden) { e.preventDefault(); e.stopPropagation(); mostrarAtual(); fechar(); }
   });
   lst.addEventListener('mousedown', e => e.preventDefault());
+  // "Ver todos": abre a lista completa de serviços (sem precisar digitar)
+  const tg = box.querySelector('.svb-tg'); tg.addEventListener('mousedown', e => e.preventDefault());
+  tg.addEventListener('click', () => { if (!lst.hidden) { fechar(); return; } mostrarAtual(); res = opts; ativo = Math.max(0, opts.findIndex(o => o.id === sel.value)); inp.focus(); desenhar(); });
   lst.addEventListener('click', e => { const b = e.target.closest('[data-svb]'); if (b) escolher(b.dataset.svb); });
   inp.addEventListener('blur', () => setTimeout(() => { mostrarAtual(); fechar(); }, 120));
   mostrarAtual();
@@ -11482,7 +11501,7 @@ function ligarModoPublico() {
   };
   confirmarPeloLink = function (S, tk, resposta) { const r = _conf(S, tk, resposta); enviarEntrada('confirmar', { tk, resposta }); return r; };
   registrarAcessoOrigem = function (S, codigo, dia) { const ok = _acesso(S, codigo, dia); if (ok) enviarEntrada('acesso', { codigo, dia: dia || TODAY }); return ok; };
-  ligarPublico = function (cat) { _ligar(cat); const b = document.getElementById('pub-equipe'); if (b) b.onclick = () => { location.href = '/'; }; };
+  ligarPublico = function (cat) { _ligar(cat); const b = document.getElementById('pub-equipe'); if (b) b.remove(); };   // quem entra pelo link do formulário não vê a Área da equipe
   window.addEventListener('online', drenarFila);
   drenarFila();
 }
