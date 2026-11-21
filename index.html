@@ -95,6 +95,10 @@
 .fa .svb-o:hover,.fa .svb-o.on{background:#FFF0CF}.fa .svb-o.sel b{color:#8A6416}
 .svb-tg{flex:none;display:flex;align-items:center;gap:4px;border:0;background:transparent;color:inherit;font:inherit;font-size:14px;font-weight:700;cursor:pointer;padding:6px 8px;border-radius:10px;white-space:nowrap}
 .svb-tg svg{width:18px;height:18px}.fa .svb-tg{font-size:15px;color:var(--fa-brown);background:#F7F3EC}
+/* campo de pesquisa sempre com espaço para digitar: "Ver todos" vira só a setinha em campos estreitos */
+.svb .svb-c{min-width:0}.svb .svb-in{flex:1 1 auto;min-width:48px}
+.svb-tg span{display:none}.fa .svb-tg span{display:inline}.svb-tg{padding:8px;background:var(--sunk)}
+@media (max-width:560px){.pk-cr{grid-template-columns:minmax(0,1fr) 80px auto}.pk-cr>.svb{grid-column:1/-1}}
 .fa{position:relative}
 .fa-equipe{position:absolute;top:14px;right:14px;z-index:2;min-height:40px;padding:8px 14px;border-radius:999px;border:1px solid rgba(255,220,143,.45);background:rgba(48,36,28,.35);color:#FFDC8F;font:inherit;font-size:14px;font-weight:700;cursor:pointer}
 
@@ -1129,6 +1133,7 @@ td.acts{width:1%;white-space:nowrap}
 .po-num{display:flex;flex-direction:column;align-items:center;line-height:1.1} .po-num b{font-size:18px} .po-num span{font-size:11.5px;color:var(--muted)}
 .po-alerta{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;font-size:12.5px;font-weight:700;color:var(--bad);background:var(--bad-soft);border-radius:8px;padding:2px 8px;max-width:100%;overflow-wrap:anywhere}
 .srow .sjt{grid-column:1/-1;justify-self:start;font-size:13px;padding:4px 10px}.srow .sjt.on{color:var(--ok);font-weight:700}
+.pv-cm{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}@media (max-width:560px){.pv-cm{grid-template-columns:1fr}}.pv-cmo{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);cursor:pointer}.pv-cmo:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}.pv-cmo input{margin-top:3px;flex:none;width:18px;height:18px}.pv-cmo span{display:flex;flex-direction:column;gap:2px}.pv-cmo small{color:var(--muted);font-size:13px;line-height:1.35}
 .pdf-op{display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}.pdf-op .btn{align-self:flex-start}
 .pct-l{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden}.pct-i{display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer}.pct-i+.pct-i{border-top:1px solid var(--line)}.pct-i input{width:20px;height:20px;flex:none}.pct-c{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}.pct-v{flex:none;white-space:nowrap}
 .au-f{display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:10px;align-items:end;margin-bottom:6px}.au-f .au-b{align-self:end}
@@ -3513,6 +3518,10 @@ function venderPacote(S, a, d) {
       data: d.data || TODAY, validoAte: pc.validadeDias ? addDays(d.data || TODAY, pc.validadeDias) : '', vendidoPor: a.nome, criadoEm: stamp() };
     S.pacoteVendas = S.pacoteVendas || []; S.pacoteVendas.push(v);
     at.pacoteVendaId = v.id;
+    // regra nova: o valor do pacote entra no faturamento do salão na venda, mas a comissão NÃO.
+    // Cada sessão comissiona quem fez, sobre a parte do pacote daquele serviço (proporcional ao preço de tabela)
+    // quem vende escolhe: comissão depois, em cada sessão (padrão) ou agora, do pacote inteiro para uma profissional
+    if (d.comissao !== 'venda') { v.comissaoNaSessao = true; semComissaoNaVenda(S, at); }
     // horário já marcado (serviço avulso) que a cliente trocou pelo pacote: vira sessão do pacote
     conv.forEach(x => { const st = situacaoVenda(S, v), servicoId = servicoDaSessao(S, v, st, itensVenda(v).some(i => i.servicoId === x.servicoId) ? x.servicoId : '');
       const n = st.ags.filter(y => !INATIVOS.includes(y.status)).length + 1;
@@ -3523,6 +3532,22 @@ function venderPacote(S, a, d) {
     audit(S, a, 'Pacote vendido', `${v.codigo} · ${pc.nome} · ${S.clientes.find(k => k.id === d.clienteId)?.nome || ''} · ${brl(valor)} · ${sessoes.length + conv.length} de ${pc.sessoes} sessões marcadas${conv.length ? ` (${conv.length} trocada(s) do agendamento)` : ''}`);
     return v;
   });
+}
+/* venda sem comissão: o registro da venda fica sem profissional e as comissões da venda são canceladas */
+function semComissaoNaVenda(S, at) {
+  Object.assign(at, { funcId: '', semProfissional: true, pct: 0, comissaoTotal: 0, parteSalao: at.valorFinal });
+  S.parcelas.filter(p => p.atendimentoId === at.id).forEach(p => Object.assign(p, { funcId: '', comissao: 0, parteSalao: p.valor }));
+  S.obrigacoes.filter(o => o.atendimentoId === at.id && !o.sessaoAgId).forEach(o => Object.assign(o, { cancelada: true, motivo: 'pacote: comissão na sessão' }));
+}
+const comissaoNaSessao = v => !!v && (v.tipo === 'credito' || !!v.comissaoNaSessao);
+/* quanto do pacote vale cada sessão: o valor pago dividido pelos serviços do pacote, proporcional ao preço de tabela.
+   Ex.: pacote de R$ 50 com Mecha (R$ 35) e Unha (R$ 15) → a sessão de Mecha vale R$ 35 e a de Unha R$ 15. */
+function baseSessaoPacote(S, v, servicoId) {
+  const at = S.atendimentos.find(x => x.id === v.atendimentoId && x.status === 'concluido'); if (!at) return 0;
+  const total = at.valorFinal, preco = id => Math.max(S.servicos.find(x => x.id === id)?.preco || 0, 1);
+  const its = itensVenda(v); if (!its.length) return Math.round(total / Math.max(v.sessoes || 1, 1));
+  const peso = sum(its.map(i => preco(i.servicoId) * i.qtd));
+  return Math.round(total * preco(its.some(i => i.servicoId === servicoId) ? servicoId : its[0].servicoId) / peso);
 }
 /* compra de serviços sem agendar (ex.: vendas na live): avulsos, combos ou vários de um serviço.
    A cliente paga agora e fica com o saldo; quando quiser, agenda pelo saldo (já está pago).
@@ -3564,9 +3589,11 @@ function venderServicos(S, a, d) {
 /* serviço comprado antes (saldo) e feito agora: a comissão é de quem fez, sobre o valor pago por aquele serviço,
    e entra no fechamento da semana em que a sessão foi feita */
 function comissaoDaSessao(S, a, v, ag) {
-  const at = (v.atendimentoIds || []).map(id => S.atendimentos.find(x => x.id === id)).find(x => x && x.servicoId === ag.servicoId && x.status === 'concluido');
+  const credito = v.tipo === 'credito';
+  const at = credito ? (v.atendimentoIds || []).map(id => S.atendimentos.find(x => x.id === id)).find(x => x && x.servicoId === ag.servicoId && x.status === 'concluido')
+    : S.atendimentos.find(x => x.id === v.atendimentoId && x.status === 'concluido');
   const func = S.funcionarios.find(f => f.id === ag.funcId); if (!at || !func) return null;
-  const base = Math.round(at.valorFinal / (at.creditoQtd || 1)), com = Engine.comissao(base, func.pct || 0);
+  const base = credito ? Math.round(at.valorFinal / (at.creditoQtd || 1)) : baseSessaoPacote(S, v, ag.servicoId), com = Engine.comissao(base, func.pct || 0);
   const pago = S.parcelas.filter(p => p.atendimentoId === at.id).every(p => p.status !== 'pendente');
   const o = { id: uid('ob'), atendimentoId: at.id, parcelaId: null, sessaoAgId: ag.id, funcId: func.id, tipo: 'pix_cartao', comissao: com, liberado: pago ? com : 0, fechado: 0, cancelada: false,
     base, data: ag.data, hora: ag.inicio, codigo: `${v.codigo} · sessão`, clienteId: ag.clienteId, servicoId: ag.servicoId };
@@ -3594,7 +3621,7 @@ function editarVendaPacote(S, a, vendaId, d) {
   const v = (S.pacoteVendas || []).find(x => x.id === vendaId); if (!v) throw new Error('Pacote não encontrado.');
   if (v.cancelado) throw new Error('Este pacote foi desfeito e não pode ser editado.');
   const motivo = String(d.motivo || '').trim(); if (motivo.length < 5) throw new Error('Descreva o motivo da alteração.');
-  const credito = v.tipo === 'credito';
+  const credito = v.tipo === 'credito', semCom = comissaoNaSessao(v);
   // modelo: outro pacote do cardápio (troca tudo) ou o próprio pacote vendido
   const pc = d.pacoteId && d.pacoteId !== v.pacoteId ? (S.pacotes || []).find(x => x.id === d.pacoteId) : null;
   if (d.pacoteId && d.pacoteId !== v.pacoteId && !pc) throw new Error('Pacote não encontrado.');
@@ -3610,7 +3637,7 @@ function editarVendaPacote(S, a, vendaId, d) {
   if (!credito && (!sv || !sv.funcs.includes(funcId))) throw new Error(`Escolha uma profissional que faz ${sv ? sv.nome : 'o serviço do pacote'}.`);
   if (credito && valor !== v.valor && ats.length > 1) throw new Error('Esta compra tem vários serviços: para mudar o valor, desfaça e lance de novo.');
   const obs = at ? S.obrigacoes.filter(o => o.atendimentoId === at.id && !o.cancelada && !o.sessaoAgId) : [], ps = at ? S.parcelas.filter(p => p.atendimentoId === at.id) : [];
-  const mudaValor = at && (valor !== at.valorFinal || (!credito && funcId !== at.funcId) || (!credito && at.servicoId !== servicoId));
+  const mudaValor = at && (valor !== at.valorFinal || (!semCom && funcId !== at.funcId) || (!credito && at.servicoId !== servicoId));
   if (mudaValor && obs.some(o => o.fechado > 0)) throw new Error('A comissão desta venda já entrou em fechamento. Corrija com um ajuste no próximo fechamento.');
   if (mudaValor && ps.some(p => (p.acertado || 0) > 0)) throw new Error('O convênio desta venda já tem pagamento registrado.');
   // não pode ficar com menos sessões do que já foram usadas ou marcadas
@@ -3626,16 +3653,21 @@ function editarVendaPacote(S, a, vendaId, d) {
     if (pc) v.pacoteId = pc.id;
     if (itens.length) v.itens = itens; else delete v.itens;
     if (at && mudaValor) {
-      const pct = credito ? 0 : func.pct || 0, com = Engine.comissao(valor, pct);
+      const pct = semCom ? 0 : func.pct || 0, com = Engine.comissao(valor, pct);
       const vals = ps.length === 1 ? [valor] : Engine.ratear(valor, ps.map(p => p.valor || 0)), coms = Engine.ratear(com, vals);
-      ps.forEach((p, i) => { const o = obs.find(x => x.parcelaId === p.id); Object.assign(p, { valor: vals[i], comissao: coms[i], parteSalao: vals[i] - coms[i], funcId }); if (p.forma === 'convenio') p.acrescimo = Engine.acrescimo(vals[i], Number(p.taxaPct || 0)); if (o) Object.assign(o, { comissao: coms[i], funcId, liberado: Engine.liberadoParcela(p, coms[i]) }); });
-      Object.assign(at, { ...(credito ? {} : { servicoId, funcId }), valorCobrado: valor + (at.desconto || 0), valorFinal: valor, pct, comissaoTotal: com, parteSalao: valor - com, corrigidoEm: stamp(), corrigidoPor: a.nome });
+      ps.forEach((p, i) => { const o = obs.find(x => x.parcelaId === p.id); Object.assign(p, { valor: vals[i], comissao: coms[i], parteSalao: vals[i] - coms[i], funcId: semCom ? '' : funcId }); if (p.forma === 'convenio') p.acrescimo = Engine.acrescimo(vals[i], Number(p.taxaPct || 0)); if (o) Object.assign(o, { comissao: coms[i], funcId, liberado: Engine.liberadoParcela(p, coms[i]) }); });
+      Object.assign(at, { ...(credito ? {} : { servicoId }), ...(semCom ? {} : { funcId }), valorCobrado: valor + (at.desconto || 0), valorFinal: valor, pct, comissaoTotal: com, parteSalao: valor - com, corrigidoEm: stamp(), corrigidoPor: a.nome });
       if (!credito) at.obs = `Pacote: ${v.nome}`;
     }
     // sessões ainda abertas com serviço fora do pacote passam para um serviço com saldo
     sessoesDaVenda(S, v.id).filter(x => ABERTOS.includes(x.status) && !itensVenda(v).some(i => i.servicoId === x.servicoId)).forEach(x => {
       const novo = servicoDaSessao(S, v, situacaoVenda(S, v), '', x), s2 = S.servicos.find(k => k.id === novo); x.servicoId = novo; x.fim = fromMin(toMin(x.inicio) + (s2?.duracao || 60)); });
     renumerarSessoes(S, v);
+    // comissão das sessões já feitas (ainda fora de fechamento) acompanha o novo valor e a nova composição
+    if (semCom && !credito) S.obrigacoes.filter(o => o.sessaoAgId && o.atendimentoId === v.atendimentoId && !o.cancelada && !(o.fechado > 0)).forEach(o => {
+      const ag = S.agendamentos.find(x => x.id === o.sessaoAgId), f = S.funcionarios.find(x => x.id === o.funcId); if (!ag || !f) return;
+      const base = baseSessaoPacote(S, v, ag.servicoId), com = Engine.comissao(base, f.pct || 0);
+      Object.assign(o, { base, comissao: com, liberado: o.liberado > 0 ? com : 0 }); if (ag.comissaoSaldo) Object.assign(ag.comissaoSaldo, { base, comissao: com }); });
     (v.historico = v.historico || []).push({ quando: stamp(), usuario: a.nome, texto: `Alterado: ${antes} → ${v.nome} · ${v.sessoes} sessões · ${brl(v.valor)} · ${motivo}` });
     audit(S, a, 'Pacote da cliente alterado', `${v.codigo} · ${antes} → ${v.nome} · ${v.sessoes} sessões · ${brl(valor)} · ${motivo}`);
     return v;
@@ -3730,7 +3762,7 @@ function concluirSessaoPacote(S, a, agId, servicoId = '') {
     const ativos = situacaoVenda(S, v).ags.filter(x => !INATIVOS.includes(x.status)); ag.obs = obsSessao(S, v, ativos.indexOf(ag) + 1, novo);
   }
   ag.status = 'concluido'; ag.historico.push({ quando: stamp(), usuario: a.nome, texto: `Sessão do pacote ${v?.codigo || ''} concluída (já pago na venda)` });
-  if (v?.tipo === 'credito') comissaoDaSessao(S, a, v, ag);
+  if (comissaoNaSessao(v)) comissaoDaSessao(S, a, v, ag);
   if (S.estoqueMov) baixarConsumo(S, a, ag.servicoId, ag.id, v?.codigo || '', ag.data);
   const st = situacaoVenda(S, v);
   audit(S, a, 'Sessão de pacote concluída', `${v?.codigo} · ${S.servicos.find(x => x.id === ag.servicoId)?.nome || ''} · ${st.usadas} de ${v?.sessoes} usadas`, ctxAg(S, ag));
@@ -4368,6 +4400,8 @@ function salvarMeta(S, a, d) {
   S.metas.push({ id: 'mt_' + d.mes, mes: d.mes, salao: Math.round(d.salao || 0), func, por: a.nome, em: stamp() });
   audit(S, a, 'Metas do mês', `${d.mes} · salão ${brl(d.salao || 0)} · ${Object.keys(func).length} profissional(is) · vale também para os próximos meses`);
 }
+/* sessões de pacote ou de saldo concluídas no período (com a comissão de quem fez) */
+const sessoesFeitas = (S, ini, fim) => S.obrigacoes.filter(o => o.sessaoAgId && !o.cancelada && o.data >= ini && o.data <= fim);
 function progressoMetas(S, mes, hoje = TODAY) {
   const M = metaDoMes(S, mes), ini = mes + '-01', fim = iso(new Date(+mes.slice(0, 4), +mes.slice(5, 7), 0));
   const ats = S.atendimentos.filter(x => x.status === 'concluido' && x.data >= ini && x.data <= fim);
@@ -4376,7 +4410,10 @@ function progressoMetas(S, mes, hoje = TODAY) {
   const linha = (meta, real, n) => { const pct = meta ? Math.round(real * 1000 / meta) / 10 : 0, proj = passados ? Math.round(real * diasMes / passados) : 0;
     return { meta, real, n, pct, falta: Math.max(0, meta - real), projecao: proj, projPct: meta ? Math.round(proj * 100 / meta) : 0, porDia: restantes && meta > real ? Math.ceil((meta - real) / restantes) : 0 }; };
   const salao = linha(M.salao, sum(ats.map(x => x.valorFinal)) + sum(vendas.map(v => v.total)), ats.length);
-  const funcs = S.funcionarios.filter(f => f.ativo && (M.func[f.id] > 0 || ats.some(x => x.funcId === f.id))).map(f => ({ f, ...linha(M.func[f.id] || 0, sum(ats.filter(x => x.funcId === f.id).map(x => x.valorFinal)) + sum(vendas.filter(v => v.funcId === f.id).map(v => v.total)), ats.filter(x => x.funcId === f.id).length) }));
+  // sessões de pacote/saldo feitas no mês contam para a meta de quem fez (pelo valor da sessão)
+  const ses = sessoesFeitas(S, ini, fim);
+  const funcs = S.funcionarios.filter(f => f.ativo && (M.func[f.id] > 0 || ats.some(x => x.funcId === f.id) || ses.some(o => o.funcId === f.id))).map(f => { const so = ses.filter(o => o.funcId === f.id);
+    return { f, ...linha(M.func[f.id] || 0, sum(ats.filter(x => x.funcId === f.id).map(x => x.valorFinal)) + sum(so.map(o => o.base || 0)) + sum(vendas.filter(v => v.funcId === f.id).map(v => v.total)), ats.filter(x => x.funcId === f.id).length + so.length) }; });
   return { M, ini, fim, diasMes, passados, restantes, salao, funcs, produtos: sum(vendas.map(v => v.total)) };
 }
 
@@ -5181,7 +5218,7 @@ function runTests() {
     agendarSessaoPacote(S2, d2, v.id, { data: addDays(TODAY, 15), inicio: '11:00' }); agendarSessaoPacote(S2, d2, v.id, { data: addDays(TODAY, 22), inicio: '11:00' });
     const cheio = deveFalhar(() => agendarSessaoPacote(S2, d2, v.id, { data: addDays(TODAY, 29), inicio: '11:00' }));
     const st2 = situacaoVenda(S2, v), at = S2.atendimentos.find(x => x.id === v.atendimentoId);
-    return (S2.atendimentos.length === nAt + 1 && at.valorFinal === 16000 && at.comissaoTotal === 6400 && st1.marcadas === 2 && st1.livres === 2 && st2.concluidas === 1 && st2.livres === 0 && /já estão marcadas/.test(cheio) && ag.status === 'concluido') || JSON.stringify([st1, st2, cheio]);
+    return (S2.atendimentos.length === nAt + 1 && at.valorFinal === 16000 && at.comissaoTotal === 0 && ag.comissaoSaldo && ag.comissaoSaldo.base === 4000 && ag.comissaoSaldo.comissao === 1600 && st1.marcadas === 2 && st1.livres === 2 && st2.concluidas === 1 && st2.livres === 0 && /já estão marcadas/.test(cheio) && ag.status === 'concluido') || JSON.stringify([st1, st2, cheio]);
   });
   T('Formulário recusa nome sem sobrenome, telefone sem DDD, dia passado e profissional errada', () => {
     const base = { nome: 'Ana Paula', telefone: '(55) 97777-1111', itens: [{ servicoId: 's1' }], data: TODAY, hora: '10:00' };
@@ -5417,7 +5454,7 @@ function runTests() {
     const v = venderPacote(S5, d5, { pacoteId: caro.id, clienteId: 'k3', funcId: 'f2', parcelas: [{ forma: 'pix', valor: 14500 }], sessoes: [{ data: addDays(TODAY, 3), inicio: '10:00', servicoId: 's8' }] });
     editarVendaPacote(S5, d5, v.id, { pacoteId: certo.id, valor: 10000, motivo: 'vendido o pacote errado' });
     const at = S5.atendimentos.find(x => x.id === v.atendimentoId), pg = S5.parcelas.find(x => x.atendimentoId === at.id), ob = S5.obrigacoes.find(x => x.parcelaId === pg.id), ses = sessoesDaVenda(S5, v.id)[0];
-    const corr = v.sessoes === 4 && !v.itens && at.valorFinal === 10000 && pg.valor === 10000 && ob.comissao === 5000 && at.status === 'concluido' && ses.servicoId === 's7' && /sessão 1 de 4/.test(ses.obs);
+    const corr = v.sessoes === 4 && !v.itens && at.valorFinal === 10000 && pg.valor === 10000 && ob.cancelada && pg.comissao === 0 && at.status === 'concluido' && ses.servicoId === 's7' && /sessão 1 de 4/.test(ses.obs);
     estornarAtendimento(S5, d5, at.id, 'cliente desistiu do pacote');
     const st = situacaoVenda(S5, v);
     return (corr && v.cancelado && st.encerrado && ses.status === 'cancelado' && /estornado/.test(deveFalhar(() => agendarSessaoPacote(S5, d5, v.id, { data: addDays(TODAY, 5), inicio: '10:00' })))) || JSON.stringify([corr, at, pg, ob, ses, v]);
@@ -5546,6 +5583,31 @@ function runTests() {
     const fb = f2 || f; S.bloqueios.push({ id: 'b1', funcId: fb, data: dia, inicio: '16:00', fim: '20:00', motivo: 'Indisponível' }, { id: 'b2', funcId: fb, data: dia, inicio: '16:00', fim: '20:00', motivo: 'Indisponível' });
     const antes = ocupacao(S, fb, dia, '17:00', '17:40'); const n = liberarBloqueiosNoHorario(S, d, fb, dia, '17:00', '17:40');
     return (ids.length === 2 && id3 && /repetido/.test(rep) && antes && antes.tipo === 'bloqueio' && n === 2 && !ocupacao(S, fb, dia, '17:00', '17:40')) || JSON.stringify([ids, id3, rep, antes, n]);
+  });
+  T('Pacote: a venda entra no faturamento sem comissão; cada sessão comissiona quem fez, proporcional ao preço do serviço', () => {
+    const S = seedBase(), d = S.users.find(u => u.id === 'u0');
+    const s1 = S.servicos.find(x => x.id === 's1'), s2 = S.servicos.find(x => x.id !== 's1' && x.funcs.length && x.funcs.some(f => S.funcionarios.find(k => k.id === f && (k.pct || 0) > 0)));
+    s1.preco = 3500; s2.preco = 1500;
+    const fA = S.funcionarios.find(f => s1.funcs.includes(f.id) && f.pct > 0), fB = S.funcionarios.find(f => s2.funcs.includes(f.id) && f.pct > 0 && f.id !== fA.id) || S.funcionarios.find(f => s2.funcs.includes(f.id) && f.pct > 0);
+    fA.pct = 50; fB.pct = 50;
+    const pc = salvarPacote(S, d, { nome: 'Mecha + Unha', servicoId: 's1', itens: [{ servicoId: 's1', qtd: 1 }, { servicoId: s2.id, qtd: 1 }], preco: 5000 });
+    const v = venderPacote(S, d, { pacoteId: pc.id, clienteId: 'k1', funcId: fA.id, valor: 5000, parcelas: [{ forma: 'pix', valor: 5000 }] });
+    const at = S.atendimentos.find(x => x.id === v.atendimentoId);
+    const comVenda = sum(S.obrigacoes.filter(o => o.atendimentoId === at.id && !o.cancelada).map(o => o.comissao));
+    const g1 = agendarSessaoPacote(S, d, v.id, { data: TODAY, inicio: '10:00', funcId: fA.id, servicoId: 's1' }), g2 = agendarSessaoPacote(S, d, v.id, { data: TODAY, inicio: '11:00', funcId: fB.id, servicoId: s2.id });
+    const id1 = typeof g1 === 'string' ? g1 : g1.id, id2 = typeof g2 === 'string' ? g2 : g2.id;
+    concluirSessaoPacote(S, d, id1); concluirSessaoPacote(S, d, id2);
+    const o1 = S.obrigacoes.find(o => o.sessaoAgId === id1), o2 = S.obrigacoes.find(o => o.sessaoAgId === id2);
+    return (at.valorFinal === 5000 && comVenda === 0 && o1 && o1.funcId === fA.id && o1.base === 3500 && o1.comissao === 1750 && o2 && o2.funcId === fB.id && o2.base === 1500 && o2.comissao === 750) || JSON.stringify([at.valorFinal, comVenda, o1, o2]);
+  });
+  T('Pacote: quem vende escolhe comissão na venda (uma profissional) ou na sessão (quem fizer)', () => {
+    const S = seedBase(), d = S.users.find(u => u.id === 'u0');
+    const pc = salvarPacote(S, d, { nome: 'Pacote 4 escovas', servicoId: 's5', sessoes: 4, preco: 16000 });
+    const v1 = venderPacote(S, d, { pacoteId: pc.id, clienteId: 'k2', funcId: 'f3', comissao: 'venda', parcelas: [{ forma: 'pix', valor: 16000 }], sessoes: [{ data: addDays(TODAY, 1), inicio: '10:00' }] });
+    const at1 = S.atendimentos.find(x => x.id === v1.atendimentoId), ag1 = sessoesDaVenda(S, v1.id)[0]; concluirSessaoPacote(S, d, ag1.id);
+    const v2 = venderPacote(S, d, { pacoteId: pc.id, clienteId: 'k3', funcId: 'f3', parcelas: [{ forma: 'pix', valor: 16000 }], sessoes: [{ data: addDays(TODAY, 1), inicio: '14:00' }] });
+    const at2 = S.atendimentos.find(x => x.id === v2.atendimentoId), ag2 = sessoesDaVenda(S, v2.id)[0]; concluirSessaoPacote(S, d, ag2.id);
+    return (at1.funcId === 'f3' && at1.comissaoTotal === 6400 && !v1.comissaoNaSessao && !ag1.comissaoSaldo && at2.comissaoTotal === 0 && v2.comissaoNaSessao && ag2.comissaoSaldo?.comissao === 1600) || JSON.stringify([at1.comissaoTotal, ag1.comissaoSaldo, at2.comissaoTotal, ag2.comissaoSaldo]);
   });
   return out;
 }
@@ -8228,7 +8290,8 @@ function pgPainel() {
   const pc = L.filter(r => r.o.tipo === 'pix_cartao'), cv = L.filter(r => r.o.tipo === 'convenio');
   const pagos = sum(DB.pagamentos.filter(p => p.data >= ini && p.data <= fim).map(p => p.valor));
   const livres = sum(DB.funcionarios.filter(f => f.ativo).map(f => horariosLivres(DB, f.id, TODAY, nowMin()).length));
-  const perf = DB.funcionarios.filter(f => f.ativo).map(f => { const at = ats.filter(x => x.funcId === f.id); return { f, n: at.length, fat: sum(at.map(x => x.valorFinal)), com: sum(at.map(x => x.comissaoTotal)) }; });
+  const sesP = sessoesFeitas(DB, ini, fim);
+  const perf = DB.funcionarios.filter(f => f.ativo).map(f => { const at = ats.filter(x => x.funcId === f.id), so = sesP.filter(o => o.funcId === f.id); return { f, n: at.length + so.length, fat: sum(at.map(x => x.valorFinal)) + sum(so.map(o => o.base || 0)), com: sum(at.map(x => x.comissaoTotal)) + sum(so.map(o => o.comissao || 0)) }; });
   const maxFat = Math.max(1, ...perf.map(p => p.fat));
   const nm = nowMin();
   const prox = ags.filter(x => ['aguardando', 'confirmado', 'chegou'].includes(x.status) && (x.data > TODAY || (x.data === TODAY && toMin(x.fim) >= nm))).sort((x, y) => (x.data + x.inicio).localeCompare(y.data + y.inicio)).slice(0, 6);
@@ -8499,6 +8562,7 @@ function buscaServico(root, selId) {
   lst.addEventListener('mousedown', e => e.preventDefault());
   // "Ver todos": abre a lista completa de serviços (sem precisar digitar)
   const tg = box.querySelector('.svb-tg'); tg.addEventListener('mousedown', e => e.preventDefault());
+  box.querySelector('.svb-c').addEventListener('click', e => { if (e.target === e.currentTarget || e.target.closest('svg') && !e.target.closest('.svb-tg')) inp.focus(); });   // tocar em qualquer parte do campo abre o teclado
   tg.addEventListener('click', () => { if (!lst.hidden) { fechar(); return; } mostrarAtual(); res = opts; ativo = Math.max(0, opts.findIndex(o => o.id === sel.value)); inp.focus(); desenhar(); });
   lst.addEventListener('click', e => { const b = e.target.closest('[data-svb]'); if (b) escolher(b.dataset.svb); });
   inp.addEventListener('blur', () => setTimeout(() => { mostrarAtual(); fechar(); }, 120));
@@ -8894,7 +8958,7 @@ function modalAtendimento(id) {
     ${at.obs ? `<div class="muted">Obs.: ${esc(at.obs)}</div>` : ''}
     ${(() => { const pv = at.pacoteVendaId && (DB.pacoteVendas || []).find(v => v.id === at.pacoteVendaId && (v.atendimentoIds || [v.atendimentoId]).includes(at.id)); if (!pv) return '';
       if (pv.tipo === 'credito') return `<div class="note small">Compra sem agendar <b>${esc(pv.codigo)}</b> · ${esc(pv.nome)}${pv.cancelado ? ' · <b>estornada</b>' : ''}. O serviço fica de saldo para a cliente agendar depois. A venda não tem profissional: a comissão vai para quem fizer cada sessão.</div>`;
-      return `<div class="note small">Venda do pacote <b>${esc(pv.codigo)}</b> · ${esc(pv.nome)}${pv.cancelado ? ' · <b>estornado</b>' : ''}.${isOwner(ACTOR) && !pv.cancelado && at.status === 'concluido' ? ` Vendeu errado ou a cliente mudou de ideia? Em <b>Editar pacote</b> dá para trocar o pacote, o valor, os serviços e as sessões, ou desfazer o pacote.<div class="bar" style="margin-top:6px"><button class="btn sm pri" data-pk-corrigir="${pv.id}">Editar pacote</button></div>` : ''}</div>`; })()}
+      return `<div class="note small">Venda do pacote <b>${esc(pv.codigo)}</b> · ${esc(pv.nome)}${pv.cancelado ? ' · <b>estornado</b>' : ''}.${pv.comissaoNaSessao ? ' A venda não tem comissão: cada sessão comissiona quem fizer, proporcional ao preço do serviço.' : ` Comissão na venda para ${esc(fn(pv.funcId) || 'a profissional')}.`}${isOwner(ACTOR) && !pv.cancelado && at.status === 'concluido' ? ` Vendeu errado ou a cliente mudou de ideia? Em <b>Editar pacote</b> dá para trocar o pacote, o valor, os serviços e as sessões, ou desfazer o pacote.<div class="bar" style="margin-top:6px"><button class="btn sm pri" data-pk-corrigir="${pv.id}">Editar pacote</button></div>` : ''}</div>`; })()}
     ${isOwner(ACTOR) && at.custoMaterial ? `<div class="small muted">Material gasto (baixado do estoque): ${brl(at.custoMaterial)} · lucro real ${brl(at.valorFinal - at.comissaoTotal - at.custoMaterial)}</div>` : ''}
     ${produtosDoDiaHTML(at.clienteId, at.data)}
     ${isOwner(ACTOR) && at.status === 'concluido' && !at.pacoteVendaId && (DB.pacotes || []).some(x => x.ativo !== false) ? `<div class="ag-pk"><div class="small"><b>A cliente decidiu levar um pacote?</b><div class="muted">Este serviço${at.data < TODAY ? `, mesmo sendo de ${dBR(at.data)},` : ''} vira a 1ª sessão (feita) e o valor avulso é trocado pelo valor do pacote.</div></div><button class="btn sm" data-trocar-pk="${at.id}">Trocar por pacote</button></div>` : ''}
@@ -9840,7 +9904,10 @@ function modalVenderPacote(pacoteId = '', clienteId = '', opts = {}) {
   const ov = openModal(conv.length ? 'Trocar por pacote' : 'Vender pacote', `<div class="stack" style="gap:14px">
     ${conv.length ? `<div class="note small">${conv.map(x => `<b>${dBR(x.data).slice(0, 5)} às ${x.inicio}</b> · ${esc(SV(x.servicoId)?.nome || '')}`).join('<br>')}<br>${trAt ? `O registro <b>${esc(trAt.codigo)}</b> (${brl(trAt.valorFinal)}) é <b>estornado</b> e o serviço feito vira a 1ª sessão do pacote, já <b>concluída</b>. Lance abaixo o valor total pago pelo pacote.` : opts.concluir ? 'Este atendimento vira a 1ª sessão do pacote e já fica <b>concluído</b>, sem cobrar de novo.' : 'Este horário vira a 1ª sessão do pacote (sem cobrança separada).'}</div>` : ''}
     <div><div class="sec" style="margin:0 0 6px">Cliente</div>${clientePickerHTML('pv', clienteId, !!conv.length)}</div>
-    <div class="form"><label class="f">Pacote<select id="pv-p">${opt(pcs.map(x => [x.id, `${x.nome} · ${brl(x.preco)}`]), pc.id)}</select></label><label class="f">Profissional<select id="pv-f"></select></label>
+    <div class="form"><label class="f">Pacote<select id="pv-p">${opt(pcs.map(x => [x.id, `${x.nome} · ${brl(x.preco)}`]), pc.id)}</select></label><div class="f full"><span style="font-weight:700;color:var(--muted);font-size:.9em">Comissão do pacote</span><div class="pv-cm" role="radiogroup" aria-label="Como comissionar">
+        <label class="pv-cmo"><input type="radio" name="pv-cm" value="sessao" checked><span><b>Depois, em cada serviço feito</b><small>A comissão vai para quem fizer cada sessão, proporcional ao preço do serviço.</small></span></label>
+        <label class="pv-cmo"><input type="radio" name="pv-cm" value="venda"><span><b>Agora, para uma profissional</b><small>A comissão do pacote inteiro vai para a profissional escolhida, na venda.</small></span></label></div></div>
+      <label class="f"><span id="pv-fl">Profissional das sessões (preferência)</span><select id="pv-f"></select></label>
       <label class="f">Valor cobrado (R$)<input id="pv-v" inputmode="decimal"></label><label class="f">Forma de pagamento<select id="pv-fp">${opt([['pix', 'Pix'], ['debito', 'Cartão de débito'], ['credito', 'Cartão de crédito'], ['dinheiro', 'Dinheiro']], 'pix')}</select></label>
       <label class="f">Recebimento<select id="pv-st">${opt([['registrado', 'Recebido agora'], ['pendente', 'Não recebido (pendente)']], 'registrado')}</select></label><label class="f">Data do pagamento<input type="date" id="pv-d" value="${TODAY}" max="${TODAY}"></label></div>
     <div><div class="split"><div class="sec" style="margin:0">Datas das sessões</div><span class="muted small">Deixe em branco para marcar depois</span></div><div id="pv-ses" class="pv-ses"></div></div>
@@ -9872,14 +9939,16 @@ function modalVenderPacote(pacoteId = '', clienteId = '', opts = {}) {
     q('#pv-ses').querySelectorAll('[data-sx]').forEach(el => el.onclick = () => { const i = +el.dataset.sx; ses[i] = { data: '', inicio: '', servicoId: ses[i].servicoId, auto: false }; desenhar(); });
     resumo();
   };
+  const modoCm = () => ov.querySelector('[name="pv-cm"]:checked')?.value || 'sessao';
   const resumo = () => { const m = ses.filter(x => x.data && x.inicio).length + conv.length;
-    q('#pv-res').innerHTML = `<b>${esc(pc.nome)}</b>: ${esc(composicaoTxt(pc))} por <b>${brl(toCents(q('#pv-v').value) || 0)}</b>. ${m} sessão(ões) vão para a agenda agora${pc.sessoes - m ? `, ${pc.sessoes - m} fica(m) para marcar depois` : ''}. A comissão é calculada sobre o valor do pacote.${pc.validadeDias ? ` Vale ${pc.validadeDias} dias.` : ''}`; };
+    q('#pv-res').innerHTML = `<b>${esc(pc.nome)}</b>: ${esc(composicaoTxt(pc))} por <b>${brl(toCents(q('#pv-v').value) || 0)}</b>. ${m} sessão(ões) vão para a agenda agora${pc.sessoes - m ? `, ${pc.sessoes - m} fica(m) para marcar depois` : ''}. O valor entra no faturamento agora. ${modoCm() === 'venda' ? `<b>Comissão na venda</b> para ${esc(fn(q('#pv-f').value) || 'a profissional escolhida')}, sobre o valor do pacote; as sessões depois não comissionam de novo.` : '<b>Sem comissão na venda</b>: cada sessão comissiona quem fizer, sobre a parte do pacote daquele serviço (proporcional ao preço de tabela).'}${pc.validadeDias ? ` Vale ${pc.validadeDias} dias.` : ''}`; };
   q('#pv-p').onchange = () => { pc = pcs.find(x => x.id === q('#pv-p').value); ses = []; desenhar(); };
   q('#pv-f').onchange = () => { ses = ses.map(x => x.auto ? null : x); desenhar(); };
+  ov.querySelectorAll('[name="pv-cm"]').forEach(r => r.onchange = () => { q('#pv-fl').textContent = modoCm() === 'venda' ? 'Profissional que recebe a comissão' : 'Profissional das sessões (preferência)'; resumo(); });
   q('#pv-v').oninput = resumo;
   desenhar();
   q('#pv-ok').onclick = () => { const r = run(() => { const cid = lerCliente(ov, 'pv'), v = toCents(q('#pv-v').value) || 0;
-      const base = { pacoteId: pc.id, funcId: q('#pv-f').value, valor: v, data: q('#pv-d').value, parcelas: [{ forma: q('#pv-fp').value, valor: v, status: q('#pv-st').value }],
+      const base = { pacoteId: pc.id, funcId: q('#pv-f').value, comissao: modoCm(), valor: v, data: q('#pv-d').value, parcelas: [{ forma: q('#pv-fp').value, valor: v, status: q('#pv-st').value }],
         sessoes: ses.filter(x => x.data && x.inicio).map(x => ({ data: x.data, inicio: x.inicio, servicoId: x.servicoId })) };
       if (trAt) return trocarAtendimentoPorPacote(DB, ACTOR, trAt.id, base);
       return venderPacote(DB, ACTOR, { ...base, clienteId: cid, converter: conv.map(x => x.id), concluirConvertidos: !!opts.concluir }); },
