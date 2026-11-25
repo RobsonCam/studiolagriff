@@ -2348,7 +2348,7 @@ function criarPedido(S, d, agora = TODAY, por = null) {
   const telDiferente = achado.por === 'nome' && telChave(cli.telefone) !== telChave(tel);
   const telDeOutro = !cli || achado.por === 'nome' ? (achado.telDeOutro && achado.telDeOutro !== cli ? achado.telDeOutro.nome : '') : '';
   if (!cli) {
-    if (achado.telDeOutro) throw new Error(`Este WhatsApp já está cadastrado em outro nome no estúdio. Use o seu próprio número ou fale com o estúdio pelo WhatsApp.`);
+    // telefone de outra cliente (ex.: mãe e filha no mesmo WhatsApp) pode: vira um cadastro novo, só o nome não pode repetir
     try { validarNomeCliente(S, nome, null); } catch (e) { throw new Error('Já temos uma cliente com este nome e sobrenome. Escreva também o seu segundo nome (ex.: Maria Fernanda Souza) para não confundirmos o cadastro.'); }
     cli = { id: uid('cl'), nome, telefone: formatarTel(tel), aniversario: '', obs: '', origemId: origem ? origem.id : null, viaFormulario: true, cadastro: agora };
     S.clientes.push(cli); novo = true;
@@ -2471,7 +2471,8 @@ function validarNomeCliente(S, nome, id) {
   const iguais = S.clientes.filter(c => c.id !== id && !c.excluido && (() => { const q = partesNome(c.nome); return q.length && q[0] + ' ' + q[q.length - 1] === chave; })());
   if (!iguais.length) return;
   const mesmo = iguais.find(c => partesNome(c.nome).join(' ') === completo);
-  const ex = `${String(nome).trim().split(/\s+/)[0]} Fernanda ${String(nome).trim().split(/\s+/).slice(-1)[0]}`;
+  const cap = w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(), pn = String(nome).trim().split(/\s+/);
+  const ex = `${cap(pn[0])} Fernanda ${cap(pn[pn.length - 1])}`;
   if (mesmo) throw new Error(`Já existe uma cliente chamada ${mesmo.nome} (${mesmo.telefone}). Se for a mesma pessoa, use o cadastro dela. Se for outra pessoa, escreva também o segundo nome, por exemplo: ${ex}.`);
   if (p.length < 3) throw new Error(`Já existe cliente com este nome e sobrenome: ${iguais.map(c => c.nome).join(', ')}. Para não confundir, escreva também o segundo nome, por exemplo: ${ex}.`);
 }
@@ -2485,11 +2486,10 @@ function salvarCliente(S, a, d) {
   if (d.id && !pode(S, a, 'clientesEditar')) throw new Error('Editar cadastro de clientes é restrito. Peça à proprietária.');
   if (!d.id && !(pode(S, a, 'clientes') || pode(S, a, 'agendar') || pode(S, a, 'registrar'))) throw new Error('Seu usuário não cadastra clientes.');
   if (!d.nome || !d.nome.trim()) throw new Error('Informe o nome do cliente.');
-  const tel = digits(d.telefone);
-  if (tel.length < 10) throw new Error('Informe um telefone com DDD (10 ou 11 dígitos).');
+  const tel = telLimpo(d.telefone);
+  if (tel.length < 10 || tel.length > 11) throw new Error('Informe o telefone com DDD (qualquer DDD), ex.: (55) 99999-0000.');
   const atual = d.id ? S.clientes.find(c => c.id === d.id) : null;
-  // cadastro antigo que já dividia telefone pode ser editado sem trocar o número; cadastro novo nunca repete
-  if (!(atual && telChave(atual.telefone) === telChave(tel))) validarTelefoneCliente(S, tel, d.id);
+  // o mesmo telefone pode estar em mais de uma cliente (mãe e filha, por exemplo); o que não pode repetir é o nome
   if (!(atual && nomeChave(atual.nome) === nomeChave(d.nome))) validarNomeCliente(S, d.nome, d.id);
   d = { ...d };
   if (d.aniversario !== undefined) d.aniversario = normalizarAniversario(d.aniversario);
@@ -2596,9 +2596,21 @@ function juntarComanda(S, ats) {
   return ats;
 }
 function registrarAtendimentoGrupo(S, a, d) { return juntarComanda(S, registrarAtendimentoGrupoBase(S, a, d)); }
+/* não deixa registrar de novo um agendamento que já tem registro valendo (toque duplo, ou outro aparelho com a tela antiga) */
+function conferirJaRegistrado(S, agIds) {
+  for (const id of new Set((agIds || []).filter(Boolean))) {
+    const at = S.atendimentos.find(x => x.agendamentoId === id && x.status === 'concluido'), ag = S.agendamentos.find(x => x.id === id);
+    if (at || (ag && ag.status === 'concluido')) {
+      const cli = S.clientes.find(k => k.id === (at || ag).clienteId)?.nome || 'esta cliente', sv = S.servicos.find(x => x.id === (at || ag).servicoId)?.nome || 'serviço';
+      throw new Error(at ? `${sv} de ${cli} já foi registrado como ${at.codigo}${at.registradoPor ? ` por ${at.registradoPor.split(' ')[0]}` : ''}${at.registradoEm ? ` em ${at.registradoEm}` : ''}. Não é preciso registrar de novo. Se o valor ficou errado, estorne o ${at.codigo} e registre outra vez.`
+        : `${sv} de ${cli} já está concluído. Não é preciso registrar de novo.`);
+    }
+  }
+}
 function registrarAtendimentoGrupoBase(S, a, d) {
   const itens = d.itens || [];
   if (!itens.length) throw new Error('Adicione ao menos um serviço.');
+  conferirJaRegistrado(S, itens.map(i => i.agendamentoId));
   // convênio: parcelamento (mín. R$ 50 por parcela) e cliente com parcela vencida só com liberação
   const conv = (d.parcelas || []).filter(p => p.forma === 'convenio');
   conv.forEach(p => { const cv = S.convenios.find(x => x.id === p.convenioId); validarParcelamento((p.valor || 0) + Engine.acrescimo(p.valor || 0, Number(cv?.taxa || 0)), p.nParcelas); });
@@ -3391,7 +3403,10 @@ function criarAvaliacao(S, d, agora = TODAY, opts = {}) {
   // A mesma cliente pode avaliar quantas vezes quiser: cada avaliação fica registrada, ligada ao último atendimento dela
   let ult = null;
   if (opts.validar !== false) {
-    const k = S.clientes.find(c => !c.excluido && telChave(c.telefone) === telChave(tel));
+    // o mesmo WhatsApp pode ser de mais de uma cliente: vale a que tiver atendimento recente (de preferência com o mesmo nome)
+    const ks = S.clientes.filter(c => !c.excluido && telChave(c.telefone) === telChave(tel)).sort((x, y) => nomesCompativeis(y.nome, nome) - nomesCompativeis(x.nome, nome));
+    const recente = c => S.atendimentos.some(x => x.clienteId === c.id && x.status === 'concluido' && x.data <= agora && x.data >= addDays(agora, -60));
+    const k = ks.find(recente) || ks[0];
     ult = k && S.atendimentos.filter(x => x.clienteId === k.id && x.status === 'concluido' && x.data <= agora && x.data >= addDays(agora, -60)).sort((p, q) => q.data.localeCompare(p.data))[0];
     if (!ult) throw new Error('Não encontramos um atendimento recente com este WhatsApp. A avaliação é só para clientes atendidas nos últimos 60 dias. Use o mesmo número que você deu no estúdio.');
     cli.cli = k;
@@ -4948,11 +4963,12 @@ function runTests() {
     return (a1.pedido.clienteId === 'k5' && a2.pedido.clienteId === 'k5' && a3.pedido.clienteId === 'k5' && !a3.novoCliente && a3.pedido.telefoneDiferente === k.telefone
       && a4.novoCliente && S.clientes.length === n0 + 1) || JSON.stringify({ a1: a1.pedido.clienteId, a2: a2.pedido.clienteId, a3: a3.pedido, a4: a4.novoCliente, n: S.clientes.length - n0 });
   });
-  T('Mesmo WhatsApp com outro nome: não vira o cadastro da outra pessoa nem cria cadastro com telefone repetido', () => {
+  T('Mesmo WhatsApp com outro nome (ex.: mãe e filha): vira um cadastro novo, sem mexer no cadastro da outra pessoa', () => {
     const k = S.clientes.find(x => x.id === 'k6');   // Larissa Pereira
-    const n0 = S.clientes.length, p0 = S.pedidos.length;
-    const e = deveFalhar(() => criarPedido(S, { nome: 'Maria Souza Teste', telefone: k.telefone, itens: [{ servicoId: 's1' }], data: addDays(TODAY, 5), hora: '10:00' }));
-    return (/outro nome/.test(e) && S.clientes.length === n0 && S.pedidos.length === p0) || JSON.stringify({ e, n: S.clientes.length - n0 });
+    const n0 = S.clientes.length, nomeK = k.nome;
+    const r = criarPedido(S, { nome: 'Maria Souza Teste', telefone: k.telefone, itens: [{ servicoId: 's1' }], data: addDays(TODAY, 5), hora: '10:00' });
+    const nova = S.clientes.find(c => c.id === r.pedido.clienteId);
+    return (r.novoCliente && S.clientes.length === n0 + 1 && nova.id !== k.id && nova.nome === 'Maria Souza Teste' && k.nome === nomeK && r.pedido.telefoneDeOutro === nomeK) || JSON.stringify({ n: S.clientes.length - n0, cli: nova?.nome, de: r.pedido.telefoneDeOutro });
   });
   T('Horário ocupado: o pedido do cliente entra (aviso só para a equipe) e o agendamento por cima é recusado', () => {
     const dia = addDays(TODAY, 8);
@@ -5173,17 +5189,20 @@ function runTests() {
     const k = S6.clientes.find(x => x.id === f.clienteId);
     return (F.ats.length === 2 && F.faturado === 16000 && F.recebido === 9000 && F.pendente === 7000 && F.totSaidas === 2000 && F.resultado === 7000 && F.pacientes.length === 2 && k.soPodologia && fichaPodo(S6, k.id).anexos[0].id === ax.id && grande && pacientesPodologia(S6).length === 3) || JSON.stringify([F.ats.length, F.faturado, F.recebido, F.pendente, F.resultado]);
   });
-  T('Cadastro: sem nome e sem telefone repetidos; nome e sobrenome iguais exigem o segundo nome', () => {
+  T('Cadastro: nome não repete (telefone pode repetir, qualquer DDD); nome e sobrenome iguais exigem o segundo nome', () => {
     const S8 = seedBase(), d8 = S8.users.find(u => u.id === 'u0');
     const e = [deveFalhar(() => salvarCliente(S8, d8, { nome: 'Mariana Alves', telefone: '(55) 97777-0001' })),
       deveFalhar(() => salvarCliente(S8, d8, { nome: 'Mariana', telefone: '(55) 97777-0002' })),
-      deveFalhar(() => salvarCliente(S8, d8, { nome: 'Joana Lima', telefone: S8.clientes[0].telefone })),
+      !deveFalhar(() => salvarCliente(S8, d8, { nome: 'Joana Lima', telefone: S8.clientes[0].telefone })) && 'telefone repetido aceito',
       deveFalhar(() => salvarCliente(S8, d8, { nome: 'mariana  alves', telefone: '(55) 97777-0003' }))];
     const ok = salvarCliente(S8, d8, { nome: 'Mariana Fernanda Alves', telefone: '(55) 97777-0004' });
     const dup3 = deveFalhar(() => salvarCliente(S8, d8, { nome: 'Mariana Fernanda Alves', telefone: '(55) 97777-0005' }));
     const edita = !deveFalhar(() => salvarCliente(S8, d8, { id: 'k1', nome: 'Mariana Alves', telefone: S8.clientes[0].telefone, obs: 'x' }));
-    const form = deveFalhar(() => criarPedido(S8, { nome: 'Carla Mendes', telefone: S8.clientes[1].telefone, itens: [{ servicoId: 's1' }], data: addDays(TODAY, 2), hora: '10:00' }));
-    return (e.every(Boolean) && /segundo nome/.test(e[0]) && /já está no cadastro/.test(e[2]) && !!ok && dup3 && edita && /outro nome/.test(form)) || JSON.stringify([e, dup3, edita, form]);
+    const form = criarPedido(S8, { nome: 'Carla Mendes', telefone: S8.clientes[1].telefone, itens: [{ servicoId: 's1' }], data: addDays(TODAY, 2), hora: '10:00' }).novoCliente;
+    const ddd = ['(11) 98888-7777', '(91) 3222-1111', '+55 (21) 97777-6666', '051 99999-8888'].map((t, i) => !deveFalhar(() => salvarCliente(S8, d8, { nome: 'Cliente Ddd' + 'abcd'[i] + ' Teste', telefone: t })));
+    const curto = deveFalhar(() => salvarCliente(S8, d8, { nome: 'Cliente Curto Teste', telefone: '9999-1111' }));
+    const nomeForm = deveFalhar(() => criarPedido(S8, { nome: 'mariana fernanda alves', telefone: '(48) 96666-1234', itens: [{ servicoId: 's1' }], data: addDays(TODAY, 3), hora: '10:00' }));
+    return (e.every(Boolean) && /segundo nome/.test(e[0]) && !!ok && dup3 && edita && form && ddd.every(Boolean) && /DDD/.test(curto)) || JSON.stringify([e, dup3, edita, form, ddd, curto, nomeForm]);
   });
   T('Avaliação: nota de 1 a 5, nome e telefone obrigatórios, nota baixa pede comentário; a mesma cliente pode avaliar várias vezes', () => {
     const S1 = seedBase();
@@ -5609,6 +5628,15 @@ function runTests() {
     const at2 = S.atendimentos.find(x => x.id === v2.atendimentoId), ag2 = sessoesDaVenda(S, v2.id)[0]; concluirSessaoPacote(S, d, ag2.id);
     return (at1.funcId === 'f3' && at1.comissaoTotal === 6400 && !v1.comissaoNaSessao && !ag1.comissaoSaldo && at2.comissaoTotal === 0 && v2.comissaoNaSessao && ag2.comissaoSaldo?.comissao === 1600) || JSON.stringify([at1.comissaoTotal, ag1.comissaoSaldo, at2.comissaoTotal, ag2.comissaoSaldo]);
   });
+  T('Registro em dobro: o mesmo agendamento não pode ser registrado duas vezes (toque duplo ou outro aparelho)', () => {
+    const S = seedBase(), d = S.users.find(u => u.id === 'u0');
+    const id = salvarAgendamento(S, d, { clienteId: 'k1', servicoId: 's1', funcId: 'f1', data: TODAY, inicio: '10:00', fim: '11:00', status: 'confirmado' });
+    const reg = () => registrarAtendimentoGrupo(S, d, { clienteId: 'k1', data: TODAY, hora: '11:00', parcelas: [{ forma: 'pix', valor: 5000 }], itens: [{ agendamentoId: id, funcId: 'f1', servicoId: 's1', valorCobrado: 5000 }] });
+    const [at] = reg(); const n1 = S.atendimentos.filter(x => x.agendamentoId === id).length;
+    const e = deveFalhar(reg); const n2 = S.atendimentos.filter(x => x.agendamentoId === id).length;
+    estornarAtendimento(S, d, at.id, 'valor errado'); const [at2] = reg();   // depois do estorno pode registrar de novo
+    return (n1 === 1 && n2 === 1 && e.includes('já foi registrado como ' + at.codigo) && at2 && at2.id !== at.id) || JSON.stringify([n1, n2, e]);
+  });
   return out;
 }
 
@@ -5966,6 +5994,18 @@ function syncEnviar() {
 }
 
 /* ---------- leitura ---------- */
+/* busca no banco os pacotes da semana dessas datas (só nas coleções pedidas) e aplica aqui antes de uma ação sensível */
+async function atualizarDoServidor(cols, datas) {
+  if (!SYNC.db || !SYNC.pronto) return;
+  const bases = [...new Set((datas || []).filter(Boolean).map(semanaDe))];
+  const tarefas = [];
+  for (const c of cols) for (const b0 of bases) {
+    const nomes = [b0, ...Object.keys(SYNC.tam).filter(k => k.startsWith(c + '/' + b0 + '-')).map(k => k.slice(c.length + 1))];
+    for (const b of new Set(nomes)) tarefas.push(Promise.race([SYNC.db.doc(c + '/' + b).get(), new Promise(r => setTimeout(() => r(null), 4000))])
+      .then(snap => { if (snap && snap.exists) aplicarPacote(c, b, snap.data(), false); }).catch(() => { }));
+  }
+  await Promise.all(tarefas);
+}
 function aplicarPacote(col, b, dados, inicial) {
   const k = col + '/' + b; SYNC.existe.add(k);
   const m = SYNC.meta[col] || (SYNC.meta[col] = {});
@@ -8869,7 +8909,16 @@ function modalRegistro(pref = {}) {
   q('#r-addsv').onclick = () => { itens.push({ servicoId: '', funcId: own ? ACTOR.funcId : (itens[itens.length - 1]?.funcId || funcs[0]?.id), valor: 0 }); drawItens(); sync(); };
   q('#r-add').onclick = () => { pagoManual = true; const rest = total() - sum(leParc().map(p => p.valor)); parcelas.push({ forma: convsCli().length ? 'convenio' : 'credito', valor: rest > 0 ? centsInput(rest) : '', status: 'registrado', convenioId: '', autorizacao: '' }); drawParc(); calc(); };
   drawItens(); drawParc(); sync();
-  const concluir = vender => {
+  let enviando = false;
+  const concluir = async vender => {
+    if (enviando) return;   // toque duplo: o segundo toque não faz nada
+    enviando = true; const bts = ['#r-ok', '#r-okv'].map(s => q(s)).filter(Boolean); const txt = bts.map(b => b.textContent);
+    bts.forEach(b => { b.disabled = true; b.textContent = 'Registrando…'; });
+    try {
+      // outro aparelho pode ter registrado este serviço e esta tela estar desatualizada: busca o mais recente antes
+      await atualizarDoServidor(['atendimentos', 'agendamentos'], [val('r-dt'), ...itens.map(it => DB.agendamentos.find(x => x.id === it.agendamentoId)?.data)]);
+      try { conferirJaRegistrado(DB, itens.map(it => it.agendamentoId)); } catch (e) { toast(e.message, 'bad'); closeModal(); render(); return; }
+    } finally { enviando = false; bts.forEach((b, i) => { if (b.isConnected) { b.disabled = false; b.textContent = txt[i]; } }); }
     const res = run(() => {
       const clienteId = lerCliente(ov, 'r');
       if (itens.some(x => !x.servicoId)) throw new Error('Escolha o serviço em todas as linhas, ou remova a linha vazia.');
