@@ -2077,7 +2077,19 @@ function historicoServico(S, ids) {
   const add = (quando, usuario, tipo, titulo, detalhe, sub) => { if (!quando) return; ev.push({ ms: stampMs(quando), n: n++, quando, usuario: usuario || '—', tipo, titulo, detalhe: detalhe || '', sub: sub || '' }); };
   const varios = ags.length > 1;
   const tipoH = t => /WhatsApp|Mensagem/i.test(t) ? 'wa' : /criado|Criado a partir/i.test(t) ? 'ag' : /Sinal/i.test(t) ? 'pg' : /estornad|desfeito|excluída/i.test(t) ? 'bad' : /Concluído|concluída/i.test(t) ? 'ok' : /Cliente pediu|Presença confirmada/i.test(t) ? 'cli' : 'alt';
-  for (const ag of ags) for (const h of ag.historico || []) add(h.quando, h.usuario, tipoH(h.texto), h.texto, h.det || (h.texto === 'Agendamento criado' ? 'dados de hoje: ' + descreverAgendamento(S, ag) : ''), varios ? `${ag.inicio} · ${nomeSv(S, ag.servicoId)} · ${nomeFu(S, ag.funcId).split(' ')[0]}` : '');
+  // edições antigas (antes do detalhamento campo a campo): compara a "foto" do agendamento gravada na auditoria antes e depois
+  const audAg = id => (S.auditoria || []).filter(l => l.agId === id && l.ref).map(l => ({ l, ms: stampMs(l.quando) }));
+  const editAntiga = (ag, h) => {
+    const L = audAg(ag.id), ms = stampMs(h.quando), dep = L.find(x => x.l.quando === h.quando && x.l.usuario === h.usuario && /editad/i.test(x.l.acao));
+    const ant = L.filter(x => x.ms < ms || (x.ms === ms && x !== dep && x.l.acao === 'Agendamento criado')).sort((a, b) => b.ms - a.ms)[0];
+    const limpa = r => String(r || '').replace(/^Agendamento\s+/, '').split(' · ').join(', ');
+    const base = 'Registro antigo: até 27/11/2026 o sistema guardava só "Dados editados", sem dizer o que mudou';
+    if (dep && ant && limpa(dep.l.ref) !== limpa(ant.l.ref)) return `Antes: ${limpa(ant.l.ref)} · Depois: ${limpa(dep.l.ref)} · ${base}`;
+    if (dep && ant) return `Data, horário, serviço e profissional continuaram iguais: ${limpa(dep.l.ref)} · A situação também não mudou · A alteração só pode ter sido no valor, no canal ou na observação, ou o agendamento foi salvo sem mudar nada · ${base}`;
+    return `${base} · Dados de hoje: ${descreverAgendamento(S, ag)}`;
+  };
+  for (const ag of ags) for (const h of ag.historico || []) add(h.quando, h.usuario, tipoH(h.texto), h.texto,
+    h.det || (h.texto === 'Agendamento criado' ? 'dados de hoje: ' + descreverAgendamento(S, ag) : h.texto === 'Dados editados' ? editAntiga(ag, h) : /^Reagendado/.test(h.texto) ? (editAntiga(ag, h).startsWith('Antes:') ? editAntiga(ag, h).split(' · Registro antigo')[0] : '') : ''), varios ? `${ag.inicio} · ${nomeSv(S, ag.servicoId)} · ${nomeFu(S, ag.funcId).split(' ')[0]}` : '');
   for (const c of S.contatos || []) if ((c.atendimentoId && atS.has(c.atendimentoId) && !(c.agendamentoId && agS.has(c.agendamentoId))))
     add(c.quando, c.usuario, 'wa', c.dispensado ? 'Mensagem não enviada (aviso dispensado)' : 'WhatsApp aberto', `${c.modelo}${c.detalhe ? ' · ' + c.detalhe : ''}`);
   for (const at of ats) {
@@ -2164,17 +2176,37 @@ function convNaSemana(S, r, ini, fim) {
   if (r.bloqueado > 0 || r.aFechar > 0) return true;   // ainda em aberto (ou liberado e não fechado): continua aparecendo
   return (S.acertos || []).some(x => x.parcelaId === r.p.id && x.data >= ini && x.data <= fim);
 }
+/* comissões de Pix/cartão que ficaram de fora do fechamento da semana delas (ex.: serviço de sexta
+   registrado no sábado, depois do fechamento): passam para a próxima semana ainda não fechada,
+   e continuam passando de semana em semana até entrarem num fechamento */
+function comissoesAtrasadas(S, a, funcId, ini, fim) {
+  const fs = S.fechamentos.filter(f => f.funcId === funcId);
+  if (!fs.length) return [];   // profissional que nunca teve fechamento: não há semana anterior "perdida"
+  const prim = fs.reduce((m, f) => f.inicio < m ? f.inicio : m, fs[0].inicio);
+  const ja = fechamentoDaSemana(S, funcId, ini, fim), noFe = ja ? new Set(ja.itens.map(i => i.obrigacaoId)) : null;
+  return linhasObrig(S, a, { funcId, fim: addDays(ini, -1) }).filter(r => r.o.tipo === 'pix_cartao' && r.p.data >= prim && r.p.data < ini
+    && (noFe ? noFe.has(r.o.id) : r.aFechar > 0)
+    && fs.some(f => f.inicio <= r.p.data && f.fim >= r.p.data));   // só se a semana do serviço já foi fechada (senão é só fechar aquela semana)
+}
+/* para o aviso: tudo o que ficou fora do fechamento da própria semana e ainda não entrou em nenhum */
+function comissoesForaDoFechamento(S, a) {
+  return equipeComissao(S).flatMap(f => { const fs = S.fechamentos.filter(x => x.funcId === f.id); if (!fs.length) return [];
+    const prim = fs.reduce((m, x) => x.inicio < m ? x.inicio : m, fs[0].inicio);
+    return linhasObrig(S, a, { funcId: f.id }).filter(r => r.o.tipo === 'pix_cartao' && r.aFechar > 0 && r.p.data >= prim && fs.some(x => x.inicio <= r.p.data && x.fim >= r.p.data)); });
+}
 function resumoFechamento(S, a, funcId, ini, fim, inclConv) {
   const pc = linhasObrig(S, a, { funcId, ini, fim }).filter(r => r.o.tipo === 'pix_cartao');
   const cv = linhasObrig(S, a, { funcId, tipo: 'convenio' }).filter(r => r.p.situacao !== 'cancelado' && convNaSemana(S, r, ini, fim));
-  const all = [...pc, ...cv];
+  const atr = comissoesAtrasadas(S, a, funcId, ini, fim);
+  const all = [...pc, ...atr, ...cv];
   // o fechamento da semana soma tudo o que já foi liberado: Pix, cartão e convênio já acertado
   const elegiveis = all.filter(r => r.aFechar > 0);
   const val = (rows, k) => sum(rows.map(r => r[k]));
   const forma = f => pc.filter(r => r.p.forma === f);
   return {
-    pc, cv, elegiveis, forma,
+    pc, cv, atr, elegiveis, forma,
     t: {
+      atrasado: val(atr, 'aFechar'),
       pix: sum(forma('pix').map(r => r.p.valor)), debito: sum(forma('debito').map(r => r.p.valor)), credito: sum(forma('credito').map(r => r.p.valor)), dinheiro: sum(forma('dinheiro').map(r => r.p.valor)),
       comPC: val(pc, 'comissao'), liberadaPC: val(pc, 'liberado'), aguardandoRec: val(pc, 'bloqueado'), pagaPC: val(pc, 'pago'), pendentePC: val(pc, 'aPagar'),
       conv: sum(cv.map(r => r.p.valor)), comConv: val(cv, 'comissao'), convBloq: val(cv, 'bloqueado'), convLib: val(cv, 'liberado'), convAFechar: val(cv, 'aFechar'),
@@ -5775,6 +5807,21 @@ function runTests() {
       && /WhatsApp aberto/.test(tit) && tit.includes(`Serviço ${at.codigo} registrado`) && tit.includes(`fechamento ${f.codigo}`) && tit.includes(`Comissão paga · ${f.codigo}`) && H.resumo[0].paga === at.comissaoTotal;
     return ok || JSON.stringify({ semRuido, tit, r: H.resumo[0] && { c: H.resumo[0].comissao, p: H.resumo[0].paga } });
   });
+  T('Serviço de sexta registrado depois do fechamento: a comissão passa para a próxima semana aberta (e continua passando até ser fechada)', () => {
+    const S = seedBase(), d = S.users.find(u => u.id === 'u0'), ws = addDays(weekStart(TODAY), -14), we = addDays(ws, 6), sexta = we;
+    registrarAtendimento(S, d, { funcId: 'f2', servicoId: 's7', clienteId: 'k1', data: addDays(ws, 1), valorCobrado: 4000, parcelas: [{ forma: 'pix', valor: 4000 }] });
+    const f1 = confirmarFechamento(S, d, 'f2', ws, we, { abater: false });
+    const tarde = registrarAtendimento(S, d, { funcId: 'f2', servicoId: 's7', clienteId: 'k2', data: sexta, valorCobrado: 6000, parcelas: [{ forma: 'pix', valor: 6000 }] });
+    const sem2 = [addDays(ws, 7), addDays(ws, 13)], sem3 = [addDays(ws, 14), addDays(ws, 20)];
+    const r2 = resumoFechamento(S, d, 'f2', ...sem2), aviso = comissoesForaDoFechamento(S, d).some(r => r.at.id === tarde.id);
+    const r3 = resumoFechamento(S, d, 'f2', ...sem3);   // semana 2 ainda não fechada: continua aparecendo na seguinte também
+    const naSem2 = r2.atr.some(r => r.at.id === tarde.id) && r2.elegiveis.some(r => r.at.id === tarde.id), naSem3 = r3.atr.some(r => r.at.id === tarde.id);
+    registrarAtendimento(S, d, { funcId: 'f2', servicoId: 's7', clienteId: 'k1', data: sem2[0], valorCobrado: 2000, parcelas: [{ forma: 'pix', valor: 2000 }] });
+    const f2 = confirmarFechamento(S, d, 'f2', ...sem2, { abater: false });
+    const entrou = f2.itens.some(i => i.atendimentoId === tarde.id), some = !comissoesForaDoFechamento(S, d).some(r => r.at.id === tarde.id) && !resumoFechamento(S, d, 'f2', ...sem3).atr.length;
+    const aindaNa2 = resumoFechamento(S, d, 'f2', ...sem2).atr.some(r => r.at.id === tarde.id);
+    return (!f1.itens.some(i => i.atendimentoId === tarde.id) && naSem2 && naSem3 && aviso && entrou && some && aindaNa2) || JSON.stringify({ naSem2, naSem3, aviso, entrou, some, aindaNa2 });
+  });
   return out;
 }
 
@@ -8527,7 +8574,7 @@ function pgPainel() {
     <div class="bar" style="justify-content:space-between"><div class="sec" style="margin:0">Visão do período</div>${perBar()}</div>
     ${cardAlertas()}
     ${painelContatos(ags)}
-    ${painelMetas('dono')}${avisoEstoque()}
+    ${avisoForaFechamentoHTML()}${painelMetas('dono')}${avisoEstoque()}
     <div class="sec">Agenda</div>
     <div class="grid g4">
       ${kpi('Atendimentos de hoje', agHoje.length, `${agHoje.filter(x => x.status === 'confirmado').length} confirmados hoje`, 'accent')}
@@ -9484,6 +9531,20 @@ function modalAcerto(parcelaId) {
   rebindFns.set(ov, bind); bind();
 }
 
+/* comissões que ficaram fora do fechamento da própria semana: avisa e leva para a próxima semana aberta */
+function proximaSemanaAberta(funcId, data) {
+  const f = DB.fechamentos.find(x => x.funcId === funcId && x.inicio <= data && x.fim >= data); let w = f ? addDays(f.inicio, 7) : semanaAPagar()[0];
+  for (let i = 0; i < 60 && fechamentoDaSemana(DB, funcId, w, addDays(w, 6)); i++) w = addDays(w, 7);
+  return w;
+}
+function avisoForaFechamentoHTML() {
+  if (!isOwner(ACTOR)) return '';
+  const L = comissoesForaDoFechamento(DB, ACTOR); if (!L.length) return '';
+  const por = new Map(); L.forEach(r => { const k = r.o.funcId; if (!por.has(k)) por.set(k, []); por.get(k).push(r); });
+  return `<div class="note warn"><b>Comissões que ficaram fora do fechamento da semana delas</b> (serviço registrado depois que a semana foi fechada). Elas entram no próximo fechamento de cada profissional:
+    ${[...por].map(([fid, rs]) => { const w = proximaSemanaAberta(fid, rs.reduce((m, r) => r.p.data < m ? r.p.data : m, rs[0].p.data));
+      return `<div class="split small" style="margin-top:6px;flex-wrap:wrap;gap:6px"><span><b>${esc(fn(fid))}</b> · ${brl(sum(rs.map(r => r.aFechar)))} · ${rs.map(r => `${esc(r.at.codigo)} (${dBR(r.p.data).slice(0, 5)}, registrado ${esc(r.at.registradoEm || '')})`).join(', ')}</span><button class="btn sm" data-fe-ir="${fid}|${w}">Abrir semana ${dBR(w).slice(0, 5)} a ${dBR(addDays(w, 6)).slice(0, 5)}</button></div>`; }).join('')}</div>`;
+}
 /* depois de fechar a semana: lembra de registrar o pagamento na aba Pagamentos */
 function avisoPagarFechamento(f) {
   if (!f) return; const falta = aPagarFech(f);
@@ -9512,7 +9573,7 @@ function pgFechamento() {
   return `
   <div class="ph"><div><h1>Fechamento Semanal</h1><p>Um único fechamento por profissional e por semana, somando tudo o que já foi liberado: Pix, cartão e convênio acertado. O que for liberado depois entra no mesmo fechamento, e o pagamento é feito de uma vez.</p></div></div>
   <div class="stack">
-    ${avisoDuplicadosHTML()}${avisoFechSemPagamentoHTML()}
+    ${avisoDuplicadosHTML()}${avisoForaFechamentoHTML()}${avisoFechSemPagamentoHTML()}
     <div class="panel"><div class="bar">
       <label class="f">Funcionário<select id="fe-f">${opt(equipeComissao(DB).map(f => [f.id, f.nome]), fid)}</select></label>
       <label class="f">Data inicial<input type="date" id="fe-i" value="${UI.fechIni}"></label><label class="f">Data final<input type="date" id="fe-e" value="${UI.fechFim}"></label>
@@ -9524,6 +9585,9 @@ function pgFechamento() {
     <div class="grid g4">${kpi('1 · Pix', brl(t.pix))}${kpi('2 · Cartão de débito', brl(t.debito))}${kpi('3 · Cartão de crédito', brl(t.credito))}${t.dinheiro ? kpi('Dinheiro', brl(t.dinheiro)) : ''}
       ${kpi('4 · Comissões liberadas', brl(t.liberadaPC), `de ${brl(t.comPC)} calculadas${t.aguardandoRec ? ` · ${brl(t.aguardandoRec)} aguardam recebimento` : ''}`, 'info')}${kpi('5 · Já pagas', brl(t.pagaPC), 'em fechamentos anteriores', 'ok')}${kpi('6 · Pendentes de pagamento', brl(t.pendentePC), 'liberadas e não pagas', 'warn')}</div>
     ${tabela(R.pc)}
+    ${R.atr.length ? `<div class="sec">Comissões de semanas anteriores</div>
+    <div class="note warn small">${jaFe ? 'Estes serviços eram de semanas já fechadas e entraram neste fechamento.' : `<b>${R.atr.length} serviço(s) de semanas que já estavam fechadas</b> (registrados depois do fechamento, ex.: serviço de sexta lançado no sábado). A comissão de <b>${brl(t.atrasado)}</b> entra neste fechamento. Se esta semana for fechada sem eles, passam para a seguinte, até serem fechados.`}</div>
+    ${tabela(R.atr)}` : ''}
     <div class="sec">Convênios</div>
     <div class="muted small">Convênio em aberto aparece aqui em todas as semanas (bloqueado) até o convênio pagar. A comissão é liberada na semana em que o pagamento foi registrado.</div>
     <div class="grid g4">${kpi('7 · Serviços por convênio', brl(t.conv), `comissão calculada ${brl(t.comConv)}`, 'info')}${kpi('8 · Comissão bloqueada', brl(t.convBloq), 'saldo ainda não acertado', 'warn')}${kpi('9 · Liberada após acerto', brl(t.convLib), `${brl(t.convAFechar)} ainda não fechada`, 'ok')}</div>
@@ -11262,7 +11326,7 @@ const AFTER = {
 
 /* ---------- eventos globais (delegação) ---------- */
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-al-todos],[data-pkv-limpa],[data-online],[data-pg-dup],[data-wa-pk],[data-pk-limpa],[data-sv-limpa],[data-del-cat],[data-po-limpa],[data-ct-todos],[data-del],[data-dono-novo],[data-dono-edit],[data-podo-aba],[data-podo-nova],[data-podo-ficha],[data-cxcentro],[data-comanda],[data-av-teste],[data-av-qr],[data-av-copiar],[data-av-dl],[data-av-nota],[data-pk-novo],[data-pk-corrigir],[data-trocar-pk],[data-vender-sv],[data-pg-rec],[data-ad-ed],[data-ad-ex],[data-rec-ed],[data-usar-saldo],[data-pk-edit],[data-pk-vender],[data-pk-filtro],[data-pk-sessao],[data-cli-nivel],[data-dona-serv],[data-mov],[data-mov-ed],[data-mov-ex],[data-cxper],[data-cxnav],[data-cxtipo],[data-cli-acao],[data-conv-membros],[data-conv-pagar],[data-receb-com],[data-conf-com],[data-acerto-com],[data-pagar-cli],[data-cvst],[data-liberar],[data-conta],[data-sair],[data-codigo],[data-repasse],[data-adiant],[data-extrato],[data-abater],[data-conv-novo],[data-conv-edit],[data-conv-filtro],[data-alertas],[data-fechar],[data-faltou],[data-chegou],[data-tema],[data-pdf],[data-wa-ag],[data-wa-cli],[data-wa-cob],[data-wa-at],[data-fab],[data-go],[data-menu],[data-per],[data-agv],[data-agnav],[data-ag],[data-bl],[data-slot],[data-goday],[data-new-ag],[data-new-bl],[data-new-reg],[data-at-open],[data-receb],[data-conf],[data-acerto],[data-fesem],[data-fe-ver],[data-pagar],[data-new-cli],[data-cli],[data-new-func],[data-func],[data-new-serv],[data-serv],[data-new-cat],[data-mais],[data-pub-abrir],[data-pub-cliente],[data-origem-nova],[data-origem],[data-ped-agendar],[data-ped-recusar],[data-qr-copiar],[data-qr-dl],[data-qr-ver],[data-ped-dia]');
+  const t = e.target.closest('[data-fe-ir],[data-al-todos],[data-pkv-limpa],[data-online],[data-pg-dup],[data-wa-pk],[data-pk-limpa],[data-sv-limpa],[data-del-cat],[data-po-limpa],[data-ct-todos],[data-del],[data-dono-novo],[data-dono-edit],[data-podo-aba],[data-podo-nova],[data-podo-ficha],[data-cxcentro],[data-comanda],[data-av-teste],[data-av-qr],[data-av-copiar],[data-av-dl],[data-av-nota],[data-pk-novo],[data-pk-corrigir],[data-trocar-pk],[data-vender-sv],[data-pg-rec],[data-ad-ed],[data-ad-ex],[data-rec-ed],[data-usar-saldo],[data-pk-edit],[data-pk-vender],[data-pk-filtro],[data-pk-sessao],[data-cli-nivel],[data-dona-serv],[data-mov],[data-mov-ed],[data-mov-ex],[data-cxper],[data-cxnav],[data-cxtipo],[data-cli-acao],[data-conv-membros],[data-conv-pagar],[data-receb-com],[data-conf-com],[data-acerto-com],[data-pagar-cli],[data-cvst],[data-liberar],[data-conta],[data-sair],[data-codigo],[data-repasse],[data-adiant],[data-extrato],[data-abater],[data-conv-novo],[data-conv-edit],[data-conv-filtro],[data-alertas],[data-fechar],[data-faltou],[data-chegou],[data-tema],[data-pdf],[data-wa-ag],[data-wa-cli],[data-wa-cob],[data-wa-at],[data-fab],[data-go],[data-menu],[data-per],[data-agv],[data-agnav],[data-ag],[data-bl],[data-slot],[data-goday],[data-new-ag],[data-new-bl],[data-new-reg],[data-at-open],[data-receb],[data-conf],[data-acerto],[data-fesem],[data-fe-ver],[data-pagar],[data-new-cli],[data-cli],[data-new-func],[data-func],[data-new-serv],[data-serv],[data-new-cat],[data-mais],[data-pub-abrir],[data-pub-cliente],[data-origem-nova],[data-origem],[data-ped-agendar],[data-ped-recusar],[data-qr-copiar],[data-qr-dl],[data-qr-ver],[data-ped-dia]');
   if (!t) return;
   const ds = t.dataset;
   if ('waAg' in ds) { e.stopPropagation(); const x = DB.agendamentos.find(a => a.id === ds.waAg); return modalWhatsApp({ agendamentoId: ds.waAg }, ds.waM || waModeloPadrao(x)); }
@@ -11361,6 +11425,7 @@ document.addEventListener('click', e => {
     ov.querySelector('#rc-ok').onclick = () => run(() => confirmarRecebimento(DB, ACTOR, ds.receb, { data: val('rc-d'), hora: val('rc-h') }), isOwner(ACTOR) ? 'Recebimento registrado · comissão liberada' : 'Recebimento registrado').ok && closeModal(); return; }
   if ('conf' in ds) return run(() => marcarConferido(DB, ACTOR, ds.conf), 'Parcela marcada como conferida');
   if ('acerto' in ds) return modalAcerto(ds.acerto);
+  if ('feIr' in ds) { const [f, w] = ds.feIr.split('|'); closeModal(); UI.route = 'fechamento'; UI.fechFunc = f; UI.fechIni = w; UI.fechFim = addDays(w, 6); UI.fechRev = false; render(); window.scrollTo(0, 0); return; }
   if ('fesem' in ds) { const w = addDays(semanaAPagar()[0], +ds.fesem); UI.fechIni = w; UI.fechFim = addDays(w, 6); UI.fechRev = false; render(); return; }
   if ('feVer' in ds) return modalFechamento(ds.feVer);
   if ('pagar' in ds) return modalPagamento(ds.pagar);
