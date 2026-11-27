@@ -1640,6 +1640,43 @@ select option,select optgroup{background:var(--surface);color:var(--ink)}
 @media (max-width:700px){.pk-tit .pk-tb{flex-basis:100%;max-width:none;order:3}.pk-tit .seg{margin-left:0}}
 .svb .svb-in{border:0!important;background:transparent!important;box-shadow:none!important;outline:none!important;min-height:0!important;padding:10px 4px!important;margin:0!important;width:100%;font:inherit;color:inherit}
 .svb .svb-c{display:flex;align-items:center;gap:8px;padding:0 12px;min-height:46px;box-sizing:border-box}
+
+/* revisão em 2 etapas: painel por cima da janela, botão liberado após 5 s */
+.rv{position:fixed;inset:0;z-index:70;background:rgba(20,12,18,.62);display:flex;align-items:center;justify-content:center;padding:16px;animation:fade .15s ease both}
+.rv-c{background:var(--surface);color:var(--ink);border-radius:20px;box-shadow:0 40px 90px -30px rgba(0,0,0,.6);width:100%;max-width:520px;max-height:calc(100dvh - 32px);display:flex;flex-direction:column;overflow:hidden;border:2px solid var(--warn)}
+.rv-h{padding:16px 18px 10px;display:flex;gap:10px;align-items:flex-start;background:var(--warn-soft)}
+.rv-h .rv-i{flex:0 0 auto;width:30px;height:30px;border-radius:50%;background:var(--warn);color:#fff;display:grid;place-items:center;font-weight:800}
+.rv-h h3{margin:0;font-size:17px}.rv-h p{margin:2px 0 0;font-size:13px;color:var(--muted)}
+.rv-b{padding:12px 18px;overflow:auto;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.rv-r{display:flex;justify-content:space-between;gap:10px;border-bottom:1px dashed var(--line);padding:5px 0}.rv-r span{color:var(--muted)}.rv-r b{text-align:right}
+.rv-s{border:1px solid var(--line);border-radius:12px;padding:8px 10px;display:flex;flex-direction:column;gap:2px}.rv-s b{font-size:14px}.rv-s small{color:var(--muted)}
+.rv-t{display:flex;justify-content:space-between;font-size:16px;font-weight:800;padding-top:6px}
+.rv-f{padding:12px 18px 16px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;border-top:1px solid var(--line)}
+.rv-f .btn{flex:1 1 160px;min-height:46px}
+.rv-f .btn[disabled]{opacity:.55;cursor:not-allowed}
+.rv-bar{height:4px;background:var(--sunk)}.rv-bar i{display:block;height:100%;background:var(--warn);width:0;transition:width 1s linear}
+
+/* auditoria de um serviço: linha do tempo */
+.reg-aud{display:flex;width:max-content;align-items:center;gap:4px;margin-top:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:3px 10px 3px 7px;font:inherit;font-size:12px;font-weight:700;letter-spacing:0;cursor:pointer;min-height:28px}.reg-aud svg{width:15px;height:15px}.reg-aud:hover{border-color:var(--accent);color:var(--accent)}
+.hs-top{display:flex;flex-wrap:wrap;gap:8px 22px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--sunk)}.hs-top>div{display:flex;flex-direction:column;gap:1px}
+.hs-sv{border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}.hs-sv small{display:block;color:var(--muted);margin-top:2px}
+.hs-n{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--muted)}.hs-n b{color:var(--ink)}.hs-n b.ok{color:var(--ok)}
+.hs-lst{position:relative;display:flex;flex-direction:column;gap:8px;padding-left:4px}
+.hs-lst::before{content:'';position:absolute;left:20px;top:6px;bottom:6px;width:2px;background:var(--line)}
+.hs-dia{position:relative;margin:8px 0 0 40px;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.hs-ev{position:relative;display:grid;grid-template-columns:34px 1fr;gap:10px;align-items:start}
+.hs-ic{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--surface);border:2px solid var(--line);color:var(--muted);z-index:1}.hs-ic svg{width:17px;height:17px}
+.hs-cx{border:1px solid var(--line);border-radius:12px;padding:8px 11px;background:var(--surface);min-width:0}
+.hs-t{display:flex;justify-content:space-between;gap:8px;align-items:baseline}.hs-t b{font-size:14px}.hs-h{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.hs-u{font-size:12px;color:var(--muted);margin-top:1px}
+.hs-d{margin:6px 0 0;padding:0 0 0 16px;font-size:13px;display:flex;flex-direction:column;gap:1px}.hs-d li{overflow-wrap:anywhere}
+.t-ag .hs-ic{border-color:var(--info);color:var(--info);background:var(--info-soft)}
+.t-alt .hs-ic{border-color:var(--warn);color:var(--warn);background:var(--warn-soft)}
+.t-wa .hs-ic{border-color:#25A162;color:#1E8A53;background:#E2F4EA}
+.t-cli .hs-ic{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.t-ok .hs-ic,.t-pg .hs-ic{border-color:var(--ok);color:var(--ok);background:var(--ok-soft)}
+.t-com .hs-ic{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.t-bad .hs-ic{border-color:var(--bad);color:var(--bad);background:var(--bad-soft)}.t-bad .hs-cx{border-color:var(--bad)}
 </style>
 
 </head>
@@ -1988,7 +2025,7 @@ function inferirCtxAud(S, l, gravando) {
   if ((m = d.match(/\bVP-\d+/))) { const v = (S.vendasProduto || []).find(x => x.codigo === m[0]); if (v && v.clienteId) return { clienteId: v.clienteId, cliente: nomeCli(S, v.clienteId), ref: `Venda ${v.codigo} · ${dBR(v.data)}` }; }
   if (!gravando && /agendamento|reagendamento|vários serviços/i.test(l.acao || '')) {
     const ix = indiceHistAg(S);
-    const c = ix.get(l.quando + '|' + l.usuario + '|' + d) || (l.acao === 'Agendamento criado' ? (ix.get(l.quando + '|' + l.usuario + '|Agendamento criado') || []).filter(x => `${dBR(x.data)} ${x.inicio}` === d) : null);
+    const c = ix.get(l.quando + '|' + l.usuario + '|' + d) || (l.acao === 'Agendamento criado' ? (ix.get(l.quando + '|' + l.usuario + '|Agendamento criado') || []).filter(x => { const k = `${dBR(x.data)} ${x.inicio}`; return d === k || d.startsWith(k + ' · '); }) : null);
     if (c && c.length) return ctxAg(S, c[0], c.length > 1 ? `+${c.length - 1} no mesmo minuto` : '');
   }
   const nm = d.split(' · ')[0].trim();
@@ -1996,6 +2033,87 @@ function inferirCtxAud(S, l, gravando) {
   return null;
 }
 
+/* ---------- histórico completo de um serviço (auditoria) ---------- */
+const nomeSv = (S, id) => (S.servicos || []).find(x => x.id === id)?.nome || '—';
+const nomeFu = (S, id) => (S.funcionarios || []).find(x => x.id === id)?.nome || '—';
+function descreverAgendamento(S, x) {
+  return `${dBR(x.data)} ${x.inicio}–${x.fim} · ${nomeSv(S, x.servicoId)} · com ${nomeFu(S, x.funcId)}${x.canal ? ' · via ' + (CANAIS[x.canal] || x.canal) : ''}${x.preco ? ' · ' + brl(x.preco) : ''}${x.obs ? ' · obs.: ' + x.obs : ''}`;
+}
+/* o que mudou num agendamento, campo a campo (antes → depois) */
+function difAgendamento(S, ant, d) {
+  const r = [], v = (k) => d[k] === undefined ? ant[k] : d[k];
+  if (ant.clienteId !== v('clienteId')) r.push(`Cliente: ${nomeCli(S, ant.clienteId) || '—'} → ${nomeCli(S, v('clienteId')) || '—'}`);
+  if (ant.data !== v('data') || ant.inicio !== v('inicio') || ant.fim !== v('fim')) r.push(`Horário: ${dBR(ant.data)} ${ant.inicio}–${ant.fim} → ${dBR(v('data'))} ${v('inicio')}–${v('fim')}`);
+  if (ant.servicoId !== v('servicoId')) r.push(`Serviço: ${nomeSv(S, ant.servicoId)} → ${nomeSv(S, v('servicoId'))}`);
+  if (ant.funcId !== v('funcId')) r.push(`Profissional: ${nomeFu(S, ant.funcId)} → ${nomeFu(S, v('funcId'))}`);
+  if ((ant.preco || 0) !== (v('preco') || 0)) r.push(`Valor: ${brl(ant.preco || 0)} → ${brl(v('preco') || 0)}`);
+  if (ant.status !== v('status')) r.push(`Situação: ${AG_STATUS[ant.status] || ant.status} → ${AG_STATUS[v('status')] || v('status')}`);
+  if ((ant.canal || '') !== (v('canal') || '')) r.push(`Canal: ${CANAIS[ant.canal] || ant.canal || '—'} → ${CANAIS[v('canal')] || v('canal') || '—'}`);
+  if ((ant.obs || '') !== (v('obs') || '')) r.push(`Observação: "${ant.obs || ''}" → "${v('obs') || ''}"`);
+  return r;
+}
+/* 27/11/2026, 19:56 → número para ordenar */
+function stampMs(q) {
+  const m = String(q || '').match(/(\d{2})\/(\d{2})\/(\d{4})\D+(\d{2}):(\d{2})/);
+  if (m) return Date.UTC(+m[3], +m[2] - 1, +m[1], +m[4], +m[5]);
+  const d = String(q || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return d ? Date.UTC(+d[1], +d[2] - 1, +d[3], 23, 59) : 0;
+}
+/* ações da auditoria que já aparecem pelos próprios registros (não repetir na linha do tempo) */
+const AUD_JA_NA_LINHA = new Set(['Agendamento criado', 'Reagendamento', 'Agendamento editado', 'Agendamento cancelado', 'WhatsApp aberto', 'Mensagem não enviada', 'Serviço registrado', 'Estorno de serviço',
+  'Recebimento registrado', 'Acerto de convênio', 'Parcela conferida em extrato', 'Sinal recebido', 'Sessão de pacote concluída', 'Fechamento confirmado', 'Fechamento atualizado', 'Pagamento de comissão', 'Pedido agendado']);
+/* tudo o que aconteceu com um serviço: agendamento, alterações, mensagens, registro, pagamentos da cliente,
+   fechamento e pagamento da comissão. ids: { atIds, agIds } (a comanda ou o atendimento inteiro entram juntos) */
+function historicoServico(S, ids) {
+  const atS = new Set(ids.atIds || []), agS = new Set(ids.agIds || []);
+  (S.atendimentos || []).filter(x => atS.has(x.id) && x.agendamentoId).forEach(x => agS.add(x.agendamentoId));
+  [...agS].forEach(id => grupoDe(S, (S.agendamentos || []).find(x => x.id === id)).forEach(x => agS.add(x.id)));
+  (S.atendimentos || []).filter(x => x.agendamentoId && agS.has(x.agendamentoId)).forEach(x => atS.add(x.id));
+  const ags = (S.agendamentos || []).filter(x => agS.has(x.id)).sort((p, q) => (p.data + p.inicio).localeCompare(q.data + q.inicio));
+  const ats = (S.atendimentos || []).filter(x => atS.has(x.id)).sort((p, q) => (+String(p.codigo).replace(/\D/g, '') || 0) - (+String(q.codigo).replace(/\D/g, '') || 0));
+  const ps = (S.parcelas || []).filter(p => atS.has(p.atendimentoId)), psS = new Set(ps.map(p => p.id));
+  const obs = (S.obrigacoes || []).filter(o => atS.has(o.atendimentoId) || (o.sessaoAgId && agS.has(o.sessaoAgId))), obS = new Set(obs.map(o => o.id));
+  const fechs = (S.fechamentos || []).filter(f => f.itens.some(i => obS.has(i.obrigacaoId)));
+  const ev = []; let n = 0;
+  const add = (quando, usuario, tipo, titulo, detalhe, sub) => { if (!quando) return; ev.push({ ms: stampMs(quando), n: n++, quando, usuario: usuario || '—', tipo, titulo, detalhe: detalhe || '', sub: sub || '' }); };
+  const varios = ags.length > 1;
+  const tipoH = t => /WhatsApp|Mensagem/i.test(t) ? 'wa' : /criado|Criado a partir/i.test(t) ? 'ag' : /Sinal/i.test(t) ? 'pg' : /estornad|desfeito|excluída/i.test(t) ? 'bad' : /Concluído|concluída/i.test(t) ? 'ok' : /Cliente pediu|Presença confirmada/i.test(t) ? 'cli' : 'alt';
+  for (const ag of ags) for (const h of ag.historico || []) add(h.quando, h.usuario, tipoH(h.texto), h.texto, h.det || (h.texto === 'Agendamento criado' ? 'dados de hoje: ' + descreverAgendamento(S, ag) : ''), varios ? `${ag.inicio} · ${nomeSv(S, ag.servicoId)} · ${nomeFu(S, ag.funcId).split(' ')[0]}` : '');
+  for (const c of S.contatos || []) if ((c.atendimentoId && atS.has(c.atendimentoId) && !(c.agendamentoId && agS.has(c.agendamentoId))))
+    add(c.quando, c.usuario, 'wa', c.dispensado ? 'Mensagem não enviada (aviso dispensado)' : 'WhatsApp aberto', `${c.modelo}${c.detalhe ? ' · ' + c.detalhe : ''}`);
+  for (const at of ats) {
+    const pa = ps.filter(p => p.atendimentoId === at.id);
+    add(at.registradoEm, at.registradoPor, 'ok', `Serviço ${at.codigo} registrado`,
+      `${nomeSv(S, at.servicoId)} · feito por ${nomeFu(S, at.funcId)} · atendimento em ${dataHora(at.data, at.hora)} · cobrado ${brl(at.valorCobrado)}${at.desconto ? ` · desconto ${brl(at.desconto)}` : ''} · final ${brl(at.valorFinal)} · comissão ${brl(at.comissaoTotal)} (${at.pct}%)`
+      + (pa.length ? ` · pagamento: ${pa.map(p => `${FORMAS[p.forma] || p.forma} ${brl(p.valor)}${p.forma === 'convenio' ? ' (aguarda o convênio)' : p.status === 'pendente' ? ' (pendente)' : ''}`).join(' + ')}` : '') + (at.obs ? ` · obs.: ${at.obs}` : ''));
+    if (at.status === 'estornado') add(at.estornadoEm, at.estornadoPor, 'bad', `Serviço ${at.codigo} estornado`, at.motivoEstorno || '');
+  }
+  for (const p of ps) {
+    const cod = ats.find(x => x.id === p.atendimentoId)?.codigo || '';
+    if (p.recebidoEm) add(p.recebidoEm, p.recebidoPor, 'pg', 'Recebimento confirmado', `${cod} · ${FORMAS[p.forma]} ${brl(p.valor)} recebido em ${dataHora(p.dataRecebimento, p.hora)}`);
+    if (p.conferidoEm) add(p.conferidoEm, p.conferidoPor, 'pg', 'Conferido no extrato', `${cod} · ${FORMAS[p.forma]} ${brl(p.valor)}`);
+  }
+  for (const x of S.acertos || []) if (psS.has(x.parcelaId))
+    add(x.criadoEm, x.responsavel, 'pg', 'Convênio pago (acerto)', `${brl(x.valor)} pago em ${dataHora(x.data, x.hora)}${x.metodo ? ' via ' + x.metodo : ''} · comissão liberada ${brl(x.liberado || 0)}${x.referencia ? ' · ref. ' + x.referencia : ''}`);
+  for (const f of fechs) {
+    const meu = sum(f.itens.filter(i => obS.has(i.obrigacaoId)).map(i => i.valor));
+    add(f.criadoEm, f.criadoPor, 'com', `Comissão entrou no fechamento ${f.codigo}`, `${brl(meu)} deste serviço para ${nomeFu(S, f.funcId)} · semana ${dBR(f.inicio)} a ${dBR(f.fim)} · total do fechamento ${brl(f.total)}${f.atualizadoEm ? ` · fechamento somado depois em ${f.atualizadoEm} por ${f.atualizadoPor}` : ''}`);
+    for (const pg of (S.pagamentos || []).filter(x => x.fechamentoId === f.id))
+      add(pg.criadoEm, pg.responsavel, 'com', `Comissão paga · ${f.codigo}`, `${brl(pg.valor)} pago a ${nomeFu(S, pg.funcId)} em ${dataHora(pg.data, pg.hora)} via ${pg.metodo}${pg.referencia ? ' · ref. ' + pg.referencia : ''}${pg.editadoEm ? ` · corrigido por ${pg.editadoPor} em ${pg.editadoEm}` : ''}`);
+    for (const ab of (S.abatimentos || []).filter(x => x.fechamentoId === f.id))
+      add(ab.criadoEm, ab.responsavel, 'com', `Comissão descontada do adiantamento · ${f.codigo}`, `${brl(ab.valor)} abatido do adiantamento de ${nomeFu(S, ab.funcId)}`);
+  }
+  for (const l of S.auditoria || []) {
+    if (AUD_JA_NA_LINHA.has(l.acao)) continue;
+    const c = l.atId || l.agId ? l : inferirCtxAud(S, l); if (!c) continue;
+    if ((c.atId && atS.has(c.atId)) || (c.agId && agS.has(c.agId))) add(l.quando, l.usuario, /estorn|exclu|desfeit/i.test(l.acao) ? 'bad' : 'alt', l.acao, l.detalhe);
+  }
+  ev.sort((a, b) => a.ms - b.ms || a.n - b.n);
+  const pagoOb = pagoPorObrigacao(S);
+  const resumo = ats.map(at => { const os = obs.filter(o => o.atendimentoId === at.id && !o.cancelada);
+    return { at, comissao: sum(os.map(o => o.comissao)), liberada: sum(os.map(o => o.liberado)), paga: sum(os.map(o => pagoOb[o.id] || 0)),
+      fechamentos: fechs.filter(f => f.itens.some(i => os.some(o => o.id === i.obrigacaoId))).map(f => f.codigo) }; });
+  return { ags, ats, parcelas: ps, eventos: ev, resumo };
+}
 /* ---------- leituras financeiras derivadas ---------- */
 function pagoPorObrigacao(S) {
   const m = {};
@@ -2522,13 +2640,16 @@ function salvarAgendamento(S, a, d, opt = {}) {
   }
   if (d.status === 'concluido') throw new Error('Para concluir, use "Concluir e registrar serviço". Agendamento não vira receita sozinho.');
   if (ant) {
+    const dif = difAgendamento(S, ant, d);
+    if (!dif.length) return ant.id;   // salvou sem mudar nada: não enche o histórico
     const mudou = ant.data !== d.data || ant.inicio !== d.inicio || ant.funcId !== d.funcId;
     const h = mudou ? `Reagendado de ${dBR(ant.data)} ${ant.inicio} para ${dBR(d.data)} ${d.inicio}` : (ant.status !== d.status ? `Situação: ${AG_STATUS[ant.status]} → ${AG_STATUS[d.status]}` : 'Dados editados');
-    Object.assign(ant, d); ant.historico.push({ quando: stamp(), usuario: a.nome, texto: h });
-    audit(S, a, ant.status === 'cancelado' && h.startsWith('Situação') ? 'Agendamento cancelado' : mudou ? 'Reagendamento' : 'Agendamento editado', h, ctxAg(S, ant)); return ant.id;
+    Object.assign(ant, d); ant.historico.push({ quando: stamp(), usuario: a.nome, texto: h, det: dif.join(' · ') });
+    audit(S, a, ant.status === 'cancelado' && h.startsWith('Situação') ? 'Agendamento cancelado' : mudou ? 'Reagendamento' : 'Agendamento editado', dif.join(' · '), ctxAg(S, ant)); return ant.id;
   }
   const ag = { id: uid('ag'), status: 'aguardando', canal: 'whatsapp', obs: '', preco: 0, ...d, historico: [{ quando: stamp(), usuario: a.nome, texto: 'Agendamento criado' }] };
-  S.agendamentos.push(ag); audit(S, a, 'Agendamento criado', `${dBR(ag.data)} ${ag.inicio}`, ctxAg(S, ag)); return ag.id;
+  ag.historico[0].det = descreverAgendamento(S, ag);
+  S.agendamentos.push(ag); audit(S, a, 'Agendamento criado', `${dBR(ag.data)} ${ag.inicio} · ${descreverAgendamento(S, ag)}`, ctxAg(S, ag)); return ag.id;
 }
 
 /* ---------- vários serviços no mesmo atendimento ----------
@@ -2610,6 +2731,7 @@ function conferirJaRegistrado(S, agIds) {
 function registrarAtendimentoGrupoBase(S, a, d) {
   const itens = d.itens || [];
   if (!itens.length) throw new Error('Adicione ao menos um serviço.');
+  itens.forEach((it, i) => { if (!it.servicoId) throw new Error(`Escolha o serviço ${itens.length > 1 ? i + 1 : ''}.`.replace(' .', '.')); if (!it.funcId) throw new Error(`Escolha a profissional que fez o serviço${itens.length > 1 ? ' ' + (i + 1) : ''}.`); });
   conferirJaRegistrado(S, itens.map(i => i.agendamentoId));
   // convênio: parcelamento (mín. R$ 50 por parcela) e cliente com parcela vencida só com liberação
   const conv = (d.parcelas || []).filter(p => p.forma === 'convenio');
@@ -2754,14 +2876,14 @@ function confirmarRecebimento(S, a, parcelaId, d = {}) {
   // serviço vendido como saldo: as comissões das sessões já feitas são liberadas quando a compra é recebida
   if (S.parcelas.filter(x => x.atendimentoId === p.atendimentoId).every(x => x.status !== 'pendente'))
     S.obrigacoes.filter(x => x.sessaoAgId && x.atendimentoId === p.atendimentoId && !x.cancelada).forEach(x => { x.liberado = x.comissao; });
-  audit(S, a, 'Recebimento registrado', `${FORMAS[p.forma]} ${brl(p.valor)} em ${dataHora(p.dataRecebimento, p.hora)} · comissão liberada ${brl(o.liberado)}`);
+  audit(S, a, 'Recebimento registrado', `${FORMAS[p.forma]} ${brl(p.valor)} em ${dataHora(p.dataRecebimento, p.hora)} · comissão liberada ${brl(o.liberado)}`, ctxAt(S, S.atendimentos.find(x => x.id === p.atendimentoId)));
 }
 function marcarConferido(S, a, parcelaId) {
   exigirDono(a);
   const p = S.parcelas.find(x => x.id === parcelaId);
   if (p.forma === 'convenio' || p.status !== 'registrado') throw new Error('Só é possível conferir parcelas com recebimento registrado.');
   p.status = 'conferido'; p.conferidoPor = a.nome; p.conferidoEm = stamp();
-  audit(S, a, 'Parcela conferida em extrato', `${FORMAS[p.forma]} ${brl(p.valor)}`);
+  audit(S, a, 'Parcela conferida em extrato', `${FORMAS[p.forma]} ${brl(p.valor)}`, ctxAt(S, S.atendimentos.find(x => x.id === p.atendimentoId)));
 }
 
 function exigirConvenios(S, a) {
@@ -2789,7 +2911,7 @@ function registrarAcerto(S, a, parcelaId, d) {
   const repAgora = repasseDevido(p) - repAntes;
   o.liberado = novoLib;
   S.acertos.push({ id: uid('ac'), parcelaId: p.id, funcId: p.funcId, data: d.data, hora, metodo: d.metodo || '', valor: d.valor, liberado: liberadoAgora, repasse: repAgora, responsavel: a.nome, referencia: d.referencia || '', obs: d.obs || '', criadoEm: stamp() });
-  audit(S, a, 'Acerto de convênio', `${brl(d.valor)} pago em ${dataHora(d.data, hora)} · comissão liberada ${brl(liberadoAgora)} · bloqueada ${brl(o.comissao - novoLib)}${repAgora ? ` · repasse ao conveniado ${brl(repAgora)}` : ''}`);
+  audit(S, a, 'Acerto de convênio', `${brl(d.valor)} pago em ${dataHora(d.data, hora)} · comissão liberada ${brl(liberadoAgora)} · bloqueada ${brl(o.comissao - novoLib)}${repAgora ? ` · repasse ao conveniado ${brl(repAgora)}` : ''}`, ctxAt(S, S.atendimentos.find(x => x.id === p.atendimentoId)));
   return liberadoAgora;
 }
 function mudarSituacaoConvenio(S, a, parcelaId, sit) {
@@ -2797,7 +2919,7 @@ function mudarSituacaoConvenio(S, a, parcelaId, sit) {
   const p = S.parcelas.find(x => x.id === parcelaId);
   if (!['registrado', 'conferencia', 'pendente'].includes(sit)) throw new Error('Situação inválida para alteração manual.');
   if (p.acertado > 0 || p.situacao === 'cancelado') throw new Error('Convênio com acerto ou cancelado não volta para esta situação.');
-  audit(S, a, 'Situação de convênio', `${CONV_STATUS[p.situacao]} → ${CONV_STATUS[sit]}`);
+  audit(S, a, 'Situação de convênio', `${CONV_STATUS[p.situacao]} → ${CONV_STATUS[sit]}`, ctxAt(S, S.atendimentos.find(x => x.id === p.atendimentoId)));
   p.situacao = sit;
 }
 
@@ -5637,6 +5759,22 @@ function runTests() {
     estornarAtendimento(S, d, at.id, 'valor errado'); const [at2] = reg();   // depois do estorno pode registrar de novo
     return (n1 === 1 && n2 === 1 && e.includes('já foi registrado como ' + at.codigo) && at2 && at2.id !== at.id) || JSON.stringify([n1, n2, e]);
   });
+  T('Auditoria do serviço: mostra criação, alterações (antes → depois), WhatsApp, registro, fechamento e comissão paga', () => {
+    const S = seedBase(), d = S.users.find(u => u.id === 'u0');
+    const id = salvarAgendamento(S, d, { clienteId: 'k1', servicoId: 's1', funcId: 'f1', data: TODAY, inicio: '10:00', fim: '11:00', status: 'aguardando' });
+    const ag = S.agendamentos.find(x => x.id === id), n0 = ag.historico.length;
+    salvarAgendamento(S, d, { ...ag, historico: undefined, id });   // salvou sem mudar nada
+    const semRuido = ag.historico.length === n0;
+    salvarAgendamento(S, d, { id, clienteId: 'k1', servicoId: 's1', funcId: 'f1', data: TODAY, inicio: '10:30', fim: '11:30', status: 'confirmado', canal: ag.canal, obs: '', preco: ag.preco });
+    registrarContatoWhatsApp(S, d, { clienteId: 'k1', modeloId: S.config.whatsapp.modelos[0].id, agendamentoId: id });
+    const [at] = registrarAtendimentoGrupo(S, d, { clienteId: 'k1', data: TODAY, hora: '11:30', parcelas: [{ forma: 'pix', valor: 5000 }], itens: [{ agendamentoId: id, funcId: 'f1', servicoId: 's1', valorCobrado: 5000 }] });
+    const ws = weekStart(TODAY), f = confirmarFechamento(S, d, 'f1', ws, addDays(ws, 6), { abater: false });
+    registrarPagamento(S, d, f.id, { valor: aPagarFech(f), data: TODAY, hora: '18:00', metodo: 'Pix' });
+    const H = historicoServico(S, { atIds: [at.id] }), tit = H.eventos.map(e => e.titulo).join(' | '), det = H.eventos.map(e => e.detalhe).join(' | ');
+    const ok = semRuido && /Agendamento criado/.test(tit) && /Reagendado/.test(tit) && det.includes('10:00–11:00 → ') && det.includes('Situação: Aguardando confirmação → Confirmado')
+      && /WhatsApp aberto/.test(tit) && tit.includes(`Serviço ${at.codigo} registrado`) && tit.includes(`fechamento ${f.codigo}`) && tit.includes(`Comissão paga · ${f.codigo}`) && H.resumo[0].paga === at.comissaoTotal;
+    return ok || JSON.stringify({ semRuido, tit, r: H.resumo[0] && { c: H.resumo[0].comissao, p: H.resumo[0].paga } });
+  });
   return out;
 }
 
@@ -6051,15 +6189,29 @@ function aplicarMeta(d) {
   return mudou;
 }
 /* re-renderiza quando outra pessoa altera algo, sem atrapalhar quem está digitando na página */
+/* chegou alteração de outro aparelho: atualiza a tela na hora.
+   Se a pessoa está com o cursor num campo (ex.: a busca), atualiza assim que ela para de digitar (1 s),
+   devolvendo o cursor e o texto ao mesmo lugar; não espera mais ela sair do campo. */
+let ULT_TECLA = 0, REMOTO_T = null;
+document.addEventListener('input', () => { ULT_TECLA = Date.now(); }, true);
+document.addEventListener('keydown', () => { ULT_TECLA = Date.now(); }, true);
 function renderRemoto() {
   if (typeof limparIndices === 'function') limparIndices();   // chegou dado novo: refaz as contas
-  const a = document.activeElement;
-  if (a && a.closest && a.closest('#app') && a.matches('input,textarea,select')) { SYNC.renderAdiado = true; return; }
+  clearTimeout(REMOTO_T); REMOTO_T = setTimeout(renderRemotoAgora, 60);   // vários avisos juntos: uma atualização só
+}
+function renderRemotoAgora() {
+  const a = document.activeElement, campo = a && a.closest && a.closest('#app') && a.matches('input,textarea,select') ? a : null;
+  if (campo) {
+    const parado = Date.now() - ULT_TECLA;
+    if (!campo.id || campo.matches('select') || parado < 1000) { SYNC.renderAdiado = true; clearTimeout(REMOTO_T); REMOTO_T = setTimeout(renderRemotoAgora, Math.max(300, 1000 - parado)); return; }
+  }
   SYNC.renderAdiado = false;
   if (typeof save === 'function') { clearTimeout(SAVE_T); SAVE_T = setTimeout(salvarNoAparelho, 3000); }
+  const id = campo && campo.id, val = campo && campo.value, ss = campo && campo.selectionStart, se = campo && campo.selectionEnd;
   render();
+  if (id) { const n = document.getElementById(id); if (n && n !== document.activeElement && n.matches('input,textarea')) { if (n.value !== val && n.type !== 'date') n.value = val; n.focus({ preventScroll: true }); try { if (ss != null) n.setSelectionRange(ss, se); } catch (e) { } } }
 }
-document.addEventListener('focusout', () => { if (SYNC.renderAdiado) setTimeout(() => { if (SYNC.renderAdiado) renderRemoto(); }, 50); });
+document.addEventListener('focusout', () => { if (SYNC.renderAdiado) setTimeout(() => { if (SYNC.renderAdiado) renderRemotoAgora(); }, 50); });
 
 /* ---------- início ---------- */
 async function esvaziarFila() {
@@ -7551,11 +7703,14 @@ function afterEstoque() {
 
 /* ---------- cliques das telas novas ---------- */
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-est-aba],[data-est-f],[data-est-limpa],[data-est-ed],[data-est-ent],[data-est-aj],[data-est-del],[data-est-cons],[data-est-desf],[data-vp-nova],[data-vp-ver],[data-conf-ok],[data-remarc-ok],[data-ag-edit],[data-sinal-reg],[data-sinal-rm],[data-nivel-ok],[data-est-aba-go]');
+  const t = e.target.closest('[data-est-aba],[data-est-f],[data-est-limpa],[data-est-ed],[data-est-ent],[data-est-aj],[data-est-del],[data-est-cons],[data-est-desf],[data-vp-nova],[data-vp-ver],[data-conf-ok],[data-remarc-ok],[data-ag-edit],[data-sinal-reg],[data-sinal-rm],[data-nivel-ok],[data-est-aba-go],[data-aud-at],[data-aud-ag],[data-aud-cmd]');
   if (!t || typeof DB === 'undefined' || !DB) return;
   const ds = t.dataset;
   if ('estAbaGo' in ds && 'go' in ds) { const [a, f] = ds.estAbaGo.split('|'); UI.estAba = a; UI.estFiltro = f || ''; return; }   // o data-go faz a navegação
   e.preventDefault(); e.stopImmediatePropagation();
+  if ('audAt' in ds) return modalHistoricoServico({ atIds: [ds.audAt] });
+  if ('audAg' in ds) return modalHistoricoServico({ agIds: [ds.audAg] });
+  if ('audCmd' in ds) return modalHistoricoServico({ atIds: DB.atendimentos.filter(x => comandaDe(x) === ds.audCmd).map(x => x.id) });
   if ('estAba' in ds) { UI.estAba = ds.estAba; render(); return; }
   if ('estF' in ds) { UI.estFiltro = ds.estF; render(); return; }
   if ('estLimpa' in ds) { UI.estBusca = ''; render(); document.getElementById('est-b')?.focus(); return; }
@@ -7864,7 +8019,7 @@ function openModal(title, body, foot = '', wide = false) {
   const mdEl = ov.querySelector('.md'); if (mdEl) mdEl.addEventListener('scroll', () => { if (mdEl.scrollTop && window.innerWidth > 560) mdEl.scrollTop = 0; });
   return ov;
 }
-function closeModal() { if (MODAL) { MODAL.remove(); MODAL = null; } document.documentElement.classList.remove('trava-rolagem'); }
+function closeModal() { fecharRevisao(); if (MODAL) { MODAL.remove(); MODAL = null; } document.documentElement.classList.remove('trava-rolagem'); }
 /* rolagem pelo teclado: setas, Page Up/Down, Home/End rolam a janela aberta, o card clicado ou a página */
 let ROLA_ALVO = null;
 const rolavel = el => { for (let n = el; n && n.nodeType === 1 && n !== document.body && n !== document.documentElement; n = n.parentElement) { const cs = getComputedStyle(n); if (/(auto|scroll)/.test(cs.overflowY) && n.scrollHeight > n.clientHeight + 2) return n; } return null; };
@@ -7882,7 +8037,7 @@ function rolarTeclado(e) {
   if (pagina || el.scrollTop !== antes) e.preventDefault();
 }
 document.addEventListener('keydown', rolarTeclado);
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('[role=button][data-ag],[role=button][data-goday],[role=button][data-cli]')) { e.preventDefault(); e.target.click(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (document.querySelector('.rv')) { fecharRevisao(); return; } closeModal(); } if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('[role=button][data-ag],[role=button][data-goday],[role=button][data-cli]')) { e.preventDefault(); e.target.click(); } });
 /* confirmação dentro da própria página (o visualizador não exibe confirm()) */
 function confirmar(ov, html, onOk, label = 'Confirmar') {
   const f = ov.querySelector('.md-f'); const prev = f.innerHTML;
@@ -7891,6 +8046,31 @@ function confirmar(ov, html, onOk, label = 'Confirmar') {
   f.querySelector('#cf-ok').onclick = onOk;
 }
 let rebindFns = new WeakMap();
+/* revisão em 2 etapas: antes de gravar, mostra tudo para a recepção conferir; o botão de confirmar só libera depois de 5 segundos */
+const REVISAO_SEG = 5;
+function revisar({ titulo = 'Revise antes de confirmar', sub = 'Confira cliente, serviços, profissionais, horários e valores. Se algo estiver errado, volte e corrija.', html, label = 'Confirmar', onOk }) {
+  fecharRevisao();
+  const el = document.createElement('div'); el.className = 'rv'; el.setAttribute('role', 'alertdialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', titulo);
+  el.innerHTML = `<div class="rv-c"><div class="rv-h"><span class="rv-i" aria-hidden="true">!</span><div><h3>${esc(titulo)}</h3><p>${esc(sub)}</p></div></div><div class="rv-bar"><i></i></div><div class="rv-b">${html}</div>
+    <div class="rv-f"><button class="btn" type="button" id="rv-no">Voltar e corrigir</button><button class="btn pri" type="button" id="rv-ok" disabled>${esc(label)} (${REVISAO_SEG})</button></div></div>`;
+  document.body.appendChild(el);
+  const ok = el.querySelector('#rv-ok'), barra = el.querySelector('.rv-bar i'); let n = REVISAO_SEG;
+  requestAnimationFrame(() => { barra.style.transition = `width ${REVISAO_SEG}s linear`; barra.style.width = '100%'; });
+  el._t = setInterval(() => { n--; if (n > 0) { ok.textContent = `${label} (${n})`; return; } clearInterval(el._t); ok.disabled = false; ok.textContent = label; ok.focus({ preventScroll: true }); }, 1000);
+  el.querySelector('#rv-no').onclick = fecharRevisao;
+  ok.onclick = () => { if (ok.disabled) return; fecharRevisao(); onOk(); };
+  setTimeout(() => el.querySelector('#rv-no')?.focus({ preventScroll: true }), 30);
+  return el;
+}
+function fecharRevisao() { document.querySelectorAll('.rv').forEach(x => { clearInterval(x._t); x.remove(); }); }
+const rvLinha = (k, v) => `<div class="rv-r"><span>${k}</span><b>${v}</b></div>`;
+/* nome da cliente sem gravar nada (cliente nova só é cadastrada no confirmar final) */
+function nomeClienteTela(ov, p) {
+  const v = ov.querySelector(`#${p}-cl`)?.value;
+  if (v === '__novo') { const nn = (ov.querySelector(`#${p}-nn`)?.value || '').trim(); if (!nn) throw new Error('Digite o nome da cliente nova.'); return `${esc(nn)} <small class="muted">(cliente nova)</small>`; }
+  if (!v) throw new Error('Busque e escolha o cliente, ou cadastre um novo.');
+  return esc(CL(v)?.nome || '—');
+}
 function rebind(ov) { const fnb = rebindFns.get(ov); if (fnb) fnb(); }
 
 /* ---------- período ---------- */
@@ -7922,6 +8102,9 @@ const NAV = [
 const navFor = a => NAV.filter(n => (!n.own || isOwner(a)) && (!n.sup || isSuporte(a)) && (!n.emp || !isOwner(a)) && (!n.perm || pode(DB, a, n.perm)));
 const ICONS = { lupa: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4-4', sino: 'M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0', relogio: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3 2', sol: 'M12 4V2M12 22v-2M4 12H2M22 12h-2M5.6 5.6 4.2 4.2M19.8 19.8l-1.4-1.4M5.6 18.4l-1.4 1.4M19.8 4.2l-1.4 1.4M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z', lua: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z', pb: 'M12 3a9 9 0 1 0 0 18zM12 3a9 9 0 0 1 0 18', pdf: 'M7 3h8l4 4v14H7zM14 3v5h5M9.5 17v-4h1.3a1.2 1.2 0 0 1 0 2.4H9.5', wa: 'M4.5 19.5l1.1-3.6A8 8 0 1 1 8.3 18.6zM9 9.5c.3 2.2 2.3 4.2 4.5 4.6l1.2-1.2 1.8.8-.4 1.6c-3.8.3-7.6-3.4-7.3-7.3l1.6-.4.8 1.8z', mais2: 'M12 5v14M5 12h14',  painel: 'M4 4h7v8H4zM13 4h7v5h-7zM13 11h7v9h-7zM4 14h7v6H4z', agenda: 'M4 6h16v14H4zM4 10h16M8 3v5M16 3v5', registro: 'M7 3h8l4 4v14H7zM14 3v5h5M10 13h6M10 17h4', dinheiro: 'M3 7h18v11H3zM12 10a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5', mais: 'M4 7h16M4 12h16M4 17h16' };
 Object.assign(ICONS, {
+  editar: 'M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4',
+  check: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM8 12.5l2.8 2.8L16.5 9.5',
+  x: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM9 9l6 6M15 9l-6 6',
   lixo: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6',
   podologia: 'M8 3c-2 3-3 7-2 11 .6 2.6 2.3 5 4.6 6.2 2 1 4.4.3 5-1.6.7-2-.9-3.3-2.2-4.6C11.6 12.2 11 8 12 4M15.5 4.5a1.3 1.3 0 1 0 0 .1M18.5 7a1 1 0 1 0 0 .1M20 10.5a.8.8 0 1 0 0 .1',
   avaliacoes: 'M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z',
@@ -8724,7 +8907,24 @@ function modalAgendamento(pref = {}) {
   q('#a-hi').onchange = () => { const nv = toMin(val('a-hi') || '09:00'), dl = nv - hiAnt; hiAnt = nv; itens.forEach(it => { if (it.manual) { it.st += dl; it.fim += dl; } }); draw(); };
   draw();
   const bindOk = () => {
-    q('#a-ok').onclick = () => run(() => {
+    // etapa 1: confere e mostra o resumo; etapa 2 (após 5 s): grava
+    q('#a-ok').onclick = () => {
+      let resumo;
+      try {
+        const nomeCli = nomeClienteTela(ov, 'a'); calcHor();
+        if (!val('a-dt')) throw new Error('Escolha a data.');
+        if (itens.some(x => !x.servicoId)) throw new Error('Escolha o serviço em todas as linhas, ou remova a linha vazia.');
+        if (itens.some(x => !x.funcId)) throw new Error('Escolha a profissional em todas as linhas.');
+        const tot = sum(itens.map(x => x.preco || 0)), vf = veFaturamento();
+        resumo = rvLinha('Cliente', nomeCli) + rvLinha('Data', `${dBR(val('a-dt'))} (${diaSemana(val('a-dt'))})`)
+          + travados.map(x => `<div class="rv-s"><b>${x.inicio}–${x.fim} · ${esc(SV(x.servicoId)?.nome)}</b><small>${esc(fn(x.funcId))} · já concluído</small></div>`).join('')
+          + itens.map((x, i) => `<div class="rv-s"><b>${fromMin(itens._st[i])}–${fromMin(itens._fim[i])} · ${esc(SV(x.servicoId)?.nome || '—')}</b><small>com <b>${esc(fn(x.funcId))}</b>${vf ? ` · ${brl(x.preco || 0)}` : ''}</small></div>`).join('')
+          + rvLinha('Situação', esc(AG_STATUS[val('a-st')] || val('a-st'))) + rvLinha('Canal', esc(CANAIS[val('a-cn')] || val('a-cn')))
+          + (val('a-ob') ? rvLinha('Observação', esc(val('a-ob'))) : '') + (vf ? `<div class="rv-t"><span>Valor previsto</span><span>${brl(tot)}</span></div>` : '');
+      } catch (e) { toast(e.message, 'bad'); return; }
+      revisar({ titulo: ped ? 'Revise o agendamento do pedido' : ag ? 'Revise a alteração do agendamento' : 'Revise o agendamento', html: resumo, label: ag ? 'Salvar agendamento' : 'Confirmar agendamento', onOk: gravar });
+    };
+    const gravar = () => run(() => {
     const clienteId = lerCliente(ov, 'a'); calcHor();
     if (itens.some(x => !x.servicoId)) throw new Error('Escolha o serviço em todas as linhas, ou remova a linha vazia.');
     if (itens.some((x, i) => !(itens._fim[i] > itens._st[i]))) throw new Error('Confira o início e o fim de cada serviço: o fim precisa ser depois do início.');
@@ -8816,7 +9016,7 @@ function modalRegistro(pref = {}) {
     && !DB.atendimentos.some(t => t.agendamentoId === x.id && t.status !== 'estornado')) : [];
   const funcs = DB.funcionarios.filter(f => f.ativo && atende(f) && (!own || f.id === ACTOR.funcId));
   let itens = doGrupo.length ? doGrupo.map(x => ({ agendamentoId: x.id, servicoId: x.servicoId, funcId: x.funcId, valor: x.preco || SV(x.servicoId)?.preco || 0 }))
-    : [{ servicoId: '', funcId: own ? ACTOR.funcId : funcs[0]?.id, valor: 0 }];
+    : [{ servicoId: '', funcId: own ? ACTOR.funcId : '', valor: 0 }];   // sem agendamento: quem registra escolhe a profissional (não vem ninguém marcado)
   const vemDaAgenda = !!doGrupo.length;
   let parcelas = [{ forma: 'pix', valor: '', status: 'registrado', convenioId: '', autorizacao: '' }];
   let pagoManual = false, descManual = false;
@@ -8848,12 +9048,12 @@ function modalRegistro(pref = {}) {
     q('#r-itens').innerHTML = itens.map((it, i) => { const sv = SV(it.servicoId); const fs = funcs.filter(f => !sv || sv.funcs.includes(f.id));
       return `<div class="srow"><span class="sn">${i + 1}</span><div class="srow-g">
         <label class="f sv">Serviço<select data-i="${i}" data-k="servicoId" ${it.agendamentoId ? 'disabled' : ''}>${servOpts(it.servicoId, s => !own || s.funcs.includes(ACTOR.funcId))}</select></label>
-        <label class="f">Profissional<select data-i="${i}" data-k="funcId" ${own || it.agendamentoId ? 'disabled' : ''}>${fs.length ? opt(fs.map(f => [f.id, isOwner(ACTOR) ? (f.dona && !(f.pct > 0) ? `${f.nome} · proprietária` : `${f.nome} · ${f.pct}%`) : f.nome]), it.funcId) : '<option value="">Ninguém faz este serviço</option>'}</select></label>
+        <label class="f">Profissional<select data-i="${i}" data-k="funcId" ${own || it.agendamentoId ? 'disabled' : ''}>${fs.length ? (it.funcId ? '' : '<option value="" selected>Escolha quem fez…</option>') + opt(fs.map(f => [f.id, isOwner(ACTOR) ? (f.dona && !(f.pct > 0) ? `${f.nome} · proprietária` : `${f.nome} · ${f.pct}%`) : f.nome]), it.funcId) : '<option value="">Ninguém faz este serviço</option>'}</select></label>
         <label class="f">Valor (R$)<input data-i="${i}" data-k="valor" inputmode="decimal" value="${it.valor ? centsInput(it.valor) : ''}"></label></div>
         ${it.agendamentoId ? `<div class="stime">${DB.agendamentos.find(x => x.id === it.agendamentoId)?.inicio || ''}</div>` : ''}
         ${itens.length > 1 && !it.agendamentoId ? `<button class="btn sm ghost srm" data-rm="${i}" type="button">Remover</button>` : ''}</div>`; }).join('');
     q('#r-itens').querySelectorAll('[data-i]').forEach(el => { el.onchange = el.oninput = () => { const it = itens[+el.dataset.i], k = el.dataset.k;
-      if (k === 'servicoId') { it.servicoId = el.value; const sv = SV(el.value); if (sv) { it.valor = sv.preco; if (!sv.funcs.includes(it.funcId)) it.funcId = funcs.find(f => sv.funcs.includes(f.id))?.id || ''; } drawItens(); sync(); }
+      if (k === 'servicoId') { it.servicoId = el.value; const sv = SV(el.value); if (sv) { it.valor = sv.preco; if (!sv.funcs.includes(it.funcId)) { const quem = funcs.filter(f => sv.funcs.includes(f.id)); it.funcId = quem.length === 1 ? quem[0].id : ''; } } drawItens(); sync(); }
       else if (k === 'funcId') { it.funcId = el.value; calc(); }
       else { it.valor = toCents(el.value) || 0; sync(); } }; });
     q('#r-itens').querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { itens.splice(+b.dataset.rm, 1); drawItens(); sync(); });
@@ -8906,7 +9106,7 @@ function modalRegistro(pref = {}) {
       ${algumOculto ? '<div class="muted small" style="margin-top:6px">A comissão é calculada automaticamente para cada profissional e só aparece para ela e para a proprietária.</div>' : ''}${err}`;
   };
   q('#r-ds').oninput = () => { descManual = true; sync(); };
-  q('#r-addsv').onclick = () => { itens.push({ servicoId: '', funcId: own ? ACTOR.funcId : (itens[itens.length - 1]?.funcId || funcs[0]?.id), valor: 0 }); drawItens(); sync(); };
+  q('#r-addsv').onclick = () => { itens.push({ servicoId: '', funcId: own ? ACTOR.funcId : '', valor: 0 }); drawItens(); sync(); };
   q('#r-add').onclick = () => { pagoManual = true; const rest = total() - sum(leParc().map(p => p.valor)); parcelas.push({ forma: convsCli().length ? 'convenio' : 'credito', valor: rest > 0 ? centsInput(rest) : '', status: 'registrado', convenioId: '', autorizacao: '' }); drawParc(); calc(); };
   drawItens(); drawParc(); sync();
   let enviando = false;
@@ -8932,9 +9132,29 @@ function modalRegistro(pref = {}) {
     }, ats => ats.length > 1 ? `Atendimento fechado · ${ats.length} serviços registrados (${ats.map(a => a.codigo).join(', ')})` : `Serviço ${ats[0].codigo} registrado`);
     if (res.ok) { closeModal(); if (vender) modalVendaProduto({ clienteId: res.r[0].clienteId, data: res.r[0].data }); }
   };
-  q('#r-ok').onclick = () => concluir(false);
+  // etapa 1: confere e mostra o resumo; etapa 2 (após 5 s): registra
+  const revisarRegistro = vender => {
+    if (enviando) return;
+    let resumo;
+    try {
+      const nomeCli = nomeClienteTela(ov, 'r');
+      if (!val('r-dt')) throw new Error('Escolha a data do atendimento.');
+      if (itens.some(x => !x.servicoId)) throw new Error('Escolha o serviço em todas as linhas, ou remova a linha vazia.');
+      if (itens.some(x => !x.funcId)) throw new Error('Escolha a profissional que fez o serviço em todas as linhas.');
+      if (parcelas.some(p => isNaN(toCents(p.valor)))) throw new Error('Confira os valores das formas de pagamento.');
+      const P = leParc(), pg = sum(P.map(p => p.valor));
+      if (total() > 0 && pg !== total()) throw new Error(`A soma das formas de pagamento (${brl(pg)}) precisa ser igual ao total (${brl(total())}).`);
+      resumo = rvLinha('Cliente', nomeCli) + rvLinha('Data e hora', `${dBR(val('r-dt'))}${val('r-hr') ? ' às ' + esc(val('r-hr')) : ''}`)
+        + itens.map(it => `<div class="rv-s"><b>${esc(SV(it.servicoId)?.nome || '—')} · ${brl(it.valor || 0)}</b><small>feito por <b>${esc(fn(it.funcId))}</b></small></div>`).join('')
+        + (desc() ? rvLinha('Desconto', '−' + brl(desc())) : '')
+        + P.filter(p => p.valor > 0).map(p => rvLinha(esc(FORMAS[p.forma] || p.forma) + (p.forma === 'convenio' && p.nParcelas > 1 ? ` (${p.nParcelas}x)` : '') + (p.status === 'pendente' ? ' · pendente' : ''), brl(p.valor))).join('')
+        + `<div class="rv-t"><span>Total</span><span>${brl(total())}</span></div>`;
+    } catch (e) { toast(e.message, 'bad'); return; }
+    revisar({ titulo: 'Revise o registro do serviço', html: resumo, label: vender ? 'Registrar e vender produto' : 'Registrar serviço', onOk: () => concluir(vender) });
+  };
+  q('#r-ok').onclick = () => revisarRegistro(false);
   q('#r-pk')?.addEventListener('click', () => { closeModal(); modalVenderPacote('', ag.clienteId, { converter: doGrupo.map(x => x.id), concluir: true }); });
-  q('#r-okv')?.addEventListener('click', () => concluir(true));
+  q('#r-okv')?.addEventListener('click', () => revisarRegistro(true));
 }
 function pgRegistro() {
   const own = !verServicosEquipe(DB, ACTOR), dono = isOwner(ACTOR);
@@ -8964,7 +9184,7 @@ function pgRegistro() {
     <div class="bar">${perBar()}<input id="rg-b" type="search" enterkeyhint="search" autocomplete="off" placeholder="Buscar cliente: nome, telefone ou CPF" aria-label="Pesquisar cliente" value="${esc(UI.regBusca || '')}" style="flex:1 1 260px;min-width:0">${own ? '' : `<select id="rg-f" aria-label="Funcionário">${funcOpts(UI.regFunc)}</select>`}<select id="rg-fp" aria-label="Forma de pagamento">${opt([['', 'Todas as formas'], ...Object.entries(FORMAS)], UI.regForma)}</select></div>
     <div class="grid g4">${kpi('Comandas', comandas.filter(c => c.ok.length).length, `${ok.length} serviço(s)`)}${veFaturamento() ? kpi('Valor final cobrado', brl(sum(ok.map(x => x.valorFinal)))) : ''}${ok.some(vc) ? kpi(isOwner(ACTOR) ? 'Comissão calculada' : 'Minha comissão', brl(sum(ok.filter(vc).map(x => x.comissaoTotal))), '', 'accent') : ''}${isOwner(ACTOR) ? kpi('Parte do salão', brl(sum(ok.map(x => x.parteSalao)))) : ''}</div>
     ${comandas.length ? `<div class="tw"><table><thead><tr><th>Comanda</th><th>Data</th><th>Cliente</th><th>Serviços e profissionais</th><th>Pagamento</th>${veFaturamento() ? '<th class="r">Total</th>' : ''}<th class="r">Comissão</th>${dono ? '<th class="r">Salão</th>' : ''}<th>Situação</th></tr></thead><tbody>
-    ${comandas.slice(0, LIM('regMax', 150)).map(c => `<tr class="click${c.pend ? ' pend-pg' : ''}" data-comanda="${esc(c.k)}"><td class="code">${c.at.codigo}${c.ats.length > 1 ? `<div class="muted small">${c.ats.length} serviços</div>` : ''}</td><td>${dBR(c.at.data)}</td><td>${cliNome(c.at.clienteId)}</td>
+    ${comandas.slice(0, LIM('regMax', 150)).map(c => `<tr class="click${c.pend ? ' pend-pg' : ''}" data-comanda="${esc(c.k)}"><td class="code">${c.at.codigo}${c.ats.length > 1 ? `<div class="muted small">${c.ats.length} serviços</div>` : ''}${dono ? `<button class="reg-aud" type="button" data-aud-cmd="${esc(c.k)}" title="Tudo o que aconteceu com este serviço">${icon('auditoria')}<span>Auditar</span></button>` : ''}</td><td>${dBR(c.at.data)}</td><td>${cliNome(c.at.clienteId)}</td>
       <td><div class="cmd-sv">${c.ats.map(x => `<span class="${x.status === 'estornado' ? 'est' : ''}">${esc(SV(x.servicoId)?.nome)} <em>${esc(first(x.funcId))}</em></span>`).join('')}</div></td>
       <td class="small">${esc(c.formas.join(' + '))}</td>${veFaturamento() ? `<td class="r b"><div class="vcol">${brl(c.total)}${c.desc ? `<span class="muted small" style="font-weight:500">desc. ${brl(c.desc)}</span>` : ''}</div></td>` : ''}<td class="r">${c.ok.some(vc) ? brl(c.com) : '—'}</td>${dono ? `<td class="r">${brl(c.salao)}</td>` : ''}
       <td>${c.est ? pill('Estornado', 'bad') : c.pend ? pill('Pagamento pendente', 'warn') : pill('Concluída', 'ok')}</td></tr>`).join('')}
@@ -8984,7 +9204,7 @@ function modalComanda(k) {
     </tbody><tfoot><tr><td>Total da comanda</td><td></td>${veFaturamento() ? `<td class="r">${brl(sum(ok.map(x => x.valorFinal)))}</td>` : ''}<td class="r">${ok.some(vc) ? brl(sum(ok.filter(vc).map(x => x.comissaoTotal))) : ''}</td><td></td></tr></tfoot></table></div>
     <div class="sec" style="margin:4px 0 6px">Pagamento</div>${[...formas.values()].map(f => `<div class="split small"><span>${FORMAS[f.p.forma]}${f.p.sinal ? ' (sinal pago antes)' : ''}${f.p.convenioId ? ' · ' + esc(CV(f.p.convenioId)?.nome || '') : ''}</span><span>${veFaturamento() ? `<b>${brl(f.valor)}</b> ` : ''}${parcelaPendente(f.p) ? pill('Pendente', 'warn') : pill('Recebido', 'ok')}</span></div>`).join('')}
     ${produtosDoDiaHTML(ats[0].clienteId, ats[0].data)}`,
-    `<button class="btn" data-close>Fechar</button>`, true);
+    `<button class="btn" data-close>Fechar</button>${isOwner(ACTOR) ? `<button class="btn pri" data-aud-cmd="${esc(k)}">${icon('auditoria')}<span>Auditar comanda</span></button>` : ''}`, true);
 }
 function modalAtendimento(id) {
   const at = DB.atendimentos.find(x => x.id === id);
@@ -9013,10 +9233,37 @@ function modalAtendimento(id) {
     ${isOwner(ACTOR) && at.status === 'concluido' && !at.pacoteVendaId && (DB.pacotes || []).some(x => x.ativo !== false) ? `<div class="ag-pk"><div class="small"><b>A cliente decidiu levar um pacote?</b><div class="muted">Este serviço${at.data < TODAY ? `, mesmo sendo de ${dBR(at.data)},` : ''} vira a 1ª sessão (feita) e o valor avulso é trocado pelo valor do pacote.</div></div><button class="btn sm" data-trocar-pk="${at.id}">Trocar por pacote</button></div>` : ''}
     ${at.status === 'concluido' ? `<div class="bar">${ps.some(p => p.status === 'pendente') ? waBtn(`data-wa-at="${at.id}" data-wa-m="cobranca"`, 'Cobrar no WhatsApp', 'cobranca') : waBtn(`data-wa-at="${at.id}" data-wa-m="agradecimento"`, 'Agradecer no WhatsApp', 'agradecimento')}</div>` : ''}
     ${isOwner(ACTOR) && at.status === 'concluido' ? `<details><summary class="small b" style="cursor:pointer">Estornar este registro</summary><div class="stack" style="gap:8px;margin-top:10px"><div class="note warn">O estorno preserva o histórico. Só é permitido antes do serviço entrar em fechamento ou ter acerto de convênio.${at.pacoteVendaId && (DB.pacoteVendas || []).some(v => v.id === at.pacoteVendaId && (v.atendimentoIds || [v.atendimentoId]).includes(at.id)) ? ' <b>Este registro é a venda de um pacote:</b> o estorno cancela o pacote, as sessões marcadas saem da agenda e o valor sai do faturamento. Use só se a cliente desistiu e o dinheiro foi devolvido.' : ''}</div><label class="f">Justificativa<textarea id="es-m"></textarea></label><div><button class="btn dng" id="es-ok">Estornar registro</button></div></div></details>` : ''}`,
-    '', true);
+    isOwner(ACTOR) ? `<button class="btn" data-close>Fechar</button><button class="btn pri" data-aud-at="${id}">${icon('auditoria')}<span>Auditar este serviço</span></button>` : '', true);
   ov.querySelector('#es-ok')?.addEventListener('click', () => run(() => estornarAtendimento(DB, ACTOR, id, val('es-m')), 'Registro estornado').ok && closeModal());
 }
 
+/* =================== AUDITORIA DE UM SERVIÇO =================== */
+const HS_TIPOS = { ag: ['Agendamento', 'agenda'], alt: ['Alteração', 'editar'], wa: ['Mensagem', 'whatsapp'], cli: ['Cliente', 'clientes'], ok: ['Registro', 'check'], pg: ['Pagamento da cliente', 'dinheiro'], com: ['Comissão', 'dinheiro'], bad: ['Estorno / exclusão', 'x'] };
+function modalHistoricoServico(ids) {
+  if (!isOwner(ACTOR)) return toast('Só a proprietária vê a auditoria.', 'bad');
+  const H = historicoServico(DB, ids);
+  if (!H.ats.length && !H.ags.length) return toast('Serviço não encontrado.', 'bad');
+  const base = H.ats[0] || H.ags[0], cli = CL(base.clienteId);
+  const codigos = H.ats.map(x => x.codigo).join(', ');
+  const resumoAt = H.resumo.map(r => `<div class="hs-sv"><div><b>${esc(r.at.codigo)} · ${esc(SV(r.at.servicoId)?.nome || '—')}</b>${r.at.status === 'estornado' ? ' ' + pill('Estornado', 'bad') : ''}<small>feito por <b>${esc(fn(r.at.funcId))}</b> · ${dataHora(r.at.data, r.at.hora)} · registrado por ${esc(r.at.registradoPor || '—')} em ${esc(r.at.registradoEm || '—')}</small></div>
+      <div class="hs-n"><span>Valor <b>${brl(r.at.valorFinal)}</b></span><span>Comissão <b>${brl(r.comissao)}</b></span><span>Liberada <b>${brl(r.liberada)}</b></span><span>Paga <b class="${r.paga >= r.comissao && r.comissao > 0 ? 'ok' : ''}">${brl(r.paga)}</b></span>${r.fechamentos.length ? `<span>Fechamento <b>${r.fechamentos.join(', ')}</b></span>` : `<span class="muted">Ainda não fechada</span>`}</div></div>`).join('');
+  const agsSemAt = H.ags.filter(a => !H.ats.some(t => t.agendamentoId === a.id));
+  const resumoAg = agsSemAt.map(a => `<div class="hs-sv"><div><b>${dBR(a.data)} ${a.inicio}–${a.fim} · ${esc(SV(a.servicoId)?.nome || '—')}</b> ${pill(AG_STATUS[a.status], AG_TONE[a.status])}<small>com <b>${esc(fn(a.funcId))}</b>${a.preco ? ' · previsto ' + brl(a.preco) : ''} · via ${esc(CANAIS[a.canal] || a.canal || '—')}</small></div></div>`).join('');
+  const pgCli = H.parcelas.map(p => `<div class="split small"><span>${esc(H.ats.find(t => t.id === p.atendimentoId)?.codigo || '')} · ${FORMAS[p.forma]}${p.convenioId ? ' · ' + esc(CV(p.convenioId)?.nome || '') : ''} ${brl(p.valor)}</span><span>${p.forma === 'convenio' ? pill(p.situacao === 'acertado' ? 'Convênio pago' : p.situacao === 'parcial' ? `Pago ${brl(p.acertado)}` : p.situacao === 'cancelado' ? 'Cancelado' : 'Aguarda o convênio', p.situacao === 'acertado' ? 'ok' : p.situacao === 'cancelado' ? 'bad' : 'warn') : parcelaPendente(p) ? pill('Pendente', 'warn') : pill(p.status === 'conferido' ? 'Conferido no extrato' : 'Recebido', 'ok')}</span></div>`).join('');
+  let diaAnt = '';
+  const linha = e => { const [dt, hr] = String(e.quando).split(/,\s*/); const tp = HS_TIPOS[e.tipo] || HS_TIPOS.alt;
+    const cab = dt !== diaAnt ? `<div class="hs-dia">${esc(dt)}</div>` : ''; diaAnt = dt;
+    const partes = String(e.detalhe || '').split(' · ').filter(Boolean);
+    return `${cab}<div class="hs-ev t-${e.tipo}"><span class="hs-ic" aria-hidden="true">${icon(tp[1])}</span><div class="hs-cx"><div class="hs-t"><b>${esc(e.titulo)}</b><span class="hs-h">${esc(hr || '')}</span></div>
+      <div class="hs-u">${esc(tp[0])} · por <b>${esc(e.usuario)}</b>${e.sub ? ` · ${esc(e.sub)}` : ''}</div>${partes.length ? `<ul class="hs-d">${partes.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}</div></div>`; };
+  openModal(`Auditoria · ${cli?.nome || 'serviço'}`, `
+    <div class="hs-top"><div><span class="muted small">Cliente</span><b>${cli ? esc(cli.nome) : '—'}</b></div>${codigos ? `<div><span class="muted small">Registro(s)</span><b>${esc(codigos)}</b></div>` : ''}<div><span class="muted small">Eventos</span><b>${H.eventos.length}</b></div></div>
+    ${resumoAt || resumoAg ? `<div class="sec" style="margin:4px 0 6px">Serviços</div><div class="stack" style="gap:8px">${resumoAt}${resumoAg}</div>` : ''}
+    ${pgCli ? `<div class="sec" style="margin:12px 0 6px">Pagamento da cliente</div><div class="stack" style="gap:4px">${pgCli}</div>` : ''}
+    <div class="sec" style="margin:14px 0 6px">Tudo o que aconteceu, do mais antigo ao mais recente</div>
+    ${H.eventos.length ? `<div class="hs-lst">${H.eventos.map(linha).join('')}</div>` : empty('Sem eventos', 'Nada registrado para este serviço.')}`,
+    `<button class="btn" data-close>Fechar</button>`, true);
+}
 /* =================== PIX E CARTÃO =================== */
 function pgFinanceiro() {
   const [ini, fim] = periodo();
@@ -9237,6 +9484,21 @@ function modalAcerto(parcelaId) {
   rebindFns.set(ov, bind); bind();
 }
 
+/* depois de fechar a semana: lembra de registrar o pagamento na aba Pagamentos */
+function avisoPagarFechamento(f) {
+  if (!f) return; const falta = aPagarFech(f);
+  if (falta <= 0) return toast(`Fechamento ${f.codigo} quitado${f.abatido ? ' com o adiantamento' : ''}: não há nada a pagar.`, 'ok');
+  openModal('Falta registrar o pagamento', `<div class="note warn" style="font-size:15px"><b>Fechamento ${esc(f.codigo)} confirmado.</b><br>Agora registre o pagamento de <b>${brl(falta)}</b> para <b>${esc(fn(f.funcId))}</b> na aba <b>Pagamentos</b>, senão a semana continua aparecendo como <b>A pagar</b>.</div>
+    <dl class="dl"><dt>Profissional</dt><dd>${esc(fn(f.funcId))}</dd><dt>Semana</dt><dd>${dBR(f.inicio)} a ${dBR(f.fim)}</dd><dt>Total do fechamento</dt><dd>${brl(f.total)}</dd>${f.abatido ? `<dt>Descontado do adiantamento</dt><dd>−${brl(f.abatido)}</dd>` : ''}${f.pago ? `<dt>Já pago</dt><dd>${brl(f.pago)}</dd>` : ''}<dt>A pagar</dt><dd><b>${brl(falta)}</b></dd></dl>`,
+    `<button class="btn" data-close>Pagar depois</button><button class="btn" data-go="pagamentos">Ir para Pagamentos</button><button class="btn pri" data-pagar="${f.id}">Registrar pagamento agora</button>`);
+}
+/* lembrete fixo: fechamentos confirmados que ainda não tiveram pagamento registrado */
+function avisoFechSemPagamentoHTML() {
+  if (!isOwner(ACTOR)) return '';
+  const abertos = DB.fechamentos.filter(f => aPagarFech(f) > 0);
+  if (!abertos.length) return '';
+  return `<div class="note warn"><b>${abertos.length === 1 ? '1 fechamento ainda sem pagamento registrado' : abertos.length + ' fechamentos ainda sem pagamento registrado'}</b> · ${brl(sum(abertos.map(aPagarFech)))} a pagar: ${abertos.slice(0, 4).map(f => `${esc(f.codigo)} (${esc(first(f.funcId))}, ${brl(aPagarFech(f))})`).join(', ')}${abertos.length > 4 ? '…' : ''}. <a href="#" data-go="pagamentos">Registrar em Pagamentos</a></div>`;
+}
 /* =================== FECHAMENTO SEMANAL =================== */
 function pgFechamento() {
   const fid = UI.fechFunc || equipeComissao(DB).find(f => f.ativo)?.id;
@@ -9250,7 +9512,7 @@ function pgFechamento() {
   return `
   <div class="ph"><div><h1>Fechamento Semanal</h1><p>Um único fechamento por profissional e por semana, somando tudo o que já foi liberado: Pix, cartão e convênio acertado. O que for liberado depois entra no mesmo fechamento, e o pagamento é feito de uma vez.</p></div></div>
   <div class="stack">
-    ${avisoDuplicadosHTML()}
+    ${avisoDuplicadosHTML()}${avisoFechSemPagamentoHTML()}
     <div class="panel"><div class="bar">
       <label class="f">Funcionário<select id="fe-f">${opt(equipeComissao(DB).map(f => [f.id, f.nome]), fid)}</select></label>
       <label class="f">Data inicial<input type="date" id="fe-i" value="${UI.fechIni}"></label><label class="f">Data final<input type="date" id="fe-e" value="${UI.fechFim}"></label>
@@ -10151,7 +10413,16 @@ function confirmarSessaoPacote(agId) {
     <div class="stack" style="gap:8px">${doDia.map(x => `<div class="pk-cs">${doDia.length > 1 ? `<input type="checkbox" data-cs="${x.id}" checked aria-label="Concluir">` : `<input type="hidden" data-cs="${x.id}" value="1">`}<span class="b">${x.inicio}</span>${opSv ? `<label class="f" style="flex:1;min-width:0">Serviço que a cliente fez<select data-cs-sv="${x.id}">${opt(opSv, v.itens.some(i => i.servicoId === x.servicoId) ? x.servicoId : (st.itens.find(i => i.livres > 0) || v.itens[0]).servicoId)}</select></label>` : `<span>${esc(SV(x.servicoId)?.nome)}</span>`}</div>`).join('')}</div>
     <div class="note small">Sessão do <b>${esc(v.nome)}</b> (${esc(v.codigo)}). O pacote já foi pago na venda, então concluir <b>não gera nova cobrança</b>. Usadas até agora: ${st.usadas} de ${v.sessoes}.</div>`,
     `<button class="btn" data-close>Voltar</button><button class="btn pri" id="cs-ok">Concluir</button>`);
-  ov.querySelector('#cs-ok').onclick = () => run(() => { const ids = [...ov.querySelectorAll('[data-cs]')].filter(x => x.type === 'hidden' || x.checked).map(x => x.dataset.cs);
+  ov.querySelector('#cs-ok').onclick = () => {
+    const sel = [...ov.querySelectorAll('[data-cs]')].filter(x => x.type === 'hidden' || x.checked).map(x => x.dataset.cs);
+    if (!sel.length) return toast('Marque ao menos uma sessão.', 'bad');
+    revisar({ titulo: 'Revise a sessão do pacote', label: 'Concluir sessão', onOk: gravarSessao,
+      html: rvLinha('Cliente', esc(CL(ag.clienteId)?.nome)) + rvLinha('Pacote', `${esc(v.nome)} · ${esc(v.codigo)}`) + rvLinha('Data', dBR(ag.data))
+        + sel.map(id => { const x = DB.agendamentos.find(a => a.id === id); const svx = ov.querySelector(`[data-cs-sv="${id}"]`)?.value || x.servicoId;
+          return `<div class="rv-s"><b>${x.inicio} · ${esc(SV(svx)?.nome || '—')}</b><small>com <b>${esc(fn(x.funcId))}</b></small></div>`; }).join('')
+        + rvLinha('Sessões usadas depois', `${st.usadas + sel.length} de ${v.sessoes}`) });
+  };
+  const gravarSessao = () => run(() => { const ids = [...ov.querySelectorAll('[data-cs]')].filter(x => x.type === 'hidden' || x.checked).map(x => x.dataset.cs);
     if (!ids.length) throw new Error('Marque ao menos uma sessão.');
     return transacao(DB, () => ids.map(id => concluirSessaoPacote(DB, ACTOR, id, ov.querySelector(`[data-cs-sv="${id}"]`)?.value || '')).pop()); },
     s => s.encerrado ? 'Sessão concluída · pacote encerrado' : `Sessão concluída · ${s.usadas} de ${v.sessoes} usadas`).ok && closeModal();
@@ -10804,10 +11075,11 @@ function pgAuditoria() {
   const max = LIM('audMax', 150);
   const card = ({ l, c }) => { const [dt, hr] = String(l.quando || '').split(/,\s*/);
     const abrir = c.agId && DB.agendamentos.some(x => x.id === c.agId) ? `data-ag="${c.agId}"` : c.atId && DB.atendimentos.some(x => x.id === c.atId) ? `data-at-open="${c.atId}"` : '';
+    const hist = c.atId && DB.atendimentos.some(x => x.id === c.atId) ? `data-aud-at="${c.atId}"` : c.agId && DB.agendamentos.some(x => x.id === c.agId) ? `data-aud-ag="${c.agId}"` : '';
     return `<div class="au-it"><div class="au-q"><b>${esc(dt || '')}</b>${hr ? `<span>às ${esc(hr)}</span>` : ''}<em>${esc(l.usuario || '')}</em></div>
       <div class="au-c"><div class="au-a">${esc(l.acao)}</div>
         ${c.cliente ? `<div class="au-cli">${icon('clientes')}${c.clienteId && DB.clientes.some(k => k.id === c.clienteId) ? `<button class="lk" data-cli="${c.clienteId}">${esc(c.cliente)}</button>` : esc(c.cliente)}</div>` : ''}
-        ${c.ref ? `<div class="au-ref">${esc(c.ref)}${abrir ? ` <button class="btn sm ghost" ${abrir}>Abrir</button>` : ''}</div>` : ''}
+        ${c.ref ? `<div class="au-ref">${esc(c.ref)}${abrir ? ` <button class="btn sm ghost" ${abrir}>Abrir</button>` : ''}${hist ? ` <button class="btn sm pri" ${hist}>${icon('auditoria')}<span>Histórico completo</span></button>` : ''}</div>` : ''}
         ${l.detalhe ? `<div class="au-d">${esc(l.detalhe)}</div>` : ''}</div></div>`; };
   return `<div class="ph"><div><h1>Histórico de auditoria</h1><p>Toda operação fica registrada com o dia e o horário em que foi feita, quem fez, a cliente e o agendamento envolvido. Não há exclusão de registros financeiros.</p></div></div>
   <div class="au-f"><div class="po-busca-c au-b">${icon('lupa')}<input id="au-b" type="text" enterkeyhint="search" autocomplete="off" placeholder="Buscar cliente, operação ou código (ex.: AT-1352)" value="${esc(UI.audBusca || '')}" aria-label="Buscar na auditoria"></div>
@@ -10815,7 +11087,7 @@ function pgAuditoria() {
     <label class="f">Quem fez<select id="au-u"><option value="">Todos</option>${usuarios.map(u => `<option ${u === us ? 'selected' : ''}>${esc(u)}</option>`).join('')}</select></label>
     <label class="f">Tipo<select id="au-t">${Object.entries(AUD_TIPOS).map(([k, t]) => `<option value="${k}" ${k === tp ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
     ${b || dia || us || tp ? `<button class="btn sm ghost" id="au-x">Limpar filtros</button>` : ''}</div>
-  <p class="muted small" style="margin:4px 0 10px">${L.length} registro(s)${b || dia || us || tp ? ' encontrados' : ''}. Toque no nome da cliente para abrir o cadastro, ou em <b>Abrir</b> para ver o agendamento.</p>
+  <p class="muted small" style="margin:4px 0 10px">${L.length} registro(s)${b || dia || us || tp ? ' encontrados' : ''}. Toque no nome da cliente para abrir o cadastro, em <b>Abrir</b> para ver o agendamento, ou em <b>Histórico completo</b> para ver tudo o que aconteceu com o serviço: agendamento, alterações, mensagens, registro, pagamentos e comissão.</p>
   ${L.length ? `<div class="au-lista">${L.slice(0, max).map(card).join('')}</div>` : `<div class="panel">${empty('Nenhum registro encontrado', 'Mude a busca ou os filtros.')}</div>`}
   ${L.length > max ? `<div class="mais-linhas" style="margin-top:12px"><span class="muted small">Mostrando ${max} de ${L.length} registros</span><button class="btn" data-mais="audMax">Mostrar mais</button></div>` : ''}`;
 }
@@ -10889,7 +11161,10 @@ ${DB.config.producao ? `    <div class="panel"><h2>Sistema do salão</h2>
 }
 
 const PAGES = { qrcodes: pgQrCodes, pedidos: pgPedidos, whatsapp: pgWhatsApp, painel: pgPainel, agenda: pgAgenda, registro: pgRegistro, clientes: pgClientes, financeiro: pgFinanceiro, convenios: pgConvenios, fechamento: pgFechamento, comissoes: pgComissoes, pagamentos: pgPagamentos, relatorios: pgRelatorios, caixa: pgCaixa, podologia: pgPodologia, pacotes: pgPacotes, avaliacoes: pgAvaliacoes, estoque: pgEstoque, regras: pgRegras, funcionarios: pgEquipe, equipe: pgEquipe, aparencia: pgAparencia, servicos: pgServicos, auditoria: pgAuditoria, testes: pgTestes, ajustes: pgAjustes };
-const bindSel = (id, k, fnc) => { const el = document.getElementById(id); if (el) el.onchange = () => { UI[k] = el.value; if (fnc) fnc(); render(); }; };
+/* campo de data: enquanto a pessoa digita o ano (2, 20, 202…) o navegador já dispara "change" com um ano incompleto.
+   Só aplica quando o ano estiver completo (ou o campo vazio), senão a tela redesenha e o ano para em 2 dígitos */
+const dataCompleta = v => !v || /^(19|20)\d\d-\d\d-\d\d$/.test(v);
+const bindSel = (id, k, fnc) => { const el = document.getElementById(id); if (el) el.onchange = () => { if (el.type === 'date' && !dataCompleta(el.value)) return; UI[k] = el.value; if (fnc) fnc(); render(); }; };
 const AFTER = {
   estoque() { afterEstoque(); },
   regras() { afterRegras(); },
@@ -10930,7 +11205,7 @@ const AFTER = {
   },
   agenda() {
     bindSel('ag-f', 'agFunc'); bindSel('ag-s', 'agStatus'); bindSel('ag-sv', 'agServ');
-    const d = document.getElementById('ag-d'); d.onchange = () => { if (d.value) { UI.agDate = d.value; render(); } };
+    const d = document.getElementById('ag-d'); d.onchange = () => { if (d.value && dataCompleta(d.value)) { UI.agDate = d.value; render(); } };
     const b = document.getElementById('ag-b'); b.oninput = () => { UI.agBusca = b.value; clearTimeout(b._t); b._t = setTimeout(() => { render(); const nb = document.getElementById('ag-b'); nb.focus(); nb.setSelectionRange(nb.value.length, nb.value.length); }, 250); };
   },
   registro() { bindSel('rg-f', 'regFunc'); bindSel('rg-fp', 'regForma'); const rbx = document.getElementById('rg-b'); if (rbx) { let t; rbx.oninput = () => { clearTimeout(t); t = setTimeout(() => { UI.regBusca = rbx.value; UI.regMax = 0; render(); const n = document.getElementById('rg-b'); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }, 250); }; } },
@@ -10943,7 +11218,7 @@ const AFTER = {
     document.querySelectorAll('[name="fe-adi"]').forEach(r => r.onchange = () => { UI.fechAbater = r.value === '1'; });
     document.getElementById('fe-rev')?.addEventListener('click', () => { UI.fechRev = true; render(); });
     document.getElementById('fe-back')?.addEventListener('click', () => { UI.fechRev = false; render(); });
-    document.getElementById('fe-ok')?.addEventListener('click', () => { UI.fechRev = false; run(() => confirmarFechamento(DB, ACTOR, UI.fechFunc || equipeComissao(DB).find(f => f.ativo).id, UI.fechIni, UI.fechFim, { abater: UI.fechAbater !== false }), f => `Fechamento ${f.codigo} · total da semana ${brl(f.total)}`); });
+    document.getElementById('fe-ok')?.addEventListener('click', () => { UI.fechRev = false; const r = run(() => confirmarFechamento(DB, ACTOR, UI.fechFunc || equipeComissao(DB).find(f => f.ativo).id, UI.fechIni, UI.fechFim, { abater: UI.fechAbater !== false }), f => `Fechamento ${f.codigo} · total da semana ${brl(f.total)}`); if (r.ok) avisoPagarFechamento(r.r); });
   },
   relatorios() {
     bindSel('rl-t', 'relTipo'); bindSel('rl-f', 'relFunc'); bindSel('rl-c', 'relConv');
@@ -10958,7 +11233,7 @@ const AFTER = {
   },
   auditoria() {
     const b = document.getElementById('au-b'); if (b) b.oninput = () => { clearTimeout(b._t); b._t = setTimeout(() => { UI.audBusca = b.value; UI.audMax = 0; render(); const nb = document.getElementById('au-b'); nb.focus(); nb.setSelectionRange(nb.value.length, nb.value.length); }, 250); };
-    const dd = document.getElementById('au-d'); if (dd) dd.onchange = () => { UI.audDia = dd.value; UI.audMax = 0; render(); };
+    const dd = document.getElementById('au-d'); if (dd) dd.onchange = () => { if (!dataCompleta(dd.value)) return; UI.audDia = dd.value; UI.audMax = 0; render(); };
     bindSel('au-u', 'audUser'); bindSel('au-t', 'audTipo');
     document.getElementById('au-x')?.addEventListener('click', () => { UI.audBusca = UI.audDia = UI.audUser = UI.audTipo = ''; render(); });
   },
@@ -11123,8 +11398,8 @@ document.addEventListener('change', e => {
   const cc = e.target.closest && e.target.closest('[data-cli-conv]');
   if (cc) { const [k, v] = cc.dataset.cliConv.split('|'); const r = run(() => definirConveniado(DB, ACTOR, v, k, cc.checked), cc.checked ? 'Adicionada ao convênio' : 'Retirada do convênio'); if (!r.ok) cc.checked = !cc.checked; else atualizarPendencias(); return; }
   if (e.target.id === 'who' || e.target.id === 'who-m') { if (e.target.id === 'who-m') closeModal(); DB.sessaoUserId = e.target.value; UI.agFunc = ''; UI.regFunc = ''; save(); render(); toast(e.target.value === REAL?.id ? 'De volta à sua visão' : 'Vendo o sistema como ' + DB.users.find(u => u.id === e.target.value).nome); }
-  if (e.target.id === 'per-i') { UI.perIni = e.target.value; render(); }
-  if (e.target.id === 'per-f') { UI.perFim = e.target.value; render(); }
+  if (e.target.id === 'per-i' && dataCompleta(e.target.value)) { UI.perIni = e.target.value; render(); }
+  if (e.target.id === 'per-f' && dataCompleta(e.target.value)) { UI.perFim = e.target.value; render(); }
 });
 
 /* ---------- início ---------- */
@@ -11482,11 +11757,37 @@ function criarBanco(sb) {
     }
     guardar(row.col, row.id, data, row.atualizado); avisar(row.col, [row.id]);
   }
-  let inscrito = false;
-  sb.channel('lagriff-docs').on('postgres_changes', { event: '*', schema: 'public', table: 'docs' }, p => { aoMudar(p.new); })
-    .subscribe(st => { if (st === 'SUBSCRIBED') { if (inscrito) recuperar(); inscrito = true; } });
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) recuperar(); });
-  window.addEventListener('online', recuperar);
+  /* tempo real entre aparelhos: o aviso de mudança chega pelo canal; se o canal cair (celular dormiu, wi-fi trocou),
+     ele é refeito sozinho e, enquanto isso, uma conferência leve a cada poucos segundos busca só o que mudou */
+  let inscrito = false, canal = null, refazT = null, buscando = false;
+  // conferência barata: pergunta ao banco só a hora da última alteração; se houver algo mais novo, busca o que mudou
+  const conferir = async (forcar) => {
+    if (buscando || document.hidden) return; buscando = true;
+    try {
+      if (forcar !== true) {
+        const { data } = await sb.from('docs').select('atualizado').order('atualizado', { ascending: false }).limit(1);
+        const t = v => { const x = Date.parse(String(v || '').replace(' ', 'T').replace(/\+00$/, 'Z')); return isNaN(x) ? 0 : x; };
+        const ult = t(data && data[0] && data[0].atualizado), visto = Math.max(0, ...Object.values(ultimo).map(t));
+        if (!ult || (visto && ult <= visto)) return;
+      }
+      await recuperar();
+    } catch (e) { } finally { buscando = false; }
+  };
+  const assinar = () => {
+    if (canal) { try { sb.removeChannel(canal); } catch (e) { } }
+    canal = sb.channel('lagriff-docs').on('postgres_changes', { event: '*', schema: 'public', table: 'docs' }, p => { aoMudar(p.new); })
+      .subscribe(st => {
+        if (st === 'SUBSCRIBED') { PROD.canalOk = true; if (inscrito) conferir(true); inscrito = true; }
+        else if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED') { PROD.canalOk = false; clearTimeout(refazT); refazT = setTimeout(assinar, 2000 + Math.random() * 2000); }
+      });
+  };
+  assinar();
+  // conferência de segurança: a cada 8 s com o canal com problema, a cada 20 s com ele funcionando (só busca o que mudou)
+  setInterval(() => { if (!PROD.canalOk || Date.now() - (PROD.ultConf || 0) > 20000) { PROD.ultConf = Date.now(); conferir(); } }, 8000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { conferir(); if (!PROD.canalOk) assinar(); } });
+  window.addEventListener('focus', conferir);
+  window.addEventListener('pageshow', conferir);
+  window.addEventListener('online', () => { conferir(true); assinar(); });
   const db = {
     recuperar,
     doc(caminho) {
