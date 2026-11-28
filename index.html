@@ -1436,7 +1436,7 @@ html:root[data-modo="pb"]{--k-bg:#111111;--k-bd:#111111;--k-lab:#FFDC8F;--k-sub:
    (vem por último: sobrepõe o visual antigo sem mudar as cores da marca)
    ===================================================================== */
 :root{
-  --gf1:#B8862B;--gf2:#7A5230;--gf3:#2F6E4E;--gf4:#41597F;--gf5:#A3373F;
+  --gf1:#B8862B;--gfr:#B5707F;--gf2:#7A5230;--gf3:#2F6E4E;--gf4:#41597F;--gf5:#A3373F;
   --glow:rgba(201,152,58,.13);--glow2:rgba(122,82,48,.08);
   --p-bg:linear-gradient(180deg,#FFFFFF 0%,#FBF8F2 100%);
   --p-sh:0 1px 0 rgba(255,255,255,.9) inset,0 1px 2px rgba(48,36,28,.04),0 22px 44px -28px rgba(48,36,28,.32);
@@ -1445,7 +1445,7 @@ html:root[data-modo="pb"]{--k-bg:#111111;--k-bd:#111111;--k-lab:#FFDC8F;--k-sub:
   --in-bg:color-mix(in srgb,var(--sunk) 70%,var(--surface));
 }
 @media (prefers-color-scheme:dark){html:root:not([data-modo]){
-  --gf1:#FFDC8F;--gf2:#D9A06A;--gf3:#7FD1A8;--gf4:#8FB0E6;--gf5:#F2A0A7;
+  --gf1:#FFDC8F;--gfr:#EBAFBB;--gf2:#D9A06A;--gf3:#7FD1A8;--gf4:#8FB0E6;--gf5:#F2A0A7;
   --glow:rgba(255,220,143,.08);--glow2:rgba(217,160,106,.05);
   --p-bg:linear-gradient(180deg,rgba(46,35,29,.92) 0%,rgba(33,25,20,.92) 100%);
   --p-sh:0 1px 0 rgba(255,236,196,.06) inset,0 26px 50px -30px rgba(0,0,0,.85);
@@ -1454,7 +1454,7 @@ html:root[data-modo="pb"]{--k-bg:#111111;--k-bd:#111111;--k-lab:#FFDC8F;--k-sub:
   --in-bg:rgba(255,236,196,.05);
 }}
 html:root[data-modo="noite"]{
-  --gf1:#FFDC8F;--gf2:#D9A06A;--gf3:#7FD1A8;--gf4:#8FB0E6;--gf5:#F2A0A7;
+  --gf1:#FFDC8F;--gfr:#EBAFBB;--gf2:#D9A06A;--gf3:#7FD1A8;--gf4:#8FB0E6;--gf5:#F2A0A7;
   --glow:rgba(255,220,143,.08);--glow2:rgba(217,160,106,.05);
   --p-bg:linear-gradient(180deg,rgba(46,35,29,.92) 0%,rgba(33,25,20,.92) 100%);
   --p-sh:0 1px 0 rgba(255,236,196,.06) inset,0 26px 50px -30px rgba(0,0,0,.85);
@@ -1656,6 +1656,8 @@ select option,select optgroup{background:var(--surface);color:var(--ink)}
 .rv-f .btn[disabled]{opacity:.55;cursor:not-allowed}
 .rv-bar{height:4px;background:var(--sunk)}.rv-bar i{display:block;height:100%;background:var(--warn);width:0;transition:width 1s linear}
 
+/* quem está online: logada sem usar agora */
+.on-av.log{box-shadow:0 0 0 2px var(--warn) inset}.on-dot{color:var(--ok);font-size:10px}
 /* auditoria de um serviço: linha do tempo */
 .reg-aud{display:flex;width:max-content;align-items:center;gap:4px;margin-top:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:3px 10px 3px 7px;font:inherit;font-size:12px;font-weight:700;letter-spacing:0;cursor:pointer;min-height:28px}.reg-aud svg{width:15px;height:15px}.reg-aud:hover{border-color:var(--accent);color:var(--accent)}
 .hs-top{display:flex;flex-wrap:wrap;gap:8px 22px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--sunk)}.hs-top>div{display:flex;flex-direction:column;gap:1px}
@@ -1677,6 +1679,73 @@ select option,select optgroup{background:var(--surface);color:var(--ink)}
 .t-ok .hs-ic,.t-pg .hs-ic{border-color:var(--ok);color:var(--ok);background:var(--ok-soft)}
 .t-com .hs-ic{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
 .t-bad .hs-ic{border-color:var(--bad);color:var(--bad);background:var(--bad-soft)}.t-bad .hs-cx{border-color:var(--bad)}
+
+/* gráficos: rolagem lateral com eixo fixo, dia a dia */
+.gf-valp{font-size:10px;font-weight:700;fill:var(--ink);font-family:var(--f-body);font-variant-numeric:tabular-nums;paint-order:stroke;stroke:var(--surface);stroke-width:3px;stroke-linejoin:round}.gf-valp.on{font-size:11px}.gf-valn{fill:var(--muted);font-weight:600}
+.gf-leg small{font-size:11px;opacity:.8}
+.gf-bol circle{fill:var(--surface);stroke:var(--ink);stroke-width:1.6;opacity:.95}.gf-bol text{font-size:9.5px;font-weight:800;fill:var(--ink);font-family:var(--f-body)}.gf-bol{animation:fade .4s ease 1.1s both}
+.gfcl2{stop-color:var(--muted)}.gfc-bgl2{background:var(--muted)}
+.gf-wrap{display:flex;align-items:flex-start;margin-top:6px;min-width:0}
+.gf-ax{flex:0 0 auto;display:flex;flex-direction:column}.gf-ax svg,.gf-px{display:block;overflow:visible}
+.gf-sc{flex:1 1 auto;min-width:0;overflow-x:auto;overflow-y:hidden;display:flex;flex-direction:row-reverse;scrollbar-width:thin;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+.gf-sc:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.gf-in{display:flex;flex-direction:column;flex:0 0 auto}
+.gf-sub{font-weight:700;fill:var(--ink);font-size:11px}
+.gf-val{font-size:9.5px;fill:var(--muted);font-family:var(--f-body);font-variant-numeric:tabular-nums}
+.gf-dow{font-size:9.5px;text-transform:uppercase;letter-spacing:.04em}.gf-dow.dom{fill:var(--bad)}
+.gf-sem{stroke:color-mix(in srgb,var(--line) 85%,transparent);stroke-width:1}
+.gf-mes{stroke:var(--accent);stroke-width:1.2;stroke-dasharray:3 3;opacity:.7}
+.gf-dica{margin-left:auto;font-size:12px;color:var(--muted)}
+.gf-hd-r{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+@media (max-width:640px){.gf-hd-r{align-items:flex-start}.gf-dica{margin-left:0}}
+
+/* Ritmo do salão: visual delicado (curvas suaves, rosé e dourado, números leves) */
+.gf-ritmo .gf-tit{font-family:var(--f-display);font-weight:400;font-size:27px;letter-spacing:.01em;line-height:1.1;display:block;margin-top:2px}
+.gf-ritmo .gf-desde{font-size:12.5px;color:var(--muted);margin-top:3px;font-style:italic}
+.gf-kp{display:flex;flex-wrap:wrap;gap:6px 26px;margin-top:12px}.gf-kp span{display:flex;flex-direction:column;gap:1px}
+.gf-kp small{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}.gf-kp b{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+.gf-ritmo .gf-var{background:color-mix(in srgb,var(--accent-soft) 70%,transparent);border-radius:999px;padding:5px 12px;font-size:13px}
+.gf-ritmo .seg button{font-size:13px;padding:6px 14px}
+.gf-ritmo .gf-grade{stroke:color-mix(in srgb,var(--line) 55%,transparent);stroke-dasharray:1 5}
+.gf-ritmo .gf-eixo{font-size:10.5px;letter-spacing:.02em}.gf-ritmo .gf-dow{font-size:9px;letter-spacing:.14em;opacity:.8}
+.gf-ritmo .gf-linha.gft1{stroke-width:2;filter:drop-shadow(0 3px 4px color-mix(in srgb,var(--gf1) 30%,transparent))}
+.gf-ritmo .gf-area{opacity:.75}
+.gf-ritmo .gf-ponto.gft1{fill:var(--surface);stroke:var(--gf1);stroke-width:1.8}
+.gf-ritmo .gf-halo{fill:var(--gf1);stroke:none;opacity:.16;animation:gfHalo 2.4s ease-in-out 1.4s infinite}
+@keyframes gfHalo{0%,100%{opacity:.16;r:9}50%{opacity:.06;r:13}}
+.gf-ritmo .gf-l2{stroke:var(--gfr);opacity:.9;stroke-width:1.5}
+.gf-ritmo .gf-bol circle{fill:var(--surface);stroke:var(--gfr);stroke-width:1.2}.gf-ritmo .gf-bol text{fill:var(--gfr);font-size:9px;font-weight:700}
+.gf-ritmo .gf-valp{font-size:10px;font-weight:600;fill:color-mix(in srgb,var(--ink) 82%,transparent);letter-spacing:.02em}.gf-ritmo .gf-valp.on{font-size:11.5px;font-weight:700;fill:var(--accent)}
+.gf-ritmo .gf-sem{stroke:color-mix(in srgb,var(--gfr) 22%,transparent);stroke-dasharray:2 4}
+.gf-ritmo .gf-mes{stroke:var(--gfr);opacity:.5}
+.gf-ritmo .gf-l2t{fill:var(--gfr)}
+.gf-ritmo .gf-leg i.gf-l2b{background:var(--gfr);opacity:1;height:2px}
+.gf-ritmo .gf-leg{font-size:12px;letter-spacing:.02em}
+@media (prefers-reduced-motion:reduce){.gf-ritmo .gf-halo{animation:none}}
+
+/* Ritmo: pontos discretos, dica ao passar o mouse e entrada suave */
+.gf-ritmo .gf-pf{fill:var(--surface);stroke:var(--gf1);stroke-width:1.8;transition:r .2s ease,stroke-width .2s ease}
+.gf-ritmo .gf-col.ult .gf-pf{fill:var(--gf1)}
+.gf-ritmo .gf-pa{fill:var(--gfr);stroke:var(--surface);stroke-width:1;transition:r .2s ease}
+.gf-ritmo .gf-guia{stroke:var(--gfr);stroke-width:1;stroke-dasharray:2 3;opacity:0;transition:opacity .2s ease}
+.gf-ritmo .gf-hit{fill:transparent;cursor:pointer}
+.gf-ritmo .gf-col.hov .gf-guia{opacity:.55}.gf-ritmo .gf-col.hov .gf-pf{r:5.5;stroke-width:2.4}.gf-ritmo .gf-col.hov .gf-pa{r:4.5}
+.gf-tip{position:fixed;z-index:80;pointer-events:none;background:color-mix(in srgb,var(--surface) 94%,transparent);backdrop-filter:blur(6px);border:1px solid color-mix(in srgb,var(--gfr) 35%,var(--line));border-radius:14px;padding:9px 13px;box-shadow:0 14px 34px -16px rgba(60,30,40,.45);font-size:12.5px;display:flex;flex-direction:column;gap:3px;min-width:170px;opacity:0;transform:translateY(4px);transition:opacity .15s ease,transform .15s ease}
+.gf-tip.on{opacity:1;transform:none}
+.gf-tip b{font-family:var(--f-display);font-weight:400;font-size:17px;margin-bottom:2px}
+.gf-tip span{display:flex;align-items:center;gap:7px;color:var(--muted)}.gf-tip em{font-style:normal;margin-left:auto;padding-left:12px;color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums}
+.gf-tip i{width:8px;height:8px;border-radius:50%;display:inline-block}.gf-tip i.t1{background:var(--gf1)}.gf-tip i.t2{background:var(--gfr)}
+/* entrada suave: a curva se desenha, a área sobe devagar e os pontos aparecem um a um (só na primeira vez) */
+.gf-ritmo .gf-calmo .gf-linha,.gf-ritmo .gf-calmo .gf-area,.gf-ritmo .gf-calmo .gf-col{animation:none!important;stroke-dashoffset:0;opacity:1}
+.gf-ritmo .gf-calmo .gf-area{opacity:.75}
+.gf-ritmo .gf-anim .gf-linha{animation:gfLinha 1.8s cubic-bezier(.45,0,.2,1) .15s forwards}
+.gf-ritmo .gf-anim .gf-linha.gf-l2{animation-delay:.45s}
+.gf-ritmo .gf-anim .gf-area{transform-box:fill-box;transform-origin:50% 100%;animation:gfArea 1.6s cubic-bezier(.16,1,.3,1) .35s both}
+@keyframes gfArea{from{opacity:0;transform:scaleY(.4)}to{opacity:.75;transform:none}}
+.gf-ritmo .gf-anim .gf-col{animation:gfPonto .5s ease both;animation-delay:calc(.9s + var(--i) * 30ms)}
+@keyframes gfPonto{from{opacity:0}to{opacity:1}}
+.gf-ritmo .gf-anim .gf-halo{animation:fade .6s ease 1.9s both,gfHalo 2.4s ease-in-out 2.5s infinite}
+@media (prefers-reduced-motion:reduce){.gf-ritmo .gf-anim .gf-linha,.gf-ritmo .gf-anim .gf-area,.gf-ritmo .gf-anim .gf-col{animation:none!important;stroke-dashoffset:0;opacity:1}}
 </style>
 
 </head>
@@ -2252,7 +2321,7 @@ function horariosLivres(S, funcId, data, aPartir = 0) {
    WHATSAPP — mensagens prontas. O sistema só abre a conversa (wa.me) com o
    texto preenchido; quem envia é a pessoa, no WhatsApp do aparelho.
    ========================================================================= */
-const WA_VARS = [['primeiro_nome', 'Primeiro nome'], ['cliente', 'Nome completo'], ['servico', 'Serviço'], ['data', 'Data'], ['hora', 'Hora'],
+const WA_VARS = [['primeiro_nome', 'Primeiro nome'], ['nome_sobrenome', 'Nome e sobrenome'], ['cliente', 'Nome completo'], ['numero_atendimento', 'Número do atendimento'], ['servico', 'Serviço'], ['data', 'Data'], ['hora', 'Hora'],
   ['profissional', 'Profissional'], ['valor', 'Valor'], ['pix', 'Chave Pix'], ['endereco', 'Endereço'], ['salao', 'Nome do salão'], ['telefone_salao', 'Telefone do salão'], ['link_avaliacao', 'Link da avaliação'], ['link_confirmacao', 'Link para confirmar'], ['sinal', 'Valor do sinal'], ['nivel', 'Nível da cliente'], ['beneficio', 'Benefícios do nível'], ['pacote', 'Nome do pacote'], ['pacote_usadas', 'Sessões usadas'], ['pacote_restantes', 'Sessões restantes'], ['pacote_total', 'Sessões do pacote'], ['pacote_sessoes', 'Lista das sessões'], ['pacote_validade', 'Validade do pacote']];
 const WA_MODELOS = [
   { id: 'confirmacao', nome: 'Confirmar agendamento', func: true, texto: 'Olá, {primeiro_nome}! Aqui é do {salao}. Seu horário de {servico} está marcado para {data} às {hora}, com {profissional}. Podemos confirmar? É só responder SIM.\n{link_confirmacao}' },
@@ -2306,6 +2375,8 @@ function registrarContatoWhatsApp(S, a, { clienteId, modeloId, agendamentoId, pa
   const cl = S.clientes.find(c => c.id === clienteId);
   const m = S.config.whatsapp.modelos.find(x => x.id === modeloId);
   const ag = agendamentoId && S.agendamentos.find(x => x.id === agendamentoId);
+  if (!dispensar && WA_EXIGE_AGENDAMENTO.has(modeloId) && (!ag || INATIVOS.includes(ag.status) || ag.status === 'concluido'))
+    throw new Error(`"${m ? m.nome : 'Esta mensagem'}" só pode ser enviada com um agendamento já criado na agenda. Crie o agendamento primeiro e envie a mensagem por ele.`);
   if (ag) ag.historico.push({ quando: stamp(), usuario: a.nome, texto: `${dispensar ? 'Mensagem não enviada (aviso dispensado)' : 'WhatsApp aberto'} · ${m ? m.nome : 'mensagem'}` });
   S.contatos = S.contatos || [];
   S.contatos.unshift({ id: uid('wa'), quando: stamp(), usuario: a.nome, funcId: a.funcId, clienteId, modelo: m ? m.nome : 'Mensagem', modeloId: modeloId || '', agendamentoId: agendamentoId || null, atendimentoId: atendimentoId || null, ...(dispensar ? { dispensado: true } : {}) });
@@ -2681,6 +2752,7 @@ function salvarAgendamento(S, a, d, opt = {}) {
   }
   const ag = { id: uid('ag'), status: 'aguardando', canal: 'whatsapp', obs: '', preco: 0, ...d, historico: [{ quando: stamp(), usuario: a.nome, texto: 'Agendamento criado' }] };
   ag.historico[0].det = descreverAgendamento(S, ag);
+  codigoAgendamento(S, ag);
   S.agendamentos.push(ag); audit(S, a, 'Agendamento criado', `${dBR(ag.data)} ${ag.inicio} · ${descreverAgendamento(S, ag)}`, ctxAg(S, ag)); return ag.id;
 }
 
@@ -2697,6 +2769,28 @@ function transacao(S, fn) {
   try { return fn(); }
   catch (e) { const v = JSON.parse(snap); Object.keys(S).forEach(k => delete S[k]); Object.assign(S, v); throw e; }
   finally { TRANS_ABERTAS.delete(S); }
+}
+/* número do atendimento agendado (AG-1, AG-2…): o mesmo para todos os serviços do mesmo horário.
+   Agendamentos antigos ganham o número na primeira vez que precisam dele (ex.: numa mensagem) */
+function codigoAgendamento(S, ag) {
+  if (!ag) return '';
+  if (ag.codigo) return ag.codigo;
+  const gr = grupoDe(S, ag), ja = gr.find(x => x.codigo);
+  S.seq = S.seq || {}; const cod = ja ? ja.codigo : 'AG-' + (S.seq.ag = (S.seq.ag || 0) + 1);
+  gr.forEach(x => { if (!x.codigo) x.codigo = cod; }); ag.codigo = cod; return cod;
+}
+/* "Ana Maria" de "Ana Maria da Silva": primeiro e segundo nome, sem "da/de/dos" */
+function nomeCurto(nome) {
+  const p = String(nome || '').trim().split(/\s+/).filter(Boolean), r = [p[0]];
+  for (const x of p.slice(1)) { if (/^(d[aeo]s?|e)$/i.test(x)) continue; r.push(x); break; }
+  return r.filter(Boolean).join(' ');
+}
+/* modelos que só podem ser enviados com um agendamento criado na agenda */
+const WA_EXIGE_AGENDAMENTO = new Set(['confirmacao', 'lembrete']);
+/* identificação no fim de toda mensagem: nome e sobrenome da cliente e o número do atendimento */
+function waRodape(nome, numero) {
+  const n = nomeCurto(nome); if (!n && !numero) return '';
+  return `${n}${numero ? `${n ? ' · ' : ''}Atendimento nº ${numero}` : ''}`;
 }
 const grupoDe = (S, ag) => ag && ag.grupo ? S.agendamentos.filter(x => x.grupo === ag.grupo).sort((p, q) => (p.inicio + p.id).localeCompare(q.inicio + q.id)) : (ag ? [ag] : []);
 function salvarAgendamentoGrupo(S, a, d) {
@@ -3673,15 +3767,20 @@ function venderPacote(S, a, d) {
   if (!pc) throw new Error('Escolha o pacote.');
   if (!d.clienteId) throw new Error('Escolha a cliente.');
   const sv = S.servicos.find(x => x.id === pc.servicoId);
-  const funcId = d.funcId || sv?.funcs[0];
-  if (!sv || !sv.funcs.includes(funcId)) throw new Error(`Escolha uma profissional que faz ${sv ? sv.nome : 'o serviço'}.`);
+  // a profissional não é mais escolhida sozinha: sem preferência, cada sessão escolhe quem faz quando for agendada
+  const funcId = d.funcId || '';
   const sessoes = (d.sessoes || []).filter(x => x && x.data && x.inicio), conv = (d.converter || []).map(id => S.agendamentos.find(x => x.id === id)).filter(Boolean);
+  if (!sv) throw new Error('Escolha o pacote.');
+  if (!funcId && d.comissao === 'venda') throw new Error('Escolha a profissional que recebe a comissão do pacote.');
+  if (!funcId && sessoes.length) throw new Error('Escolha a profissional das sessões que já vão para a agenda (ou deixe as datas em branco para marcar depois).');
+  if (funcId && !sv.funcs.includes(funcId)) throw new Error(`Escolha uma profissional que faz ${sv.nome}.`);
+  const funcVenda = funcId || conv[0]?.funcId || sv.funcs.find(id => S.funcionarios.find(f => f.id === id)?.ativo !== false) || sv.funcs[0];   // só para o registro da venda (sem comissão, fica sem profissional)
   if (sessoes.length + conv.length > pc.sessoes) throw new Error(`Este pacote tem ${pc.sessoes} sessões.`);
   conv.forEach(x => { if (!ABERTOS.includes(x.status)) throw new Error('O horário que vira sessão do pacote já foi concluído ou cancelado.'); if (x.clienteId !== d.clienteId) throw new Error('O horário que vira sessão do pacote é de outra cliente.'); if (x.pacoteVendaId) throw new Error('Este horário já é sessão de um pacote.'); });
   return transacao(S, () => {
     const valor = d.valor > 0 ? d.valor : pc.preco;
     const [at] = registrarAtendimentoGrupo(S, a, { clienteId: d.clienteId, data: d.data || TODAY, hora: d.hora, desconto: 0, obs: `Pacote: ${pc.nome}`, parcelas: d.parcelas && d.parcelas.length ? d.parcelas : [{ forma: 'pix', valor }],
-      itens: [{ funcId, servicoId: sv.id, valorCobrado: valor }] });
+      itens: [{ funcId: d.comissao === 'venda' ? funcId : (sv.funcs.includes(funcVenda) ? funcVenda : sv.funcs[0]), servicoId: sv.id, valorCobrado: valor }] });
     S.seq.pk = (S.seq.pk || 0) + 1;
     const v = { id: uid('pv'), codigo: 'PCT-' + S.seq.pk, pacoteId: pc.id, nome: pc.nome, servicoId: sv.id, ...(pc.itens && pc.itens.length ? { itens: pc.itens.map(x => ({ ...x })) } : {}), funcId, clienteId: d.clienteId, sessoes: pc.sessoes, valor, atendimentoId: at.id,
       data: d.data || TODAY, validoAte: pc.validadeDias ? addDays(d.data || TODAY, pc.validadeDias) : '', vendidoPor: a.nome, criadoEm: stamp() };
@@ -5822,6 +5921,25 @@ function runTests() {
     const aindaNa2 = resumoFechamento(S, d, 'f2', ...sem2).atr.some(r => r.at.id === tarde.id);
     return (!f1.itens.some(i => i.atendimentoId === tarde.id) && naSem2 && naSem3 && aviso && entrou && some && aindaNa2) || JSON.stringify({ naSem2, naSem3, aviso, entrou, some, aindaNa2 });
   });
+  T('Pacote vendido para agendar depois: sem profissional escolhida automaticamente (cada sessão escolhe quem faz)', () => {
+    const S = seedBase(), d = S.users.find(u => u.id === 'u0'), pc = salvarPacote(S, d, { nome: 'Pacote teste', servicoId: 's5', sessoes: 4, preco: 16000 });
+    const v = venderPacote(S, d, { pacoteId: pc.id, clienteId: 'k1', parcelas: [{ forma: 'pix', valor: pc.preco }] });
+    const at = S.atendimentos.find(x => x.id === v.atendimentoId);
+    const e1 = deveFalhar(() => venderPacote(S, d, { pacoteId: pc.id, clienteId: 'k2', parcelas: [{ forma: 'pix', valor: pc.preco }], sessoes: [{ data: addDays(TODAY, 2), inicio: '10:00' }] }));
+    const e2 = deveFalhar(() => venderPacote(S, d, { pacoteId: pc.id, clienteId: 'k2', comissao: 'venda', parcelas: [{ forma: 'pix', valor: pc.preco }] }));
+    const ok = v.funcId === '' && at.funcId === '' && at.comissaoTotal === 0 && /profissional/i.test(e1 || '') && /comissão/i.test(e2 || '');
+    return ok || JSON.stringify({ vf: v.funcId, af: at.funcId, e1, e2 });
+  });
+  T('WhatsApp: confirmação só com agendamento criado; rodapé com nome e sobrenome + número do atendimento', () => {
+    const S = seedBase(), d = S.users.find(u => u.id === 'u0');
+    const semAg = deveFalhar(() => registrarContatoWhatsApp(S, d, { clienteId: 'k1', modeloId: 'confirmacao' }));
+    const ids = salvarAgendamentoGrupo(S, d, { clienteId: 'k1', data: TODAY, itens: [{ servicoId: 's1', funcId: 'f1', inicio: '10:00', fim: '11:00' }, { servicoId: 's2', funcId: S.servicos.find(x => x.id === 's2').funcs[0], inicio: '11:00', fim: '12:00' }] });
+    const [a1, a2] = ids.map(id => S.agendamentos.find(x => x.id === id));
+    let okAg = true; try { registrarContatoWhatsApp(S, d, { clienteId: 'k1', modeloId: 'confirmacao', agendamentoId: a1.id }); } catch (e) { okAg = e.message; }
+    const rod = waRodape('Ana Maria da Silva Souza', a1.codigo), rod2 = waRodape('Bruna de Oliveira', '');
+    const ok = !!semAg && okAg === true && /^AG-\d+$/.test(a1.codigo || '') && a1.codigo === a2.codigo && rod === `Ana Maria · Atendimento nº ${a1.codigo}` && rod2 === 'Bruna Oliveira';
+    return ok || JSON.stringify({ semAg, okAg, c1: a1.codigo, c2: a2.codigo, rod, rod2 });
+  });
   return out;
 }
 
@@ -7815,8 +7933,20 @@ document.addEventListener('click', e => {
 
 /* =================== GRÁFICOS PREMIUM (relatórios e painel) =================== */
 /* períodos: mês a mês (12 meses até o mês final) ou semana a semana (semanas do período, no mínimo 8) */
-function baldes(gran, ini, fim) {
+const DOW3 = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+function baldes(gran, ini, fim, livre) {
   const out = [];
+  if (gran === 'dia') {   // dia a dia, do primeiro ao último (sem pular dias)
+    for (let d = ini, i = 0; d <= fim && i < 1500; d = addDays(d, 1), i++) out.push({ k: d, rot: dBR(d).slice(0, 5), sub: DOW3[fromIso(d).getDay()], ini: d, fim: d });
+    return out;
+  }
+  if (gran === 'mes' && livre) {   // do mês do primeiro registro até o mês atual
+    let [a, m] = ini.slice(0, 7).split('-').map(Number); const [af, mf] = fim.slice(0, 7).split('-').map(Number);
+    for (let i = 0; (a < af || (a === af && m <= mf)) && i < 240; i++) { const d = new Date(a, m - 1, 1), k = `${a}-${String(m).padStart(2, '0')}`;
+      out.push({ k, rot: MES_CURTO[m - 1] + `/${String(a).slice(2)}`, ini: k + '-01', fim: iso(new Date(a, m, 0)) }); m++; if (m > 12) { m = 1; a++; } }
+    return out;
+  }
+  if (gran === 'semana' && livre) { for (let w = weekStart(ini); w <= weekStart(fim); w = addDays(w, 7)) out.push({ k: w, rot: dBR(w).slice(0, 5), ini: w, fim: addDays(w, 6) }); return out; }
   if (gran === 'mes') {
     const [a, m] = fim.slice(0, 7).split('-').map(Number);
     for (let i = 11; i >= 0; i--) { const d = new Date(a, m - 1 - i, 1); const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -7829,10 +7959,10 @@ function baldes(gran, ini, fim) {
   for (; w <= ultima; w = addDays(w, 7)) out.push({ k: w, rot: dBR(w).slice(0, 5), ini: w, fim: addDays(w, 6) });
   return out;
 }
-const chaveBalde = (gran, d) => gran === 'mes' ? d.slice(0, 7) : weekStart(d);
+const chaveBalde = (gran, d) => gran === 'dia' ? d : gran === 'mes' ? d.slice(0, 7) : weekStart(d);
 /* números do período por balde: faturamento, atendimentos, comissões, formas e profissionais */
-function serieEvolucao(gran, ini, fim, fid) {
-  const B = baldes(gran, ini, fim), idx = new Map(B.map((b, i) => [b.k, i])), n = B.length;
+function serieEvolucao(gran, ini, fim, fid, livre) {
+  const B = baldes(gran, ini, fim, livre), idx = new Map(B.map((b, i) => [b.k, i])), n = B.length;
   const z = () => Array(n).fill(0);
   const r = { B, fat: z(), at: z(), com: z(), formas: {}, prof: {} };
   const vc = x => isOwner(ACTOR) || x.funcId === ACTOR.funcId;
@@ -7843,6 +7973,12 @@ function serieEvolucao(gran, ini, fim, fid) {
     r.fat[i] += x.valorFinal || 0; r.at[i]++; if (vc(x)) r.com[i] += x.comissaoTotal || 0;
     (r.prof[x.funcId] || (r.prof[x.funcId] = z()))[i] += x.valorFinal || 0;
     for (const p of pAt.get(x.id) || []) (r.formas[p.forma] || (r.formas[p.forma] = z()))[i] += p.valor || 0;
+  }
+  // dia a dia: domingo é dia de salão fechado e sai do gráfico (só fica se teve algum serviço registrado)
+  if (gran === 'dia') {
+    const ok = B.map((b, i) => fromIso(b.k).getDay() !== 0 || r.at[i] > 0 || r.fat[i] > 0);
+    const f = a => a.filter((_, i) => ok[i]);
+    r.B = f(B); ['fat', 'at', 'com'].forEach(k => { r[k] = f(r[k]); }); [r.formas, r.prof].forEach(o => Object.keys(o).forEach(k => { o[k] = f(o[k]); }));
   }
   return r;
 }
@@ -7855,51 +7991,111 @@ function escala(max, partes = 4) {
 }
 const fmtCurto = v => { const r = v / 100; return r >= 1e6 ? `${(r / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mi` : r >= 1000 ? `${(r / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mil` : String(Math.round(r)); };
 let GF_N = 0;
-/* gráfico SVG: barras, barras empilhadas, linhas ou área; linha extra opcional no eixo da direita */
+/* curva suave que passa por todos os pontos sem inventar picos (cúbica monótona) */
+function curvaSuave(pts) {
+  const n = pts.length; if (n < 3) return 'M' + pts.map(p => p.join(',')).join(' L');
+  const dx = [], m = [], t = [];
+  for (let i = 0; i < n - 1; i++) { dx[i] = pts[i + 1][0] - pts[i][0]; m[i] = (pts[i + 1][1] - pts[i][1]) / (dx[i] || 1); }
+  t[0] = m[0]; t[n - 1] = m[n - 2];
+  for (let i = 1; i < n - 1; i++) t[i] = m[i - 1] * m[i] <= 0 ? 0 : (m[i - 1] + m[i]) / 2;
+  for (let i = 0; i < n - 1; i++) { if (!m[i]) { t[i] = t[i + 1] = 0; continue; } const a = t[i] / m[i], b = t[i + 1] / m[i], h = a * a + b * b; if (h > 9) { const k = 3 / Math.sqrt(h); t[i] = k * a * m[i]; t[i + 1] = k * b * m[i]; } }
+  let d = `M${pts[0][0]},${pts[0][1]}`;
+  for (let i = 0; i < n - 1; i++) { const h = dx[i] / 3; d += ` C${pts[i][0] + h},${pts[i][1] + t[i] * h} ${pts[i + 1][0] - h},${pts[i + 1][1] - t[i + 1] * h} ${pts[i + 1][0]},${pts[i + 1][1]}`; }
+  return d;
+}
+/* gráfico SVG: barras, barras empilhadas, linhas ou área.
+   • cada coluna tem largura mínima: os rótulos nunca ficam um por cima do outro; se não cabem, o gráfico rola
+     para o lado (o eixo dos valores fica parado e ele já abre mostrando o fim, que é o mais recente)
+   • a série extra (ex.: atendimentos) vai num gráfico próprio logo abaixo, alinhado dia a dia, em vez de por cima */
 function grafico(o) {
-  const cel = CELULAR.matches, W = cel ? 400 : (o.largo ? 1100 : 620), H = o.altura || (cel ? 210 : 230), L = cel ? 46 : 54, R = o.linha ? (cel ? 34 : 40) : 10, T = 14, Bm = 26;
-  const n = o.labels.length, cw = (W - L - R) / Math.max(1, n), uid = 'gf' + (++GF_N);
-  const empil = o.modo === 'empilhado', barras = o.modo === 'barras' || empil;
-  const somas = o.labels.map((_, i) => empil ? o.series.reduce((s, x) => s + (x.valores[i] || 0), 0) : Math.max(0, ...o.series.map(x => x.valores[i] || 0)));
-  const { topo, passo } = escala(Math.max(o.minimo ?? (o.fmt ? 4 : 10000), ...somas));   // sem movimento: R$ 0 a R$ 100 (ou 0 a 4)
-  const y = v => T + (H - T - Bm) * (1 - v / topo), fmt = o.fmt || (v => 'R$ ' + fmtCurto(v));
-  let g = `<defs>${o.series.map((s, k) => `<linearGradient id="${uid}-${k}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="gfc${s.cor || k + 1}" stop-opacity="${o.modo === 'area' ? .45 : 1}"/><stop offset="1" class="gfc${s.cor || k + 1}" stop-opacity="${o.modo === 'area' ? 0 : .55}"/></linearGradient>`).join('')}</defs>`;
-  for (let v = 0, i = 0; v <= topo + passo / 2 && i < 8; i++, v = i * passo) g += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" class="gf-grade"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" class="gf-eixo">${fmt(v).replace('R$ ', cel ? '' : 'R$ ')}</text>`;
-  const passoRot = n > 14 ? Math.ceil(n / (cel ? 6 : 10)) : n > 8 && cel ? 2 : 1;
-  o.labels.forEach((l, i) => { if (i % passoRot === 0 || i === n - 1) g += `<text x="${L + i * cw + cw / 2}" y="${H - 8}" text-anchor="middle" class="gf-eixo${i === n - 1 ? ' on' : ''}">${esc(l)}</text>`; });
-  if (barras) {
-    const bw = empil ? Math.min(30, cw * .62) : Math.min(22, (cw * .78) / o.series.length);
-    o.labels.forEach((l, i) => {
-      let base = 0;
-      o.series.forEach((s, k) => {
-        const v = s.valores[i] || 0; if (!v) return;
-        const x = empil ? L + i * cw + (cw - bw) / 2 : L + i * cw + (cw - bw * o.series.length) / 2 + k * bw, y1 = y(base + v), y0 = y(base);
-        g += `<rect x="${x + (empil ? 0 : 1)}" y="${y1}" width="${Math.max(2, bw - (empil ? 0 : 2))}" height="${Math.max(1, y0 - y1)}" rx="${empil ? 2 : 4}" fill="url(#${uid}-${k})" class="gf-bar" style="--i:${i}"><title>${esc(l)} · ${esc(s.nome)}: ${esc(fmt(v))}</title></rect>`;
-        if (empil) base += v;
+  const cel = CELULAR.matches, n = o.labels.length, uid = 'gf' + (++GF_N), dia = !!o.dia;
+  const baseW = cel ? 400 : (o.largo ? 1100 : 620), L = cel ? 46 : 56, R = 18;
+  const maxRot = Math.max(3, ...o.labels.map(l => String(l).length));
+  const minCw = Math.max(o.minCw || 0, dia ? (cel ? 34 : 38) : maxRot * 6.4 + 10);
+  const scroll = n * minCw > baseW - L - R;
+  const cw = scroll ? minCw : (baseW - L - R) / Math.max(1, n), PW = n * cw + R;
+  const linhas = [{ series: o.series, modo: o.modo, fmt: o.fmt || (v => 'R$ ' + fmtCurto(v)), minimo: o.minimo ?? (o.fmt ? 4 : 10000), H: o.altura || (cel ? 200 : 220) }];
+  if (o.linha && !o.sobrepor) linhas.push({ series: [{ nome: o.linha.nome, valores: o.linha.valores, cor: 'l2' }], modo: 'barras', fmt: v => String(Math.round(v)), minimo: 4, H: cel ? 92 : 104, titulo: o.linha.nome });
+  const RA = o.linha && o.sobrepor ? (cel ? 30 : 36) : 0;   // eixo da direita (linha sobreposta)
+  const fim = linhas.length - 1, Bm = dia ? 34 : 24, T = 12;
+  const desenhar = (r, k) => {
+    const ult = k === fim, H = r.H + (ult ? Bm : 14), base = r.H + 4;
+    const empil = r.modo === 'empilhado', barras = r.modo === 'barras' || empil;
+    const somas = o.labels.map((_, i) => empil ? r.series.reduce((s, x) => s + (x.valores[i] || 0), 0) : Math.max(0, ...r.series.map(x => x.valores[i] || 0)));
+    const { topo, passo } = escala(Math.max(r.minimo, ...somas) * (r.titulo || o.valores ? 1.2 : 1)), y = v => T + (base - T) * (1 - v / topo);
+    let ptsF = null, eixoD = '', eixo = '', g = `<defs>${r.series.map((s, q) => `<linearGradient id="${uid}-${k}-${q}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="gfc${s.cor || q + 1}" stop-opacity="${r.modo === 'area' ? .45 : 1}"/><stop offset="1" class="gfc${s.cor || q + 1}" stop-opacity="${r.modo === 'area' ? 0 : .55}"/></linearGradient>`).join('')}</defs>`;
+    for (let v = 0, i = 0; v <= topo + passo / 2 && i < 8; i++, v = i * passo) {
+      if (r.titulo && i % 2) continue;
+      g += `<line x1="0" x2="${PW}" y1="${y(v)}" y2="${y(v)}" class="gf-grade"/>`;
+      eixo += `<text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" class="gf-eixo">${esc(r.fmt(v).replace('R$ ', cel ? '' : 'R$ '))}</text>`;
+    }
+    if (r.titulo) g += `<text x="6" y="${T - 1}" class="gf-eixo gf-sub">${esc(r.titulo)}</text>`;
+    // separador de semana (sábado) e de mês no modo dia a dia
+    if (dia && o.datas) o.datas.forEach((d, i) => { if (i === 0) return; const a = o.datas[i - 1];
+      if (d.slice(0, 7) !== a.slice(0, 7)) g += `<line x1="${i * cw}" x2="${i * cw}" y1="${T - 4}" y2="${base}" class="gf-mes"/>`;
+      else if (fromIso(d).getDay() === 6) g += `<line x1="${i * cw}" x2="${i * cw}" y1="${T}" y2="${base}" class="gf-sem"/>`; });
+    if (barras) {
+      const bw = empil || r.series.length === 1 ? Math.min(dia ? 22 : 30, cw * .62) : Math.min(22, (cw * .78) / r.series.length);
+      o.labels.forEach((l, i) => { let b0 = 0;
+        r.series.forEach((s, q) => { const v = s.valores[i] || 0; if (!v) return;
+          const x = empil || r.series.length === 1 ? i * cw + (cw - bw) / 2 : i * cw + (cw - bw * r.series.length) / 2 + q * bw, y1 = y(b0 + v), y0 = y(b0);
+          g += `<rect x="${x}" y="${y1}" width="${Math.max(2, bw - (empil || r.series.length === 1 ? 0 : 2))}" height="${Math.max(1, y0 - y1)}" rx="${dia ? 3 : 4}" fill="url(#${uid}-${k}-${q})" class="gf-bar" style="--i:${Math.min(i, 40)}"><title>${esc(l)}${o.sub ? ' (' + esc(o.sub[i]) + ')' : ''} · ${esc(s.nome)}: ${esc(r.fmt(v))}</title></rect>`;
+          if (r.titulo && cw >= 26) g += `<text x="${i * cw + cw / 2}" y="${y1 - 3}" text-anchor="middle" class="gf-val">${esc(r.fmt(v))}</text>`;
+          if (empil) b0 += v; }); });
+    } else {
+      r.series.forEach((s, q) => {
+        const pts = s.valores.map((v, i) => [i * cw + cw / 2, y(v || 0)]); if (!pts.length) return;
+        const cv = curvaSuave(pts);
+        if (r.modo === 'area') g += `<path d="${cv} L${pts[pts.length - 1][0]},${y(0)} L${pts[0][0]},${y(0)} Z" fill="url(#${uid}-${k}-${q})" class="gf-area"/>`;
+        g += `<path d="${cv}" pathLength="1" class="gf-linha gft${s.cor || q + 1}"/>`;
+        if (o.valores || o.dica) { const u = pts[pts.length - 1]; g += `<circle cx="${u[0]}" cy="${u[1]}" r="10" class="gf-halo gft${s.cor || q + 1}"/>`; }
+        if (o.dica && r.series.length === 1) { ptsF = pts; return; }
+        g += pts.map((p, i) => `<circle cx="${p[0]}" cy="${p[1]}" r="${i === pts.length - 1 ? 4.2 : o.valores ? 3.2 : dia ? 2.4 : 2.8}" class="gf-ponto gft${s.cor || q + 1}"><title>${esc(o.labels[i])}${o.sub ? ' (' + esc(o.sub[i]) + ')' : ''} · ${esc(s.nome)}: ${esc(r.fmt(s.valores[i] || 0))}</title></circle>`).join('');
+        // resultado de cada dia escrito em cima do ponto
+        if (o.valores && r.series.length === 1) ptsF = pts;
       });
-    });
-  } else {
-    o.series.forEach((s, k) => {
-      const pts = s.valores.map((v, i) => [L + i * cw + cw / 2, y(v || 0)]);
-      if (o.modo === 'area') g += `<path d="M${pts[0][0]},${y(0)} ${pts.map(p => 'L' + p.join(',')).join(' ')} L${pts[pts.length - 1][0]},${y(0)} Z" fill="url(#${uid}-${k})" class="gf-area"/>`;
-      g += `<polyline points="${pts.map(p => p.join(',')).join(' ')}" pathLength="1" class="gf-linha gft${s.cor || k + 1}"/>`;
-      g += pts.map((p, i) => `<circle cx="${p[0]}" cy="${p[1]}" r="${i === pts.length - 1 ? 4 : 2.6}" class="gf-ponto gft${s.cor || k + 1}"><title>${esc(o.labels[i])} · ${esc(s.nome)}: ${esc(fmt(s.valores[i] || 0))}</title></circle>`).join('');
-    });
-  }
-  if (o.linha) {
-    const ml = escala(Math.max(4, ...o.linha.valores)), y2 = v => T + (H - T - Bm) * (1 - v / ml.topo);
-    const pts = o.linha.valores.map((v, i) => [L + i * cw + cw / 2, y2(v || 0)]);
-    g += `<polyline points="${pts.map(p => p.join(',')).join(' ')}" pathLength="1" class="gf-linha gf-l2"/>` + pts.map((p, i) => `<circle cx="${p[0]}" cy="${p[1]}" r="3" class="gf-ponto gf-l2"><title>${esc(o.labels[i])} · ${esc(o.linha.nome)}: ${o.linha.valores[i] || 0}</title></circle>`).join('');
-    for (let v = 0, i = 0; v <= ml.topo + ml.passo / 2 && i < 8; i++, v = i * ml.passo) g += `<text x="${W - R + 6}" y="${y2(v) + 4}" class="gf-eixo gf-l2t">${Math.round(v)}</text>`;
-  }
-  const leg = [...o.series.map((s, k) => `<span><i class="gfc-bg${s.cor || k + 1}"></i>${esc(s.nome)}</span>`), o.linha ? `<span><i class="gf-l2b"></i>${esc(o.linha.nome)}</span>` : ''].join('');
-  return `<svg viewBox="0 0 ${W} ${H}" class="gf-svg" role="img" aria-label="${esc(o.titulo || 'Gráfico')}">${g}</svg>${o.semLegenda ? '' : `<div class="gf-leg">${leg}</div>`}`;
+    }
+    if (k === 0 && RA) {   // linha sobreposta com eixo próprio à direita (ex.: atendimentos)
+      const ml = escala(Math.max(4, ...o.linha.valores) * 1.15), y2 = v => T + (base - T) * (1 - v / ml.topo);
+      const pts = o.linha.valores.map((v, i) => [i * cw + cw / 2, y2(v || 0)]);
+      g += `<path d="${curvaSuave(pts)}" pathLength="1" class="gf-linha gf-l2"/>`;
+      // atendimentos: o número vai dentro do próprio ponto (bolinha); o valor do faturamento fica em cima
+      // do ponto dourado, ou embaixo dele quando a bolinha dos atendimentos está no caminho
+      if (o.dica) {
+        // cada dia: uma faixa invisível; ao passar o mouse (ou tocar) aparecem a guia, os pontos maiores e a dica com os valores
+        g += o.labels.map((l, i) => { const f = ptsF ? ptsF[i] : null, a = pts[i], vf = r.series[0].valores[i] || 0, va = o.linha.valores[i] || 0;
+          const dica = `${o.sub ? o.sub[i].charAt(0).toUpperCase() + o.sub[i].slice(1) + ', ' : ''}${l}|${r.series[0].nome}|${o.fmt ? r.fmt(vf) : brl(vf)}|${o.linha.nome}|${va}`;
+          return `<g class="gf-col${i === n - 1 ? ' ult' : ''}" style="--i:${Math.min(i, 60)}"><line x1="${i * cw + cw / 2}" x2="${i * cw + cw / 2}" y1="${T}" y2="${base}" class="gf-guia"/>`
+            + `<circle cx="${a[0]}" cy="${a[1]}" r="2.6" class="gf-pa"/>${f ? `<circle cx="${f[0]}" cy="${f[1]}" r="${i === n - 1 ? 4 : 3}" class="gf-pf"/>` : ''}`
+            + `<rect x="${i * cw}" y="${T - 6}" width="${cw}" height="${base - T + 6}" class="gf-hit" data-gf-tip="${esc(dica)}"/></g>`; }).join('');
+      } else
+      g += pts.map((p, i) => { const n = o.linha.valores[i] || 0, tt = `<title>${esc(o.labels[i])}${o.sub ? ' (' + esc(o.sub[i]) + ')' : ''} · ${esc(o.linha.nome)}: ${n}</title>`;
+        return o.valores && n > 0 ? `<g class="gf-bol">${tt}<circle cx="${p[0]}" cy="${p[1]}" r="${n > 99 ? 11 : 9}"/><text x="${p[0]}" y="${p[1] + 3.5}" text-anchor="middle">${n}</text></g>` : `<circle cx="${p[0]}" cy="${p[1]}" r="3" class="gf-ponto gf-l2">${tt}</circle>`; }).join('');
+      if (ptsF && !o.dica) g += ptsF.map((p, i) => { const v = r.series[0].valores[i] || 0; if (!(v > 0)) return '';
+        const yA = (o.linha.valores[i] || 0) > 0 ? pts[i][1] : 1e9, emCima = !(yA >= p[1] - 24 && yA <= p[1] + 4) || yA > p[1];
+        const ty = emCima ? p[1] - 9 : Math.min(base - 3, p[1] + 17);
+        return `<text x="${p[0]}" y="${ty}" text-anchor="middle" class="gf-valp${i === ptsF.length - 1 ? ' on' : ''}">${esc(r.fmt(v).replace('R$ ', ''))}</text>`; }).join('');
+      for (let v = 0, i = 0; v <= ml.topo + ml.passo / 2 && i < 8; i++, v = i * ml.passo) eixoD += `<text x="6" y="${y2(v) + 4}" class="gf-eixo gf-l2t">${Math.round(v)}</text>`;
+    }
+    if (ult) o.labels.forEach((l, i) => { const x = i * cw + cw / 2, on = i === n - 1;
+      g += `<text x="${x}" y="${base + 15}" text-anchor="middle" class="gf-eixo${on ? ' on' : ''}">${esc(l)}</text>`;
+      if (o.sub) g += `<text x="${x}" y="${base + 28}" text-anchor="middle" class="gf-eixo gf-dow${on ? ' on' : ''}${o.sub[i] === 'dom' ? ' dom' : ''}">${esc(o.sub[i])}</text>`; });
+    return { H, eixo, eixoD, g };
+  };
+  const rows = linhas.map(desenhar), rot = esc(o.titulo || 'Gráfico');
+  const leg = [...o.series.map((s, q) => `<span><i class="gfc-bg${s.cor || q + 1}"></i>${esc(s.nome)}</span>`), o.linha ? `<span><i class="${RA ? 'gf-l2b' : 'gfc-bgl2'}"></i>${esc(o.linha.nome)}${RA ? ' <small>(eixo da direita)</small>' : ''}</span>` : ''].join('');
+  const legenda = o.semLegenda ? '' : `<div class="gf-leg">${leg}${scroll ? '<span class="gf-dica">◀ arraste para ver os dias anteriores</span>' : ''}</div>`;
+  if (!scroll) return rows.map(r => `<svg viewBox="0 0 ${L + PW + RA} ${r.H}" class="gf-svg" role="img" aria-label="${rot}">${r.eixo}<g transform="translate(${L},0)">${r.g}</g>${RA ? `<g transform="translate(${L + PW},0)">${r.eixoD}</g>` : ''}</svg>`).join('') + legenda;
+  return `<div class="gf-wrap" role="img" aria-label="${rot}"><div class="gf-ax">${rows.map(r => `<svg width="${L}" height="${r.H}" viewBox="0 0 ${L} ${r.H}">${r.eixo}</svg>`).join('')}</div>
+    <div class="gf-sc" tabindex="0" aria-label="Rolar o gráfico"><div class="gf-in">${rows.map(r => `<svg width="${PW}" height="${r.H}" viewBox="0 0 ${PW} ${r.H}" class="gf-px">${r.g}</svg>`).join('')}</div></div>${RA ? `<div class="gf-ax">${rows.map(r => `<svg width="${RA}" height="${r.H}" viewBox="0 0 ${RA} ${r.H}">${r.eixoD}</svg>`).join('')}</div>` : ''}</div>${legenda}`;
 }
 function cartaoGrafico(titulo, sub, corpo) { return `<div class="panel gf-card"><div class="gf-hd"><b>${esc(titulo)}</b>${sub ? `<span class="muted small">${sub}</span>` : ''}</div>${corpo}</div>`; }
 /* bloco de evolução dos relatórios */
 function evolucaoRelatorio(ini, fim, fid) {
   const gran = UI.relGran || ((fromIso(fim) - fromIso(ini)) / 864e5 > 70 ? 'mes' : 'semana');
+  if (gran === 'dia' && fim > TODAY) fim = TODAY < ini ? ini : TODAY;   // dia a dia: não desenha os dias que ainda não chegaram
   const S = serieEvolucao(gran, ini, fim, fid), lab = S.B.map(b => b.rot), fat = veFaturamento() || fid === ACTOR.funcId;
+  const dd = gran === 'dia' ? { dia: true, datas: S.B.map(b => b.k), sub: S.B.map(b => b.sub) } : {};
   const tot = a => brl(sum(a)), cards = [], cg = (titulo, sub, cfg) => ({ titulo, sub, cfg });
   if (fat) cards.push(cg('Faturamento e atendimentos', `${tot(S.fat)} · ${sum(S.at)} atendimento(s)`, ({ labels: lab, series: [{ nome: 'Faturamento', valores: S.fat }], modo: 'barras', linha: { nome: 'Atendimentos', valores: S.at } })));
   else cards.push(cg('Atendimentos', `${sum(S.at)} no total`, ({ labels: lab, series: [{ nome: 'Atendimentos', valores: S.at }], modo: 'barras', fmt: v => String(Math.round(v)) })));
@@ -7914,22 +8110,46 @@ function evolucaoRelatorio(ini, fim, fid) {
     cards.push(cg('Faturamento por profissional', 'as 5 que mais faturaram no gráfico', ({ labels: lab, series: ps.map(([id, v], k) => ({ nome: (F(id)?.nome || '').split(' ')[0], valores: v, cor: k + 1 })), modo: 'linhas' })));
   }
   if (cards.length % 2) cards[0].cfg.largo = true;
-  const html = cards.map(c => cartaoGrafico(c.titulo, c.sub, grafico(c.cfg))).join('');
-  return `<div class="gf-sec"><div class="split" style="flex-wrap:wrap;gap:10px"><div class="sec" style="margin:0">Evolução ${gran === 'mes' ? 'mês a mês' : 'semana a semana'}</div>
-    <div class="seg" role="tablist"><button class="${gran === 'semana' ? 'on' : ''}" data-rel-gran="semana">Semana a semana</button><button class="${gran === 'mes' ? 'on' : ''}" data-rel-gran="mes">Mês a mês</button></div></div>
-    <div class="gf-grid">${html}</div><p class="muted small" style="margin:8px 2px 0">A última coluna é ${gran === 'mes' ? 'o mês' : 'a semana'} em andamento. Toque ou passe o mouse sobre as barras e pontos para ver os valores.</p></div>`;
+  const html = cards.map(c => cartaoGrafico(c.titulo, c.sub, grafico({ ...c.cfg, ...dd, titulo: c.titulo }))).join('');
+  return `<div class="gf-sec"><div class="split" style="flex-wrap:wrap;gap:10px"><div class="sec" style="margin:0">Evolução ${gran === 'mes' ? 'mês a mês' : gran === 'dia' ? 'dia a dia' : 'semana a semana'}</div>
+    <div class="seg" role="tablist"><button class="${gran === 'dia' ? 'on' : ''}" data-rel-gran="dia">Dia a dia</button><button class="${gran === 'semana' ? 'on' : ''}" data-rel-gran="semana">Semana a semana</button><button class="${gran === 'mes' ? 'on' : ''}" data-rel-gran="mes">Mês a mês</button></div></div>
+    <div class="gf-grid">${html}</div><p class="muted small" style="margin:8px 2px 0">A última coluna é ${gran === 'mes' ? 'o mês' : gran === 'dia' ? 'o último dia do período' : 'a semana'} em andamento. Toque ou passe o mouse sobre as barras e pontos para ver os valores.</p></div>`;
 }
-/* painel da proprietária: ritmo das últimas 12 semanas */
+/* painel da proprietária: ritmo do salão desde o primeiro serviço registrado no sistema, dia a dia (ou por semana/mês) */
+const GF_ANIMADO = new Set();   // a animação de entrada roda uma vez; as atualizações ao vivo não repetem
+let GF_ROTA = '';   // ao entrar de novo no Painel, a animação roda outra vez
+setTimeout(() => { const _r = render; render = function () { if (UI.route !== GF_ROTA) { GF_ANIMADO.clear(); GF_ROTA = UI.route; } return _r.apply(this, arguments); }; }, 0);
+function primeiroRegistro() { let m = ''; for (const x of ver(DB, ACTOR, 'atendimentos')) if (x.status === 'concluido' && x.data && (!m || x.data < m)) m = x.data; return m && m <= TODAY ? m : TODAY; }
 function ritmoPainelHTML() {
   if (!isOwner(ACTOR)) return '';
-  const S = serieEvolucao('semana', addDays(TODAY, -7 * 11), TODAY, '');
+  const gran = UI.ritmoGran || 'dia', ini = primeiroRegistro();
+  const S = serieEvolucao(gran, ini, TODAY, '', true);
   // compara os últimos 7 dias com os 7 anteriores (a semana atual ainda está em andamento)
   const somaDias = (a, b) => sum(ver(DB, ACTOR, 'atendimentos').filter(x => x.status === 'concluido' && x.data > addDays(TODAY, -a) && x.data <= addDays(TODAY, -b)).map(x => x.valorFinal || 0));
   const ult = somaDias(7, 0), ant = somaDias(14, 7), var_ = ant ? Math.round((ult - ant) * 100 / ant) : null;
-  return `<div class="panel gf-card gf-ritmo"><div class="gf-hd"><div><span class="eyebrow" style="margin:0 0 4px">Ritmo do salão</span><b>Faturamento das últimas 12 semanas</b></div>
-    <span class="gf-var ${var_ === null ? '' : var_ >= 0 ? 'sobe' : 'desce'}">${var_ === null ? brl(ult) + ' nos últimos 7 dias' : `${var_ >= 0 ? '▲' : '▼'} ${Math.abs(var_)}% <small>últimos 7 dias vs. 7 anteriores</small>`}</span></div>
-    ${grafico({ labels: S.B.map(b => b.rot), series: [{ nome: 'Faturamento', valores: S.fat }], modo: 'area', linha: { nome: 'Atendimentos', valores: S.at }, altura: CELULAR.matches ? 190 : 230, largo: true })}</div>`;
+  const dias = gran === 'dia' ? S.B.length : (() => { let n = 0; for (let d = ini; d <= TODAY; d = addDays(d, 1)) if (fromIso(d).getDay() !== 0) n++; return n; })(), tot = sum(S.fat), nAt = sum(S.at);
+  return `<div class="panel gf-card gf-ritmo"><div class="gf-hd"><div><span class="eyebrow" style="margin:0 0 4px">Ritmo do salão</span><b class="gf-tit">Faturamento ${gran === 'dia' ? 'dia a dia' : gran === 'semana' ? 'semana a semana' : 'mês a mês'}</b><div class="gf-desde">desde ${dBR(ini)}, o primeiro serviço registrado</div>
+      <div class="gf-kp"><span><small>Faturado</small><b>${brl(tot)}</b></span><span><small>Atendimentos</small><b>${nAt}</b></span><span><small>Dias abertos</small><b>${dias}</b></span><span><small>Média por dia</small><b>${dias ? brl(Math.round(tot / dias)) : '—'}</b></span></div></div>
+    <div class="gf-hd-r"><span class="gf-var ${var_ === null ? '' : var_ >= 0 ? 'sobe' : 'desce'}">${var_ === null ? brl(ult) + ' nos últimos 7 dias' : `${var_ >= 0 ? '▲' : '▼'} ${Math.abs(var_)}% <small>últimos 7 dias vs. 7 anteriores</small>`}</span>
+      <div class="seg" role="tablist" aria-label="Agrupar por">${[['dia', 'Dia'], ['semana', 'Semana'], ['mes', 'Mês']].map(([k, t]) => `<button class="${gran === k ? 'on' : ''}" data-ritmo-gran="${k}">${t}</button>`).join('')}</div></div></div>
+    <div class="${GF_ANIMADO.has(gran) ? 'gf-calmo' : 'gf-anim'}">${(GF_ANIMADO.add(gran), '')}${grafico({ labels: S.B.map(b => b.rot), sub: gran === 'dia' ? S.B.map(b => b.sub) : null, dia: gran === 'dia', datas: gran === 'dia' ? S.B.map(b => b.k) : null, titulo: 'Faturamento e atendimentos',
+      series: [{ nome: 'Faturamento', valores: S.fat }], modo: 'area', linha: { nome: 'Atendimentos', valores: S.at }, sobrepor: true, dica: true, minCw: gran === 'dia' ? (CELULAR.matches ? 40 : 46) : 0, altura: CELULAR.matches ? 210 : 250, largo: true })}</div></div>`;
 }
+/* dica do gráfico: aparece ao passar o mouse ou tocar num dia */
+(() => { let tip = null, alvo = null;
+  const esconder = () => { if (tip) tip.classList.remove('on'); if (alvo) alvo.closest('.gf-col')?.classList.remove('hov'); alvo = null; };
+  const mostrar = (el, x, y) => {
+    if (!tip) { tip = document.createElement('div'); tip.className = 'gf-tip'; tip.setAttribute('role', 'tooltip'); document.body.appendChild(tip); }
+    if (alvo !== el) { if (alvo) alvo.closest('.gf-col')?.classList.remove('hov'); alvo = el; el.closest('.gf-col')?.classList.add('hov');
+      const [d, n1, v1, n2, v2] = el.dataset.gfTip.split('|');
+      tip.innerHTML = `<b>${esc(d)}</b><span><i class="t1"></i>${esc(n1)}<em>${esc(v1)}</em></span><span><i class="t2"></i>${esc(n2)}<em>${esc(v2)}</em></span>`; }
+    tip.classList.add('on'); const w = tip.offsetWidth, h = tip.offsetHeight;
+    tip.style.left = Math.max(8, Math.min(innerWidth - w - 8, x - w / 2)) + 'px'; tip.style.top = Math.max(8, y - h - 16) + 'px'; };
+  document.addEventListener('pointermove', e => { const el = e.target.closest?.('[data-gf-tip]'); if (el) mostrar(el, e.clientX, e.clientY); else if (alvo) esconder(); }, { passive: true });
+  document.addEventListener('pointerdown', e => { const el = e.target.closest?.('[data-gf-tip]'); if (el) mostrar(el, e.clientX, e.clientY); else esconder(); }, { passive: true });
+  document.addEventListener('scroll', esconder, { passive: true, capture: true });
+})();
+document.addEventListener('click', e => { const b = e.target.closest('[data-ritmo-gran]'); if (!b) return; UI.ritmoGran = b.dataset.ritmoGran; render(); });
 document.addEventListener('click', e => { const b = e.target.closest('[data-rel-gran]'); if (!b) return; UI.relGran = b.dataset.relGran; render(); });
 /* =========================================================================
    INTERFACE — lê sempre pela camada de acesso (ver/linhasObrig) e grava só
@@ -8453,9 +8673,11 @@ function waContexto({ clienteId, agendamentoId, atendimentoId, parcelaId, pacote
   const base = ag || at;
   const cid = clienteId || base?.clienteId || pv?.clienteId;
   const cl = CL(cid), c = DB.config.whatsapp;
+  const atDoAg = !at && ag ? DB.atendimentos.find(x => x.agendamentoId === ag.id && x.status !== 'estornado') : null;
+  const numero = at ? at.codigo : atDoAg ? atDoAg.codigo : ag ? codigoAgendamento(DB, ag) : '';
   const valor = pc ? pc.valor : at ? sum(DB.parcelas.filter(p => p.atendimentoId === at.id && p.status === 'pendente').map(p => p.valor)) || at.valorFinal : ag?.preco;
   return { clienteId: cid, agendamentoId: ag?.id, atendimentoId: at?.id, pacoteVendaId: pv?.id, telefone: cl?.telefone || '', ctx: {
-    cliente: cl?.nome || '', primeiro_nome: (cl?.nome || '').split(' ')[0], servico: base ? SV(base.servicoId)?.nome : '',
+    cliente: cl?.nome || '', primeiro_nome: (cl?.nome || '').split(' ')[0], nome_sobrenome: nomeCurto(cl?.nome), numero_atendimento: numero, servico: base ? SV(base.servicoId)?.nome : '',
     data: base ? dBR(base.data) : '', hora: ag ? ag.inicio : '', profissional: base ? first(base.funcId) : '',
     valor: valor ? brl(valor) : '', pix: c.pix, endereco: c.endereco, salao: DB.config.nome, telefone_salao: c.numeroSalao, link_avaliacao: typeof linkAvaliacao === 'function' ? linkAvaliacao() : '', ...waExtras(ag, cid), ...(pv ? waPacoteCtx(DB, pv) : {}) } };
 }
@@ -8465,18 +8687,26 @@ function modalWhatsApp(ref = {}, modeloId) {
   const modelos = c.modelos.filter(m => podeWhatsApp(DB, ACTOR, m.id));
   if (!modelos.length) return toast('Seu usuário não tem mensagens liberadas. Fale com a proprietária.', 'bad');
   let W = waContexto(ref);
-  let mid = modelos.some(m => m.id === modeloId) ? modeloId : modelos[0].id;
+  let mid = modelos.some(m => m.id === modeloId) ? modeloId : (modelos.find(m => W.agendamentoId || !WA_EXIGE_AGENDAMENTO.has(m.id)) || modelos[0]).id;
   const midAviso = modeloId && modelos.some(m => m.id === modeloId) && modeloId !== 'pacote' && modeloId !== 'livre' && (ref.agendamentoId || ref.atendimentoId || ref.clienteId) ? modeloId : '';
   const ov = openModal('Mensagem no WhatsApp', `
     ${W.clienteId ? '' : `<label class="f">Cliente<select id="wa-cl">${opt([['', 'Selecione…'], ...DB.clientes.slice().sort((a, b) => a.nome.localeCompare(b.nome)).map(x => [x.id, x.nome])], '')}</select></label>`}
     <div class="wa-head"><div class="wa-av">${esc((W.ctx.cliente || '?').slice(0, 1))}</div><div style="min-width:0;flex:1"><div class="b" id="wa-nome">${esc(W.ctx.cliente || 'Escolha o cliente')}</div><input id="wa-tel" inputmode="tel" value="${esc(W.telefone)}" aria-label="Telefone do cliente" class="wa-tel"></div></div>
     <div><div class="sec" style="margin:0 0 8px">Mensagem pronta</div><div class="chips" id="wa-chips">${modelos.map(m => `<button class="chip ${m.id === mid ? 'on' : ''}" data-m="${m.id}">${esc(m.nome)}</button>`).join('')}</div></div>
+    <div class="note warn" id="wa-bloq" hidden></div>
     <div class="wa-bubble"><textarea id="wa-txt" aria-label="Texto da mensagem" rows="6"></textarea></div>
     <div class="muted small" id="wa-msg">O WhatsApp abre com o texto pronto. Você revisa e envia pelo aplicativo.</div>`,
     `${midAviso ? '<button class="btn bad-b" id="wa-nao" title="Tira este aviso da lista sem mandar mensagem">Não enviar mensagem</button><div class="grow"></div>' : ''}<button class="btn" id="wa-copy">Copiar texto</button><a class="btn wa" id="wa-go" target="_blank" rel="noopener">${icon('wa')}<span>Abrir no WhatsApp</span></a>`);
   const q = s => ov.querySelector(s);
-  const fill = () => { q('#wa-txt').value = waMensagem(c.modelos.find(m => m.id === mid).texto, W.ctx); upd(); };
+  // no fim de toda mensagem: nome e sobrenome da cliente + número do atendimento (para identificar a conversa)
+  const fill = () => { const corpo = waMensagem(c.modelos.find(m => m.id === mid).texto, W.ctx), rod = waRodape(W.ctx.cliente, W.ctx.numero_atendimento);
+    q('#wa-txt').value = rod && !corpo.includes(rod) ? `${corpo}\n\n${rod}` : corpo; upd(); };
+  const semAgenda = () => WA_EXIGE_AGENDAMENTO.has(mid) && !(W.agendamentoId && (() => { const g = DB.agendamentos.find(x => x.id === W.agendamentoId); return g && !INATIVOS.includes(g.status) && g.status !== 'concluido'; })());
   const upd = () => { const tel = waTelefone(q('#wa-tel').value), a = q('#wa-go');
+    const bl = semAgenda(); q('#wa-copy').disabled = bl; q('#wa-txt').disabled = bl; q('#wa-bloq').hidden = !bl; q('.wa-bubble').style.opacity = bl ? '.45' : '';
+    if (bl) { a.removeAttribute('href'); a.setAttribute('aria-disabled', 'true');
+      q('#wa-bloq').innerHTML = `<b>"${esc(c.modelos.find(m => m.id === mid).nome)}" só pode ser enviada com um agendamento já criado na agenda.</b> Crie o agendamento primeiro e mande a mensagem pelo botão do WhatsApp dele. As outras mensagens continuam liberadas.`;
+      q('#wa-msg').textContent = 'Envio bloqueado: não há agendamento para esta mensagem.'; q('#wa-msg').className = 'small b'; q('#wa-msg').style.color = 'var(--bad)'; return; }
     if (tel) { a.href = waLink(tel, q('#wa-txt').value); a.removeAttribute('aria-disabled'); q('#wa-msg').textContent = 'O WhatsApp abre com o texto pronto. Você revisa e envia pelo aplicativo.'; q('#wa-msg').className = 'muted small'; q('#wa-msg').style.color = ''; }
     else { a.removeAttribute('href'); a.setAttribute('aria-disabled', 'true'); q('#wa-msg').textContent = 'Telefone inválido. Use DDD + número, por exemplo (55) 99999-0000.'; q('#wa-msg').className = 'small b'; q('#wa-msg').style.color = 'var(--bad)'; } };
   q('#wa-chips').onclick = e => { const b = e.target.closest('[data-m]'); if (!b) return; mid = b.dataset.m; q('#wa-chips').querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x === b)); fill(); };
@@ -8492,7 +8722,7 @@ function modalWhatsApp(ref = {}, modeloId) {
     catch (err) { toast(err.message, 'bad'); return; }
     closeModal(); render(); toast('Aviso dispensado: a mensagem não será enviada');
   };
-  q('#wa-copy').onclick = () => { const t = q('#wa-txt'); const ok = () => { if (W.clienteId) registrar(); toast('Texto copiado'); }; const fb = () => { t.select(); toast('Texto selecionado. Use Copiar do aparelho.'); };
+  q('#wa-copy').onclick = () => { if (semAgenda()) return toast('Crie o agendamento na agenda antes de mandar esta mensagem.', 'bad'); const t = q('#wa-txt'); const ok = () => { if (W.clienteId) registrar(); toast('Texto copiado'); }; const fb = () => { t.select(); toast('Texto selecionado. Use Copiar do aparelho.'); };
     try { navigator.clipboard.writeText(t.value).then(ok, fb); } catch (err) { fb(); } };
   fill();
 }
@@ -8947,7 +9177,7 @@ function modalAgendamento(pref = {}) {
   q('#a-pk')?.addEventListener('click', () => { const cid = ov.querySelector('#a-cl')?.value;
     if (!cid || cid === '__novo') return toast('Escolha a cliente primeiro (cadastre se for nova).', 'bad');
     const conv = editaveis.filter(x => ABERTOS.includes(x.status) && !x.pacoteVendaId).map(x => x.id); calcHor();
-    closeModal(); modalVenderPacote('', cid, conv.length ? { converter: conv } : { primeira: { data: val('a-dt') || TODAY, inicio: fromMin(itens._st[0] ?? toMin(d.inicio)) } }); });
+    closeModal(); modalVenderPacote('', cid, conv.length ? { converter: conv } : { primeira: { data: val('a-dt') || TODAY, inicio: fromMin(itens._st[0] ?? toMin(d.inicio)), funcId: itens[0]?.funcId || '' } }); });
   const drawTotOnly = () => { const tot = sum(itens.map(x => x.preco || 0)); const b = q('#a-tot b:last-of-type'); const bs = q('#a-tot').querySelectorAll('b'); if (bs[1]) bs[1].textContent = brl(tot); };
   q('#a-add').onclick = () => { const last = itens[itens.length - 1]; itens.push({ servicoId: '', funcId: last?.funcId || fid0, dur: 0, preco: 0, modo: 'seq' }); draw(); q('#a-itens .srow:last-child .svb-in')?.focus(); };
   // mudou o "Começa às": todos os serviços andam juntos, mantendo os horários que a recepção ajustou
@@ -10275,7 +10505,7 @@ function modalVenderPacote(pacoteId = '', clienteId = '', opts = {}) {
   const trAt = opts.trocarAt && DB.atendimentos.find(x => x.id === opts.trocarAt && x.status === 'concluido');
   const conv = trAt ? [{ id: '__at', servicoId: trAt.servicoId, funcId: trAt.funcId, data: trAt.data, inicio: trAt.hora || '' }] : (opts.converter || []).map(id => DB.agendamentos.find(x => x.id === id)).filter(x => x && ABERTOS.includes(x.status) && !x.pacoteVendaId);
   const temSv = (x, id) => x.servicoId === id || (x.itens || []).some(i => i.servicoId === id);
-  let pc = pcs.find(x => x.id === pacoteId) || (conv[0] && pcs.find(x => temSv(x, conv[0].servicoId))) || pcs[0], ses = [];
+  let pc = pcs.find(x => x.id === pacoteId) || (conv[0] && pcs.find(x => temSv(x, conv[0].servicoId))) || pcs[0], ses = [], primeiroDesenho = true;
   const ov = openModal(conv.length ? 'Trocar por pacote' : 'Vender pacote', `<div class="stack" style="gap:14px">
     ${conv.length ? `<div class="note small">${conv.map(x => `<b>${dBR(x.data).slice(0, 5)} às ${x.inicio}</b> · ${esc(SV(x.servicoId)?.nome || '')}`).join('<br>')}<br>${trAt ? `O registro <b>${esc(trAt.codigo)}</b> (${brl(trAt.valorFinal)}) é <b>estornado</b> e o serviço feito vira a 1ª sessão do pacote, já <b>concluída</b>. Lance abaixo o valor total pago pelo pacote.` : opts.concluir ? 'Este atendimento vira a 1ª sessão do pacote e já fica <b>concluído</b>, sem cobrar de novo.' : 'Este horário vira a 1ª sessão do pacote (sem cobrança separada).'}</div>` : ''}
     <div><div class="sec" style="margin:0 0 6px">Cliente</div>${clientePickerHTML('pv', clienteId, !!conv.length)}</div>
@@ -10296,14 +10526,18 @@ function modalVenderPacote(pacoteId = '', clienteId = '', opts = {}) {
     conv.forEach(x => { const k = f.indexOf(x.servicoId); f.splice(k >= 0 ? k : 0, 1); }); return f; };
   const desenhar = () => {
     const sv = SV(pc.servicoId), fs = DB.funcionarios.filter(f => f.ativo && sv?.funcs.includes(f.id));
-    const fsel = q('#pv-f'), fv = fsel.value; fsel.innerHTML = opt(fs.map(f => [f.id, f.nome]), fs.some(f => f.id === fv) ? fv : (conv[0] && fs.some(f => f.id === conv[0].funcId) ? conv[0].funcId : fs[0]?.id));
+    // sem escolha automática: só vem preenchida quando já se sabe quem faz (horário trocado ou marcado na agenda)
+    const fsel = q('#pv-f'), fv = primeiroDesenho ? (opts.primeira?.funcId || conv[0]?.funcId || '') : fsel.value; primeiroDesenho = false;
+    fsel.innerHTML = `<option value="">${modoCm() === 'venda' ? 'Escolha a profissional…' : 'Sem preferência (escolher ao agendar)'}</option>` + opt(fs.map(f => [f.id, f.nome]), fs.some(f => f.id === fv) ? fv : '');
+    if (!fs.some(f => f.id === fv)) fsel.value = '';
     q('#pv-v').value = centsInput(pc.preco);
     const fila = filaServicos(), n = fila.length, d0 = opts.primeira?.data || (conv[0] ? addDays(conv[0].data, 7) : addDays(TODAY, 1)), sug = sugerirSessoes(n, d0);
     // horário sugerido: o primeiro livre a partir das 10h (ou logo depois da sessão anterior do mesmo dia)
     const livre = (d, svId, aPartir = '10:00') => { const dur = SV(svId)?.duracao || 60, func = SV(svId)?.funcs.includes(fsel.value) ? fsel.value : SV(svId)?.funcs[0];
       const ok = h => toMin(h) + dur <= 20 * 60 && !ocupacao(DB, func, d, h, fromMin(toMin(h) + dur), new Set(), svId);
       return [aPartir, ...FA_HORAS.filter(h => h > aPartir)].find(ok) || FA_HORAS.find(ok) || ''; };
-    ses = Array.from({ length: n }, (_, i) => ses[i] && !ses[i].auto ? ses[i] : { data: i === 0 && opts.primeira ? opts.primeira.data : sug[i], inicio: i === 0 && opts.primeira ? opts.primeira.inicio : '', servicoId: fila[i], auto: true });
+    const semProf = !fsel.value;   // sem profissional: as datas ficam em branco para marcar depois
+    ses = Array.from({ length: n }, (_, i) => ses[i] && !ses[i].auto ? ses[i] : { data: i === 0 && opts.primeira ? opts.primeira.data : semProf ? '' : sug[i], inicio: i === 0 && opts.primeira ? opts.primeira.inicio : '', servicoId: fila[i], auto: true });
     ses.forEach((x, i) => { if (!x.servicoId) x.servicoId = fila[i]; if (x.auto && x.data && !(i === 0 && opts.primeira)) { const ant = ses.slice(0, i).reverse().find(y => y.data === x.data && y.inicio); x.inicio = livre(x.data, x.servicoId, ant ? fromMin(toMin(ant.inicio) + (SV(ant.servicoId)?.duracao || 60)) : '10:00'); } });
     const opSv = misto() ? pc.itens.map(i => [i.servicoId, SV(i.servicoId)?.nome || '']) : null;
     q('#pv-ses').innerHTML = ses.map((x, i) => `<div class="pv-s ${misto() ? 'pv-s5' : ''}"><span class="pv-n">${i + 1 + conv.length}</span>${opSv ? `<select data-sv="${i}" aria-label="Serviço da sessão ${i + 1 + conv.length}">${opt(opSv, x.servicoId)}</select>` : ''}<input type="date" data-sd="${i}" value="${x.data}" aria-label="Data da sessão ${i + 1 + conv.length}"><select data-sh="${i}" aria-label="Horário da sessão ${i + 1 + conv.length}"><option value="">Sem horário</option>${opt(horasCom(x.inicio).map(h => [h, h]), x.inicio)}</select><button class="btn sm ghost" type="button" data-sx="${i}" aria-label="Deixar sessão ${i + 1 + conv.length} para depois">Depois</button></div>`).join('') || '<div class="muted small">Todas as sessões já estão marcadas.</div>';
@@ -10319,10 +10553,30 @@ function modalVenderPacote(pacoteId = '', clienteId = '', opts = {}) {
     q('#pv-res').innerHTML = `<b>${esc(pc.nome)}</b>: ${esc(composicaoTxt(pc))} por <b>${brl(toCents(q('#pv-v').value) || 0)}</b>. ${m} sessão(ões) vão para a agenda agora${pc.sessoes - m ? `, ${pc.sessoes - m} fica(m) para marcar depois` : ''}. O valor entra no faturamento agora. ${modoCm() === 'venda' ? `<b>Comissão na venda</b> para ${esc(fn(q('#pv-f').value) || 'a profissional escolhida')}, sobre o valor do pacote; as sessões depois não comissionam de novo.` : '<b>Sem comissão na venda</b>: cada sessão comissiona quem fizer, sobre a parte do pacote daquele serviço (proporcional ao preço de tabela).'}${pc.validadeDias ? ` Vale ${pc.validadeDias} dias.` : ''}`; };
   q('#pv-p').onchange = () => { pc = pcs.find(x => x.id === q('#pv-p').value); ses = []; desenhar(); };
   q('#pv-f').onchange = () => { ses = ses.map(x => x.auto ? null : x); desenhar(); };
-  ov.querySelectorAll('[name="pv-cm"]').forEach(r => r.onchange = () => { q('#pv-fl').textContent = modoCm() === 'venda' ? 'Profissional que recebe a comissão' : 'Profissional das sessões (preferência)'; resumo(); });
+  ov.querySelectorAll('[name="pv-cm"]').forEach(r => r.onchange = () => { q('#pv-fl').textContent = modoCm() === 'venda' ? 'Profissional que recebe a comissão' : 'Profissional das sessões (preferência)';
+    const o = q('#pv-f option[value=""]'); if (o) o.textContent = modoCm() === 'venda' ? 'Escolha a profissional…' : 'Sem preferência (escolher ao agendar)'; resumo(); });
   q('#pv-v').oninput = resumo;
   desenhar();
-  q('#pv-ok').onclick = () => { const r = run(() => { const cid = lerCliente(ov, 'pv'), v = toCents(q('#pv-v').value) || 0;
+  // etapa 1: confere e mostra o resumo; etapa 2 (após 5 s): vende
+  q('#pv-ok').onclick = () => {
+    let resumoHtml;
+    try {
+      const nomeCli = trAt ? esc(CL(trAt.clienteId)?.nome || '—') : nomeClienteTela(ov, 'pv'), v = toCents(q('#pv-v').value) || 0, fid = q('#pv-f').value, marcadas = ses.filter(x => x.data && x.inicio);
+      if (!(v > 0)) throw new Error('Informe o valor cobrado.');
+      if (!fid && modoCm() === 'venda') throw new Error('Escolha a profissional que recebe a comissão do pacote.');
+      if (!fid && marcadas.length) throw new Error('Escolha a profissional das sessões que já vão para a agenda, ou deixe as datas em branco para marcar depois.');
+      if (ses.some(x => x.data && !x.inicio)) throw new Error('Escolha o horário de todas as sessões com data, ou apague a data.');
+      resumoHtml = rvLinha('Cliente', nomeCli) + rvLinha('Pacote', `${esc(pc.nome)} · ${esc(composicaoTxt(pc))}`)
+        + rvLinha('Valor cobrado', `<b>${brl(v)}</b>`) + rvLinha('Pagamento', `${FORMAS[q('#pv-fp').value]} · ${q('#pv-st').value === 'pendente' ? 'pendente' : 'recebido'} · ${dBR(q('#pv-d').value)}`)
+        + rvLinha('Comissão', modoCm() === 'venda' ? `agora, para <b>${esc(fn(fid))}</b>` : 'depois, para quem fizer cada sessão')
+        + rvLinha('Profissional das sessões', fid ? `<b>${esc(fn(fid))}</b>` : '<span class="muted">sem preferência (escolher ao agendar)</span>')
+        + conv.map(x => `<div class="rv-s"><b>${dBR(x.data)} ${x.inicio} · ${esc(SV(x.servicoId)?.nome || '—')}</b><small>${trAt ? 'serviço já feito, vira a 1ª sessão' : 'horário já marcado, vira sessão do pacote'}</small></div>`).join('')
+        + marcadas.map(x => `<div class="rv-s"><b>${dBR(x.data)} ${x.inicio} · ${esc(SV(x.servicoId)?.nome || '—')}</b><small>vai para a agenda com <b>${esc(fn(fid))}</b></small></div>`).join('')
+        + rvLinha('Sessões para marcar depois', String(pc.sessoes - marcadas.length - conv.length));
+    } catch (e) { toast(e.message, 'bad'); return; }
+    revisar({ titulo: trAt ? 'Revise a troca por pacote' : 'Revise a venda do pacote', html: resumoHtml, label: 'Confirmar venda', onOk: gravarVenda });
+  };
+  const gravarVenda = () => { const r = run(() => { const cid = lerCliente(ov, 'pv'), v = toCents(q('#pv-v').value) || 0;
       const base = { pacoteId: pc.id, funcId: q('#pv-f').value, comissao: modoCm(), valor: v, data: q('#pv-d').value, parcelas: [{ forma: q('#pv-fp').value, valor: v, status: q('#pv-st').value }],
         sessoes: ses.filter(x => x.data && x.inicio).map(x => ({ data: x.data, inicio: x.inicio, servicoId: x.servicoId })) };
       if (trAt) return trocarAtendimentoPorPacote(DB, ACTOR, trAt.id, base);
@@ -10462,9 +10716,19 @@ function modalSessaoPacote(vendaId) {
   const ov = openModal(v.tipo === 'credito' ? 'Agendar pelo saldo' : 'Marcar sessão do pacote', `<div class="note small"><b>${esc(CL(v.clienteId)?.nome)}</b> · ${esc(v.nome)} · ${st.usadas + st.marcadas} de ${v.sessoes} sessões usadas ou marcadas${v.validoAte ? ` · vale até ${dBR(v.validoAte)}` : ''}</div>
     ${misto ? `<div><div class="sec" style="margin:0 0 6px">Qual serviço do pacote?</div><div class="pk-esc">${comSaldo.map((i, k) => `<label class="chk"><input type="checkbox" data-ps-sv="${i.servicoId}" ${k === 0 ? 'checked' : ''}> <span>${esc(SV(i.servicoId)?.nome || '')} <small class="muted">· resta(m) ${i.livres}</small></span></label>`).join('')}</div><div class="muted small" style="margin-top:4px">Marque mais de um para fazer no mesmo dia (ex.: a mão e o pé): ficam um depois do outro.</div></div>` : ''}
     <div class="form"><label class="f">Dia<input type="date" id="ps-d" value="${sug < TODAY ? TODAY : sug}"${v.validoAte ? ` max="${v.validoAte}"` : ''}></label><label class="f">Horário<select id="ps-h">${opt(horasCom(ult?.inicio).map(h => [h, h]), ult?.inicio || '10:00')}</select></label>
-    <label class="f full">Profissional<select id="ps-f">${opt(fs.map(f => [f.id, f.nome]), v.funcId)}</select></label></div>`,
+    <label class="f full">Profissional<select id="ps-f">${fs.some(f => f.id === v.funcId) ? '' : '<option value="" selected>Escolha quem vai fazer…</option>'}${opt(fs.map(f => [f.id, f.nome]), fs.some(f => f.id === v.funcId) ? v.funcId : '')}</select></label></div>`,
     `<button class="btn" data-close>Cancelar</button><button class="btn pri" id="ps-ok">Marcar na agenda</button>`);
-  ov.querySelector('#ps-ok').onclick = () => run(() => { const ids = [...ov.querySelectorAll('[data-ps-sv]:checked')].map(x => x.dataset.psSv);
+  ov.querySelector('#ps-ok').onclick = () => {
+    const ids = [...ov.querySelectorAll('[data-ps-sv]:checked')].map(x => x.dataset.psSv);
+    if (misto && !ids.length) return toast('Marque qual serviço do pacote.', 'bad');
+    if (!val('ps-f')) return toast('Escolha a profissional que vai fazer a sessão.', 'bad');
+    if (!val('ps-d')) return toast('Escolha o dia.', 'bad');
+    revisar({ titulo: 'Revise a sessão do pacote', label: 'Marcar na agenda', onOk: gravarSessaoAg,
+      html: rvLinha('Cliente', esc(CL(v.clienteId)?.nome)) + rvLinha('Pacote', `${esc(v.nome)} · ${esc(v.codigo)}`) + rvLinha('Data e hora', `${dBR(val('ps-d'))} (${diaSemana(val('ps-d'))}) às ${esc(val('ps-h'))}`)
+        + (misto ? ids : [v.servicoId]).map(id => `<div class="rv-s"><b>${esc(SV(id)?.nome || '—')}</b><small>com <b>${esc(fn(val('ps-f')))}</b></small></div>`).join('')
+        + rvLinha('Sessões usadas ou marcadas depois', `${st.usadas + st.marcadas + (misto ? ids.length : 1)} de ${v.sessoes}`) });
+  };
+  const gravarSessaoAg = () => run(() => { const ids = [...ov.querySelectorAll('[data-ps-sv]:checked')].map(x => x.dataset.psSv);
     if (misto && !ids.length) throw new Error('Marque qual serviço do pacote.');
     return agendarSessoesPacote(DB, ACTOR, vendaId, { data: val('ps-d'), inicio: val('ps-h'), funcId: val('ps-f'), servicoIds: ids }); }, ids => ids.length > 1 ? `${ids.length} sessões marcadas na agenda` : 'Sessão marcada na agenda').ok && closeModal();
 }
@@ -10930,29 +11194,45 @@ const TELAS = () => Object.fromEntries(NAV.map(n => [n.id, n.t]));
 const tipoAparelho = () => { const ua = navigator.userAgent || ''; const app = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
   return (/iPad|Tablet/i.test(ua) ? 'Tablet' : /Mobi|Android|iPhone/i.test(ua) ? 'Celular' : 'Computador') + (app ? ' · app' : ' · navegador'); };
 const ONLINE_DESDE = { uid: '', t: 0 };
-function onlineAgora() {
-  if (Array.isArray(window.ONLINE_PROD)) return window.ONLINE_PROD.filter(x => x && x.uid && DB.users.some(u => u.id === x.uid && !u.excluido));
-  const u = usuarioSessao(); if (!u) return [];
-  if (ONLINE_DESDE.uid !== u.id) { ONLINE_DESDE.uid = u.id; ONLINE_DESDE.t = Date.now(); }
-  return [{ uid: u.id, nome: u.nome, aparelho: tipoAparelho(), tela: UI.route, desde: ONLINE_DESDE.t, eu: true }];
+/* aparelhos de cada pessoa: o canal ao vivo (quem está com o sistema aberto na tela agora) somado às sessões
+   gravadas no banco (todo aparelho logado, inclusive celular com o app em segundo plano) */
+const ONLINE_MIN = 3;   // visto nos últimos 3 minutos = usando agora
+function aparelhosSessao() {
+  const vivos = Array.isArray(window.ONLINE_PROD) ? window.ONLINE_PROD.filter(x => x && x.uid) : null;
+  const meu = window.ID_APARELHO;
+  if (!vivos) {   // demonstração: só este aparelho
+    const u = usuarioSessao(); if (!u) return [];
+    if (ONLINE_DESDE.uid !== u.id) { ONLINE_DESDE.uid = u.id; ONLINE_DESDE.t = Date.now(); }
+    return [{ uid: u.id, nome: u.nome, aparelho: tipoAparelho(), tela: UI.route, desde: ONLINE_DESDE.t, visto: Date.now(), aoVivo: true, eu: true }];
+  }
+  const m = new Map();
+  (window.SESSOES_PROD || []).forEach(r => m.set(r.ap, { uid: r.uid, nome: r.nome, aparelho: r.aparelho, tela: r.tela, desde: +r.desde || 0, visto: Date.parse(r.visto) || 0, ap: r.ap, aoVivo: false }));
+  vivos.forEach(x => { const k = x.ap || ('v' + x.uid + x.desde); const a = m.get(k);
+    m.set(k, { ...(a || {}), ...x, ap: k, visto: Date.now(), aoVivo: true, ...(a && a.uid !== x.uid ? {} : {}) }); });
+  return [...m.values()].filter(x => DB.users.some(u => u.id === x.uid && !u.excluido)).map(x => ({ ...x, eu: !!meu && x.ap === meu, agora: x.aoVivo || Date.now() - x.visto < ONLINE_MIN * 60e3 }));
 }
+function onlineAgora() { return aparelhosSessao().filter(x => x.agora); }
 const pessoasOnline = L => [...new Set(L.map(x => x.uid))];
-const haQuanto = t => { const m = Math.max(0, Math.round((Date.now() - (t || Date.now())) / 60000)); return m < 1 ? 'agora' : m < 60 ? `há ${m} min` : `há ${Math.floor(m / 60)} h${m % 60 ? ' ' + (m % 60) + ' min' : ''}`; };
+const haQuanto = t => { const m = Math.max(0, Math.round((Date.now() - (t || Date.now())) / 60000)); return m < 1 ? 'agora' : m < 60 ? `há ${m} min` : m < 1440 ? `há ${Math.floor(m / 60)} h${m % 60 ? ' ' + (m % 60) + ' min' : ''}` : `há ${Math.floor(m / 1440)} dia(s)`; };
+const quandoTxt = t => { if (!t) return ''; const d = new Date(t); return Date.now() - t < 864e5 ? haQuanto(t) : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} às ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
 function onlineBotao() { const n = pessoasOnline(onlineAgora()).length; return `<button class="online-b" data-online title="Quem está online agora" aria-label="${n} pessoa(s) online agora"><i></i><span>${n} online</span></button>`; }
 function onlineListaHTML() {
-  const L = onlineAgora(), tl = TELAS(), por = new Map();
-  L.forEach(x => { if (!por.has(x.uid)) por.set(x.uid, []); por.get(x.uid).push(x); });
+  const A = aparelhosSessao(), tl = TELAS(), por = new Map();
+  A.forEach(x => { if (!por.has(x.uid)) por.set(x.uid, []); por.get(x.uid).push(x); });
   const ativos = DB.users.filter(u => !u.excluido && u.papel !== 'suporte' && (isOwner(u) || (F(u.funcId)?.ativo && F(u.funcId)?.acesso !== 'bloqueado')));
-  const on = [...por.entries()].map(([uid, ap]) => ({ u: DB.users.find(x => x.id === uid), ap: ap.sort((a, b) => (a.desde || 0) - (b.desde || 0)) })).filter(x => x.u).sort((a, b) => a.u.nome.localeCompare(b.u.nome));
+  const lista = [...por.entries()].map(([uid, ap]) => ({ u: DB.users.find(x => x.id === uid), ap: ap.sort((a, b) => (b.agora - a.agora) || (b.visto - a.visto)) })).filter(x => x.u).sort((a, b) => a.u.nome.localeCompare(b.u.nome));
+  const on = lista.filter(x => x.ap.some(a => a.agora)), logados = lista.filter(x => !x.ap.some(a => a.agora));
   const fora = ativos.filter(u => !por.has(u.id)).sort((a, b) => a.nome.localeCompare(b.nome));
-  const linha = (u, ap) => `<div class="on-l"><span class="on-av ${ap ? 'on' : ''}">${esc((u.nome || '?')[0])}</span><div class="on-t"><b>${esc(u.nome)}</b><span class="muted small">${esc(cargoNome(DB, u))}</span>
-      ${ap ? ap.map(x => `<span class="small on-ap">${esc(x.aparelho || 'Aparelho')}${x.tela && tl[x.tela] ? ` · em <b>${esc(tl[x.tela])}</b>` : ''} · conectada ${haQuanto(x.desde)}${x.eu || (window.ID_APARELHO && x.ap === window.ID_APARELHO) ? ' · <i>este aparelho</i>' : ''}</span>`).join('') : `<span class="small muted">${u.ultimoAcesso ? 'Último acesso: ' + esc(u.ultimoAcesso) : 'Ainda não entrou no sistema'}</span>`}</div>
-      ${ap ? '<span class="pill ok on-pill">Online</span>' : ''}</div>`;
-  return `<div class="on-box"><div class="sec" style="margin:0 0 8px">Online agora · ${on.length}</div>${on.length ? on.map(x => linha(x.u, x.ap)).join('') : '<div class="muted small">Ninguém conectado agora.</div>'}
+  const ap1 = x => `<span class="small on-ap">${x.agora ? '<b class="on-dot" aria-hidden="true">●</b> ' : ''}${esc(x.aparelho || 'Aparelho')}${x.tela && tl[x.tela] ? ` · em <b>${esc(tl[x.tela])}</b>` : ''} · ${x.agora ? `conectada ${haQuanto(x.desde)}` : `logada, sem usar agora · visto ${quandoTxt(x.visto)}`}${x.eu ? ' · <i>este aparelho</i>' : ''}</span>`;
+  const linha = (u, ap, tipo) => `<div class="on-l"><span class="on-av ${tipo === 'on' ? 'on' : tipo === 'log' ? 'log' : ''}">${esc((u.nome || '?')[0])}</span><div class="on-t"><b>${esc(u.nome)}</b><span class="muted small">${esc(cargoNome(DB, u))}${ap && ap.length > 1 ? ` · ${ap.length} aparelhos` : ''}</span>
+      ${ap ? ap.map(ap1).join('') : `<span class="small muted">${u.ultimoAcesso ? 'Último acesso: ' + esc(u.ultimoAcesso) : 'Ainda não entrou no sistema'}</span>`}</div>
+      ${tipo === 'on' ? '<span class="pill ok on-pill">Online</span>' : tipo === 'log' ? '<span class="pill on-pill">Logada</span>' : ''}</div>`;
+  return `<div class="on-box"><div class="sec" style="margin:0 0 8px">Online agora · ${on.length}</div>${on.length ? on.map(x => linha(x.u, x.ap, 'on')).join('') : '<div class="muted small">Ninguém usando agora.</div>'}
+    ${logados.length ? `<div class="sec" style="margin:16px 0 8px">Logados, sem usar agora · ${logados.length}</div><div class="muted small" style="margin:-4px 0 6px">Aparelho com o sistema aberto em segundo plano ou com a tela apagada (comum no celular).</div>${logados.map(x => linha(x.u, x.ap, 'log')).join('')}` : ''}
     ${fora.length ? `<div class="sec" style="margin:16px 0 8px">Fora do sistema · ${fora.length}</div>${fora.map(u => linha(u, null)).join('')}` : ''}
-    ${Array.isArray(window.ONLINE_PROD) ? '' : '<div class="note small" style="margin-top:12px">Na demonstração aparece só este aparelho. No sistema publicado aparecem todos os aparelhos conectados, ao vivo.</div>'}</div>`;
+    ${Array.isArray(window.ONLINE_PROD) ? '' : '<div class="note small" style="margin-top:12px">Na demonstração aparece só este aparelho. No sistema publicado aparecem todos os aparelhos logados (computador, celular e tablet).</div>'}</div>`;
 }
-function modalOnline() { openModal('Quem está online', `<div id="online-modal">${onlineListaHTML()}</div>`, `<button class="btn pri" data-close>Fechar</button>`); }
+function modalOnline() { try { if (typeof carregarSessoes === 'function') carregarSessoes(); } catch (e) { } openModal('Quem está online', `<div id="online-modal">${onlineListaHTML()}</div>`, `<button class="btn pri" data-close>Fechar</button>`); }
 /* chegou a lista nova: atualiza só os pedaços da tela (sem redesenhar a página) */
 function atualizarOnline() {
   if (!REAL || !isOwner(REAL)) return;
@@ -11165,7 +11445,7 @@ function pgTestes() {
 }
 function pgWhatsApp() {
   const c = DB.config.whatsapp;
-  const amostra = { cliente: 'Mariana Alves', primeiro_nome: 'Mariana', servico: 'Mechas completas', data: dBR(addDays(TODAY, 1)), hora: '09:00', profissional: 'Ana', valor: brl(22000), pix: c.pix, endereco: c.endereco, salao: DB.config.nome, telefone_salao: c.numeroSalao };
+  const amostra = { cliente: 'Mariana Alves', primeiro_nome: 'Mariana', nome_sobrenome: 'Mariana Alves', numero_atendimento: 'AG-128', servico: 'Mechas completas', data: dBR(addDays(TODAY, 1)), hora: '09:00', profissional: 'Ana', valor: brl(22000), pix: c.pix, endereco: c.endereco, salao: DB.config.nome, telefone_salao: c.numeroSalao };
   const ult = (DB.contatos || []).slice(0, 8);
   return `
   <div class="ph"><div><h1>WhatsApp</h1><p>Mensagens prontas para a equipe confirmar horários, lembrar, reagendar e cobrar. O sistema abre a conversa com o texto preenchido. Quem envia é a pessoa, pelo WhatsApp do aparelho.</p></div>
@@ -11190,7 +11470,7 @@ function pgWhatsApp() {
           ${m.padrao ? '' : `<button class="btn sm ghost dng" data-wm-del="${m.id}">Remover</button>`}</div>
         <textarea class="wm-txt" rows="4" aria-label="Texto da mensagem ${esc(m.nome)}">${esc(m.texto)}</textarea>
         <div class="chips sm">${WA_VARS.map(([k, t]) => `<button class="chip" data-var="${k}" title="${esc(t)}">{${k}}</button>`).join('')}</div>
-        <div class="wa-bubble prev"><div class="wm-prev">${esc(waMensagem(m.texto, amostra))}</div></div>
+        <div class="wa-bubble prev"><div class="wm-prev">${esc(waMensagem(m.texto, amostra) + '\n\n' + waRodape('Mariana Alves', 'AG-128'))}</div></div>
         ${m.id === 'cobranca' ? '<div class="muted small">Quem pode cobrar é definido por pessoa em <a href="#" data-go="equipe">Equipe e acessos</a>.</div>' : `<label class="switch sm"><input type="checkbox" class="wm-func" ${m.func ? 'checked' : ''}><span></span>Liberada para funcionários</label>`}
       </div>`).join('')}</div>
     <div class="panel"><h2>Últimas conversas abertas</h2>${ult.length ? ult.map(x => `<div class="split small"><span>${cliNome(x.clienteId, 'full', '—')} · ${esc(x.modelo)}</span><span class="muted">${esc(x.usuario)} · ${esc(x.quando)}</span></div>`).join('') : '<span class="muted small">Nenhuma conversa aberta ainda.</span>'}
@@ -11249,15 +11529,15 @@ const AFTER = {
     document.querySelectorAll('[data-eqf]').forEach(b => b.onclick = () => { UI.eqFiltro = b.dataset.eqf; render(); });
   },
   whatsapp() {
-    const amostra = () => { const c = DB.config.whatsapp; return { cliente: 'Mariana Alves', primeiro_nome: 'Mariana', servico: 'Mechas completas', data: dBR(addDays(TODAY, 1)), hora: '09:00', profissional: 'Ana', valor: brl(22000), pix: val('wc-pix'), endereco: val('wc-end'), salao: DB.config.nome, telefone_salao: val('wc-tel') }; };
+    const amostra = () => { const c = DB.config.whatsapp; return { cliente: 'Mariana Alves', primeiro_nome: 'Mariana', nome_sobrenome: 'Mariana Alves', numero_atendimento: 'AG-128', servico: 'Mechas completas', data: dBR(addDays(TODAY, 1)), hora: '09:00', profissional: 'Ana', valor: brl(22000), pix: val('wc-pix'), endereco: val('wc-end'), salao: DB.config.nome, telefone_salao: val('wc-tel') }; };
     let lastTa = null;
     const coletar = () => ({ ativo: document.getElementById('wc-on').checked, funcionarios: document.getElementById('wc-func').checked, numeroSalao: val('wc-tel'), pix: val('wc-pix'), endereco: val('wc-end'),
       modelos: [...document.querySelectorAll('[data-wm]')].map(el => { const old = DB.config.whatsapp.modelos.find(m => m.id === el.dataset.wm) || {}; return { ...old, id: el.dataset.wm, nome: el.querySelector('.wm-nome').value.trim(), texto: el.querySelector('.wm-txt').value, func: el.querySelector('.wm-func') ? el.querySelector('.wm-func').checked : !!old.func }; }) });
     document.querySelectorAll('[data-wm]').forEach(el => {
       const ta = el.querySelector('.wm-txt'), pv = el.querySelector('.wm-prev');
-      ta.addEventListener('focus', () => { lastTa = ta; }); ta.addEventListener('input', () => { pv.textContent = waMensagem(ta.value, amostra()); });
+      ta.addEventListener('focus', () => { lastTa = ta; }); ta.addEventListener('input', () => { pv.textContent = waMensagem(ta.value, amostra()) + '\n\n' + waRodape('Mariana Alves', 'AG-128'); });
       el.querySelectorAll('[data-var]').forEach(b => b.onclick = () => { const s = ta.selectionStart ?? ta.value.length, e2 = ta.selectionEnd ?? s, ins = '{' + b.dataset.var + '}';
-        ta.value = ta.value.slice(0, s) + ins + ta.value.slice(e2); ta.focus(); ta.setSelectionRange(s + ins.length, s + ins.length); pv.textContent = waMensagem(ta.value, amostra()); });
+        ta.value = ta.value.slice(0, s) + ins + ta.value.slice(e2); ta.focus(); ta.setSelectionRange(s + ins.length, s + ins.length); pv.textContent = waMensagem(ta.value, amostra()) + '\n\n' + waRodape('Mariana Alves', 'AG-128'); });
     });
     ['wc-pix', 'wc-end', 'wc-tel'].forEach(id => document.getElementById(id).addEventListener('input', () => document.querySelectorAll('[data-wm]').forEach(el => { el.querySelector('.wm-prev').textContent = waMensagem(el.querySelector('.wm-txt').value, amostra()); })));
     document.getElementById('wc-save').onclick = () => run(() => salvarConfigWhatsApp(DB, ACTOR, coletar()), 'Configurações do WhatsApp salvas');
@@ -12246,26 +12526,63 @@ async function medirEspaco() {
 const PRESENCA = { canal: null, j: '', t: 0, uid: '', desde: 0 };
 const idAparelho = () => { try { let x = localStorage.getItem('lagriff.aparelho'); if (!x) { x = 'ap' + Math.random().toString(36).slice(2, 10); localStorage.setItem('lagriff.aparelho', x); } return x; } catch (e) { return PRESENCA.ap || (PRESENCA.ap = 'ap' + Math.random().toString(36).slice(2, 10)); } };
 function anunciarPresenca() {
-  const ch = PRESENCA.canal; if (!ch) return;
   const u = typeof usuarioSessao === 'function' && DB ? usuarioSessao() : null;
+  gravarSessaoAparelho(u);
+  const ch = PRESENCA.canal; if (!ch) return;
   if (!u) { if (PRESENCA.j) { PRESENCA.j = ''; PRESENCA.uid = ''; try { ch.untrack(); } catch (e) { } } return; }
   if (PRESENCA.uid !== u.id) { PRESENCA.uid = u.id; PRESENCA.desde = Date.now(); }
   const st = { uid: u.id, nome: u.nome, aparelho: tipoAparelho(), tela: UI.route || '', desde: PRESENCA.desde, ap: idAparelho() };
   const j = JSON.stringify(st); if (j === PRESENCA.j) return;
   PRESENCA.j = j; try { ch.track(st); } catch (e) { PRESENCA.j = ''; }
 }
+/* sessões gravadas no banco: cada aparelho logado registra quem está usando e quando foi visto pela última vez.
+   Assim aparecem também os celulares com o app em segundo plano (o canal ao vivo cai quando a tela apaga). */
+const SESSAO_AP = { uid: null, t: 0, tela: '' };
+async function gravarSessaoAparelho(u, forcar) {
+  if (!PROD.sb || PROD.modo !== 'equipe') return;
+  try {
+    if (!u) { if (SESSAO_AP.uid) { SESSAO_AP.uid = null; await PROD.sb.from('sessoes').delete().eq('ap', idAparelho()); } return; }
+    const agora = Date.now(), mudou = SESSAO_AP.uid !== u.id;
+    if (!forcar && !mudou && agora - SESSAO_AP.t < 60e3 && SESSAO_AP.tela === (UI.route || '')) return;
+    if (!forcar && !mudou && agora - SESSAO_AP.t < 15e3) return;   // trocou de tela: no máximo a cada 15 s
+    SESSAO_AP.uid = u.id; SESSAO_AP.t = agora; SESSAO_AP.tela = UI.route || '';
+    if (mudou || !PRESENCA.desde) PRESENCA.desde = PRESENCA.uid === u.id && PRESENCA.desde ? PRESENCA.desde : agora;
+    await PROD.sb.from('sessoes').upsert({ ap: idAparelho(), uid: u.id, nome: u.nome, aparelho: tipoAparelho(), tela: UI.route || '', desde: PRESENCA.desde || agora, visto: new Date().toISOString() });
+  } catch (e) { }
+}
+async function carregarSessoes() {
+  if (!PROD.sb || PROD.modo !== 'equipe') return;
+  try {
+    const { data, error } = await PROD.sb.from('sessoes').select('*').gte('visto', new Date(Date.now() - 30 * 864e5).toISOString()).order('visto', { ascending: false });
+    if (error || !data) return; window.SESSOES_PROD = data; try { atualizarOnline(); } catch (e) { }
+  } catch (e) { }
+}
 function ligarPresenca() {
-  if (PRESENCA.canal || !PROD.sb) return;
+  if (PRESENCA.canal || PRESENCA.ligando || !PROD.sb) return;
+  PRESENCA.ligando = true;
   const ch = PROD.sb.channel('lagriff-online', { config: { presence: { key: idAparelho() } } });
   ch.on('presence', { event: 'sync' }, () => {
     const st = ch.presenceState() || {};
     window.ONLINE_PROD = Object.values(st).map(l => (l || [])[(l || []).length - 1]).filter(Boolean);
     try { atualizarOnline(); } catch (e) { }
   });
-  ch.subscribe(s => { if (s === 'SUBSCRIBED') { PRESENCA.canal = ch; PRESENCA.j = ''; anunciarPresenca(); } });
+  // o canal ao vivo cai (servidor reinicia, celular dorme): liga de novo sozinho
+  ch.subscribe(s => {
+    if (s === 'SUBSCRIBED') { PRESENCA.canal = ch; PRESENCA.ligando = false; PRESENCA.j = ''; anunciarPresenca(); }
+    else if (s === 'CHANNEL_ERROR' || s === 'TIMED_OUT' || s === 'CLOSED') {
+      if (PRESENCA.canal !== ch && !PRESENCA.ligando) return;
+      PRESENCA.canal = null; PRESENCA.ligando = false; try { PROD.sb.removeChannel(ch); } catch (e) { }
+      clearTimeout(PRESENCA.rt); PRESENCA.rt = setTimeout(ligarPresenca, 3000);
+    }
+  });
   window.ONLINE_PROD = window.ONLINE_PROD || []; window.ID_APARELHO = idAparelho();
+  if (PRESENCA.iniciado) return; PRESENCA.iniciado = true;
   const _r = render; render = function () { _r.apply(this, arguments); clearTimeout(PRESENCA.t); PRESENCA.t = setTimeout(anunciarPresenca, 400); };
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) { PRESENCA.j = ''; anunciarPresenca(); } });
+  const voltar = () => { if (document.hidden) return; PRESENCA.j = ''; if (!PRESENCA.canal) { clearTimeout(PRESENCA.rt); ligarPresenca(); } anunciarPresenca(); gravarSessaoAparelho(typeof usuarioSessao === 'function' && DB ? usuarioSessao() : null, true); };
+  document.addEventListener('visibilitychange', voltar); window.addEventListener('focus', voltar); window.addEventListener('online', voltar); window.addEventListener('pageshow', voltar);
+  setInterval(() => { if (!document.hidden) gravarSessaoAparelho(typeof usuarioSessao === 'function' && DB ? usuarioSessao() : null); }, 60e3);
+  setInterval(() => { if (document.getElementById('online-modal') || document.getElementById('online-eq')) carregarSessoes(); }, 30e3);
+  carregarSessoes();
 }
 
 /* recebe os envios das clientes e mantém a página pública atualizada */
